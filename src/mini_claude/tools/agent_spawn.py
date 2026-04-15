@@ -58,7 +58,11 @@ class SpawnAgentTool(BaseTool):
             from ..agent.graph import build_agent_graph_no_checkpoint
             from ..agent.state import create_initial_state
             from ..llm.prompts import get_subagent_prompt
+            from ..tools.file_ops import set_current_agent
             from langchain_core.messages import AIMessage
+
+            # Set current agent ID for file locking
+            set_current_agent(agent_id)
 
             if progress_callback:
                 await progress_callback(0.1, "Starting sub-agent")
@@ -229,7 +233,11 @@ class SpawnParallelTool(BaseTool):
             async def subagent_task(t=task, aid=agent_id, progress_callback=None):
                 from ..agent.graph import build_agent_graph_no_checkpoint
                 from ..agent.state import create_initial_state
+                from ..tools.file_ops import set_current_agent
                 from langchain_core.messages import AIMessage
+
+                # Set current agent ID for file locking
+                set_current_agent(aid)
 
                 if progress_callback:
                     await progress_callback(0.1, "Starting")
