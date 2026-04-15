@@ -17,7 +17,7 @@ class RunCommandTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Execute a shell command and return the output"
+        return "[LAST RESORT] Execute a shell command. Only use when no other tool is suitable. Prefer read_file, write_file, edit_file, list_dir, search_files for file operations."
 
     @property
     def parameters(self) -> Dict[str, Any]:

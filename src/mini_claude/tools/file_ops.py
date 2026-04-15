@@ -33,7 +33,7 @@ class ReadFileTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Read the contents of a file"
+        return "[PREFERRED] Read the contents of a file. Use this tool instead of shell commands like 'cat'. Supports optional line range."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -101,7 +101,7 @@ class WriteFileTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Write content to a file, creating it if it doesn't exist"
+        return "[PREFERRED] Create or overwrite a file with content. Use this tool instead of shell commands like 'echo > file' or 'cat > file'. Automatically creates parent directories."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -173,7 +173,7 @@ class EditFileTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Edit a file by replacing old text with new text"
+        return "[PREFERRED] Edit a file by replacing specific text. Use this tool instead of sed or other shell commands. Finds old_text and replaces with new_text."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -252,7 +252,7 @@ class ListDirTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "List contents of a directory"
+        return "[PREFERRED] List contents of a directory. Use this tool instead of shell commands like 'ls' or 'dir'."
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -304,7 +304,7 @@ class SearchFilesTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Search for files matching a glob pattern"
+        return "[PREFERRED] Search for files matching a glob pattern. Use this instead of shell 'find' command. Example: '**/*.py' finds all Python files."
 
     @property
     def parameters(self) -> Dict[str, Any]:
