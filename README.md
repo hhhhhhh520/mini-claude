@@ -54,22 +54,61 @@ mini-claude status
 
 mini-claude 支持多个 Agent 安全地并行开发同一个项目：
 
+### 架构：主从模式
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    主 Agent                          │
+│  (接收用户请求，规划任务，启动子Agent，汇总结果)      │
+└─────────────────┬───────────────────────────────────┘
+                  │ plan_parallel → execute_parallel
+        ┌─────────┼─────────┬─────────┐
+        ▼         ▼         ▼         ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │子Agent 1│ │子Agent 2│ │子Agent 3│ │子Agent N│
+   │(独立执行)│ │(独立执行)│ │(独立执行)│ │(独立执行)│
+   └─────────┘ └─────────┘ └─────────┘ └─────────┘
+```
+
+### 智能并行执行
+
+使用 `plan_parallel` 和 `execute_parallel` 实现智能并行：
+
+```
+> 并行开发三个API模块：
+1. 创建 src/api/user.py - 用户API
+2. 创建 src/api/product.py - 产品API
+3. 创建 src/api/order.py - 订单API
+```
+
+LLM 会自动调用：
+1. `plan_parallel` - 分析依赖关系，检测文件冲突
+2. `execute_parallel` - 按依赖层级并行执行
+3. `aggregate_results` - 自动汇总所有结果
+
+### 依赖管理
+
+支持任务依赖声明：
+
+```json
+{
+  "id": "task_1",
+  "description": "创建数据库模型",
+  "target_files": ["models.py"]
+},
+{
+  "id": "task_2",
+  "description": "创建API路由",
+  "target_files": ["routes.py"],
+  "depends_on": ["task_1"]  // 等待 task_1 完成
+}
+```
+
 ### 文件锁机制
 
 - **读锁**：多个 Agent 可同时读取同一文件
 - **写锁**：写文件时获取独占锁，阻止其他 Agent 同时写入
 - **冲突检测**：写入前检查文件是否被其他 Agent 修改过
-
-### 并行开发示例
-
-```
-> 并行开发三个功能：
-1. 在 src/api/ 创建 user.py 处理用户API
-2. 在 src/api/ 创建 product.py 处理产品API
-3. 在 src/api/ 创建 order.py 处理订单API
-```
-
-每个子 Agent 会独立工作，文件锁确保不会互相覆盖。
 
 ### 冲突处理
 
@@ -83,10 +122,14 @@ Use 'force_write' to overwrite.
 
 使用 `force_write` 工具可以强制覆盖（谨慎使用）。
 
-### 锁管理工具
+### 并行工具一览
 
 | 工具 | 功能 |
 |------|------|
+| `plan_parallel` | 规划并行任务，分析依赖，检测冲突 |
+| `execute_parallel` | 执行并行任务，自动汇总结果 |
+| `parallel_status` | 查看执行进度和状态 |
+| `aggregate_results` | 汇总所有任务结果 |
 | `list_locks` | 查看所有活跃的文件锁 |
 | `force_write` | 强制写入文件（忽略冲突） |
 
@@ -117,9 +160,13 @@ GOOGLE_API_KEY=your-gemini-key
 | `run_command` | 执行Shell命令 |
 | `web_search` | Web搜索 |
 | `spawn_agent` | 启动单个子Agent |
-| `spawn_parallel` | 并行启动多个子Agent |
+| `spawn_parallel` | 并行启动多个子Agent（简单模式） |
 | `list_agents` | 查看所有子Agent状态 |
 | `get_result` | 获取子Agent结果 |
+| `plan_parallel` | 规划并行任务（智能模式） |
+| `execute_parallel` | 执行并行任务并自动汇总 |
+| `parallel_status` | 查看并行执行状态 |
+| `aggregate_results` | 汇总并行任务结果 |
 | `list_locks` | 查看文件锁状态 |
 | `force_write` | 强制写入文件 |
 

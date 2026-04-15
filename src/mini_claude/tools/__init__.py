@@ -19,6 +19,12 @@ from .agent_spawn import (
     SpawnParallelTool,
 )
 from .web_search import WebSearchTool
+from .parallel import (
+    PlanParallelTool,
+    ExecuteParallelTool,
+    ParallelStatusTool,
+    AggregateResultsTool,
+)
 
 
 def get_all_tools() -> List[Dict[str, Any]]:
@@ -62,6 +68,11 @@ __all__ = [
     "ListAgentsTool",
     "GetResultTool",
     "SpawnParallelTool",
+    # Parallel execution tools
+    "PlanParallelTool",
+    "ExecuteParallelTool",
+    "ParallelStatusTool",
+    "AggregateResultsTool",
     # Web tools
     "WebSearchTool",
     # Helper functions
