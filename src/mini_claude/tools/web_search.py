@@ -2,6 +2,8 @@
 
 import asyncio
 from typing import Dict, Any, List
+import socket
+import urllib.error
 
 from .base import BaseTool, register_tool
 
@@ -63,8 +65,27 @@ class WebSearchTool(BaseTool):
 
             return output
 
+        except socket.timeout:
+            return f"Search error: Connection timed out. Please try again."
+        except socket.gaierror as e:
+            return f"Search error: DNS resolution failed. Please check your internet connection. ({e})"
+        except ConnectionError:
+            return f"Search error: Connection failed. Please check your internet connection."
+        except urllib.error.URLError as e:
+            return f"Search error: URL error - {e.reason}"
+        except asyncio.TimeoutError:
+            return f"Search error: Request timed out. Please try again."
         except Exception as e:
-            return f"Search error: {str(e)}"
+            # Provide more specific error messages based on error type
+            error_msg = str(e).lower()
+            if "timeout" in error_msg:
+                return f"Search error: Request timed out. Please try again."
+            elif "connection" in error_msg or "network" in error_msg:
+                return f"Search error: Network connection issue. Please check your internet."
+            elif "rate" in error_msg or "limit" in error_msg:
+                return f"Search error: Rate limited. Please wait a moment and try again."
+            else:
+                return f"Search error: {str(e)}"
 
 
 register_tool(WebSearchTool())

@@ -209,6 +209,7 @@ class ExecuteParallelTool(BaseTool):
 
     async def _execute_task_via_agent(self, task: DistributedTask, agent_id: str) -> str:
         """Execute a single task via sub-agent."""
+        import asyncio
         from ..agent.graph import build_agent_graph_no_checkpoint
         from ..agent.state import create_initial_state
         from ..tools.file_ops import set_current_agent
@@ -226,9 +227,30 @@ Focus only on this specific task. When complete, provide a clear summary of what
 
         # Execute
         graph = build_agent_graph_no_checkpoint()
-        state = create_initial_state(prompt, thread_id=agent_id)
 
-        result = await graph.ainvoke(state)
+        # CRITICAL: Mark as subagent and limit allowed tools
+        # Sub-agents cannot spawn more agents (prevent infinite recursion)
+        subagent_allowed_tools = [
+            "read_file", "write_file", "edit_file",
+            "list_dir", "search_files", "search_content",
+            "run_command", "web_search"
+        ]
+
+        state = create_initial_state(
+            prompt,
+            thread_id=agent_id,
+            is_subagent=True,
+            allowed_tools=subagent_allowed_tools
+        )
+
+        # Add timeout to prevent hanging
+        try:
+            result = await asyncio.wait_for(
+                graph.ainvoke(state),
+                timeout=300  # 5 minute timeout
+            )
+        except asyncio.TimeoutError:
+            return "Error: Task execution timed out after 5 minutes"
 
         # Extract result
         messages = result.get("messages", [])

@@ -12,6 +12,7 @@ from rich.syntax import Syntax
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.live import Live
 from rich.table import Table
+from rich.text import Text
 
 
 class AgentStatus(Enum):
@@ -30,6 +31,8 @@ class AgentDisplay:
             sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
             sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
         self.console = Console()
+        self._streaming_text = ""
+        self._is_streaming = False
 
     def welcome(self):
         """Display welcome message."""
@@ -52,6 +55,45 @@ class AgentDisplay:
             self.console.print(Markdown(message))
         else:
             self.console.print(message)
+
+    def start_stream(self):
+        """Start streaming output."""
+        self._streaming_text = ""
+        self._is_streaming = True
+        self.console.print(f"\n[bold blue]Assistant:[/] ", end="")
+
+    def stream_token(self, token: str):
+        """Stream a single token."""
+        if not self._is_streaming:
+            self.start_stream()
+        self._streaming_text += token
+        # Print token directly (no formatting during stream)
+        print(token, end="", flush=True)
+
+    def end_stream(self):
+        """End streaming output."""
+        if self._is_streaming:
+            print()  # New line after streaming
+            self._is_streaming = False
+            # Optionally re-render as markdown for better display
+            if any(marker in self._streaming_text for marker in ["```", "##", "**", "- "]):
+                self.console.print("\n")  # Add spacing
+                # Clear and re-render as markdown
+                self.console.print(Markdown(self._streaming_text))
+
+    def show_tool_call_start(self, tool_name: str):
+        """Display tool call start (for streaming)."""
+        self._streaming_text = ""
+        self._is_streaming = True
+        self._current_tool = tool_name
+        # Use sys.stdout for immediate output on Windows
+        sys.stdout.write(f"\n[tool] {tool_name}(")
+        sys.stdout.flush()
+
+    def stream_tool_args(self, args_chunk: str):
+        """Stream tool arguments (code content)."""
+        sys.stdout.write(args_chunk)
+        sys.stdout.flush()
 
     def show_tool_call(self, tool_name: str, params: dict):
         """Display tool call."""

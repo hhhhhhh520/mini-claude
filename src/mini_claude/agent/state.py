@@ -34,6 +34,14 @@ class AgentState(TypedDict):
     is_subagent: bool                     # Whether this is a sub-agent
     allowed_tools: Optional[List[str]]    # Tools allowed for this agent
 
+    # Multi-file project tracking
+    incomplete_check_count: int           # Count of consecutive incomplete checks
+    last_missing_files: Optional[List[str]]  # Last detected missing files
+
+    # Read-only tool loop detection (for auto-stop)
+    consecutive_read_only_count: int      # Consecutive read-only tool calls
+    last_tool_names: Optional[List[str]]  # Last executed tool names
+
 
 def create_initial_state(
     user_input: str,
@@ -63,4 +71,8 @@ def create_initial_state(
         errors=None,
         is_subagent=is_subagent,
         allowed_tools=allowed_tools,
+        incomplete_check_count=0,
+        last_missing_files=None,
+        consecutive_read_only_count=0,
+        last_tool_names=None,
     )

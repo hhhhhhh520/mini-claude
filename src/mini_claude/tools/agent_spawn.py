@@ -76,9 +76,30 @@ class SpawnAgentTool(BaseTool):
             try:
                 # Use full graph with tool loop
                 graph = build_agent_graph_no_checkpoint()
-                state = create_initial_state(prompt, thread_id=agent_id)
 
-                result = await graph.ainvoke(state)
+                # CRITICAL: Mark as subagent and limit allowed tools
+                # Sub-agents cannot spawn more agents (prevent infinite recursion)
+                subagent_allowed_tools = [
+                    "read_file", "write_file", "edit_file",
+                    "list_dir", "search_files", "search_content",
+                    "run_command", "web_search"
+                ]
+
+                state = create_initial_state(
+                    prompt,
+                    thread_id=agent_id,
+                    is_subagent=True,
+                    allowed_tools=subagent_allowed_tools
+                )
+
+                # Add timeout to prevent hanging
+                try:
+                    result = await asyncio.wait_for(
+                        graph.ainvoke(state),
+                        timeout=300  # 5 minute timeout
+                    )
+                except asyncio.TimeoutError:
+                    return "Error: Sub-agent execution timed out after 5 minutes"
 
                 if progress_callback:
                     await progress_callback(1.0, "Task complete")
@@ -244,9 +265,27 @@ class SpawnParallelTool(BaseTool):
 
                 try:
                     graph = build_agent_graph_no_checkpoint()
-                    state = create_initial_state(t, thread_id=aid)
 
-                    result = await graph.ainvoke(state)
+                    # CRITICAL: Mark as subagent and limit allowed tools
+                    # Sub-agents cannot spawn more agents (prevent infinite recursion)
+                    subagent_allowed_tools = [
+                        "read_file", "write_file", "edit_file",
+                        "list_dir", "search_files", "search_content",
+                        "run_command", "web_search"
+                    ]
+
+                    state = create_initial_state(
+                        t,
+                        thread_id=aid,
+                        is_subagent=True,
+                        allowed_tools=subagent_allowed_tools
+                    )
+
+                    # Add timeout to prevent hanging
+                    result = await asyncio.wait_for(
+                        graph.ainvoke(state),
+                        timeout=300  # 5 minute timeout
+                    )
 
                     if progress_callback:
                         await progress_callback(1.0, "Done")
@@ -259,6 +298,10 @@ class SpawnParallelTool(BaseTool):
 
                     return messages[-1].content if messages else "No result"
 
+                except asyncio.TimeoutError:
+                    if progress_callback:
+                        await progress_callback(1.0, "Timeout")
+                    return "Error: Sub-agent execution timed out after 5 minutes"
                 except Exception as e:
                     if progress_callback:
                         await progress_callback(1.0, f"Error: {e}")

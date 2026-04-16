@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     auto_save_enabled: bool = Field(default=True)
     session_db_path: str = Field(default="sessions.db")
 
+    # Streaming settings
+    streaming_enabled: bool = Field(default=True)  # Enable streaming output
+
     # Workspace
     workspace_root: str = Field(default="D:/my project/mini-claude/workspace")
 

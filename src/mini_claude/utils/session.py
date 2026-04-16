@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+from contextlib import contextmanager
 
 
 class SessionManager:
@@ -14,24 +15,33 @@ class SessionManager:
         self.db_path = db_path
         self._init_db()
 
+    @contextmanager
+    def _get_connection(self):
+        """Get database connection with context manager."""
+        conn = sqlite3.connect(self.db_path)
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def _init_db(self):
         """Initialize the database."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                messages TEXT NOT NULL,
-                context TEXT,
-                summary TEXT
-            )
-        """)
-
-        conn.commit()
-        conn.close()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    messages TEXT NOT NULL,
+                    context TEXT,
+                    summary TEXT
+                )
+            """)
 
     def save_session(
         self,
@@ -41,29 +51,23 @@ class SessionManager:
         summary: Optional[str] = None
     ) -> None:
         """Save or update a session."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
         now = datetime.now().isoformat()
         messages_json = json.dumps(messages, ensure_ascii=False)
         context_json = json.dumps(context, ensure_ascii=False) if context else None
 
-        cursor.execute("""
-            INSERT OR REPLACE INTO sessions (id, created_at, updated_at, messages, context, summary)
-            VALUES (?, COALESCE((SELECT created_at FROM sessions WHERE id = ?), ?), ?, ?, ?, ?)
-        """, (session_id, session_id, now, now, messages_json, context_json, summary))
-
-        conn.commit()
-        conn.close()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO sessions (id, created_at, updated_at, messages, context, summary)
+                VALUES (?, COALESCE((SELECT created_at FROM sessions WHERE id = ?), ?), ?, ?, ?, ?)
+            """, (session_id, session_id, now, now, messages_json, context_json, summary))
 
     def load_session(self, session_id: str) -> Optional[List[Dict[str, Any]]]:
         """Load a session by ID (returns messages only for backward compatibility)."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT messages FROM sessions WHERE id = ?", (session_id,))
-        row = cursor.fetchone()
-        conn.close()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT messages FROM sessions WHERE id = ?", (session_id,))
+            row = cursor.fetchone()
 
         if row:
             return json.loads(row[0])
@@ -71,15 +75,13 @@ class SessionManager:
 
     def load_session_full(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Load a session with all metadata."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "SELECT id, created_at, updated_at, messages, context, summary FROM sessions WHERE id = ?",
-            (session_id,)
-        )
-        row = cursor.fetchone()
-        conn.close()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, created_at, updated_at, messages, context, summary FROM sessions WHERE id = ?",
+                (session_id,)
+            )
+            row = cursor.fetchone()
 
         if row:
             return {
@@ -94,38 +96,33 @@ class SessionManager:
 
     def list_sessions(self) -> List[Dict[str, Any]]:
         """List all sessions."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, created_at, updated_at,
+                       json_array_length(messages) as msg_count
+                FROM sessions
+                ORDER BY updated_at DESC
+            """)
 
-        cursor.execute("""
-            SELECT id, created_at, updated_at,
-                   json_array_length(messages) as msg_count
-            FROM sessions
-            ORDER BY updated_at DESC
-        """)
+            sessions = []
+            for row in cursor.fetchall():
+                sessions.append({
+                    "id": row[0],
+                    "created_at": row[1],
+                    "updated_at": row[2],
+                    "message_count": row[3],
+                })
 
-        sessions = []
-        for row in cursor.fetchall():
-            sessions.append({
-                "id": row[0],
-                "created_at": row[1],
-                "updated_at": row[2],
-                "message_count": row[3],
-            })
-
-        conn.close()
         return sessions
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session."""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            deleted = cursor.rowcount > 0
 
-        cursor.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-        deleted = cursor.rowcount > 0
-
-        conn.commit()
-        conn.close()
         return deleted
 
 
