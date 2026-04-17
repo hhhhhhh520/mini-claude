@@ -147,18 +147,34 @@ ANTHROPIC_API_KEY=your-claude-key
 GOOGLE_API_KEY=your-gemini-key
 ```
 
-## 可用工具
+## 可用工具（18个）
 
+### 文件操作 (8个)
 | 工具 | 功能 |
 |------|------|
 | `read_file` | 读取文件内容 |
 | `write_file` | 写入文件（自动检测冲突） |
 | `edit_file` | 编辑文件（自动检测冲突） |
+| `force_write` | 强制写入文件（忽略冲突） |
 | `list_dir` | 列出目录内容 |
 | `search_files` | 按名称搜索文件 |
 | `search_content` | 按内容搜索文件 |
+| `list_locks` | 查看文件锁状态 |
+
+### 命令执行 (2个)
+| 工具 | 功能 |
+|------|------|
 | `run_command` | 执行Shell命令 |
+| `run_background` | 后台执行长时间命令 |
+
+### Web搜索 (1个)
+| 工具 | 功能 |
+|------|------|
 | `web_search` | Web搜索 |
+
+### Agent协作 (7个)
+| 工具 | 功能 |
+|------|------|
 | `spawn_agent` | 启动单个子Agent |
 | `spawn_parallel` | 并行启动多个子Agent（简单模式） |
 | `list_agents` | 查看所有子Agent状态 |
@@ -167,8 +183,6 @@ GOOGLE_API_KEY=your-gemini-key
 | `execute_parallel` | 执行并行任务并自动汇总 |
 | `parallel_status` | 查看并行执行状态 |
 | `aggregate_results` | 汇总并行任务结果 |
-| `list_locks` | 查看文件锁状态 |
-| `force_write` | 强制写入文件 |
 
 ## 架构
 

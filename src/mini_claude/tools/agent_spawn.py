@@ -1,6 +1,7 @@
 """Agent spawning tools."""
 
 import asyncio
+import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -8,6 +9,12 @@ from .base import BaseTool, register_tool
 from ..agent.subagent import subagent_manager, AgentStatus
 from ..agent.state import create_initial_state
 from ..llm.prompts import get_subagent_prompt
+
+
+def _log(msg: str):
+    """Thread-safe logging with timestamp."""
+    timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+    print(f"[{timestamp}] [SPAWN] {msg}")
 
 
 class SpawnAgentTool(BaseTool):
@@ -95,11 +102,11 @@ class SpawnAgentTool(BaseTool):
                 # Add timeout to prevent hanging
                 try:
                     result = await asyncio.wait_for(
-                        graph.ainvoke(state),
-                        timeout=300  # 5 minute timeout
+                        graph.ainvoke(state, config={"recursion_limit": 50}),
+                        timeout=180  # 180 second timeout
                     )
                 except asyncio.TimeoutError:
-                    return "Error: Sub-agent execution timed out after 5 minutes"
+                    return "Error: Sub-agent execution timed out after 180 seconds"
 
                 if progress_callback:
                     await progress_callback(1.0, "Task complete")
@@ -246,75 +253,88 @@ class SpawnParallelTool(BaseTool):
         if not tasks:
             return "Error: No tasks provided"
 
-        # Create task definitions
-        task_defs = []
+        _log(f"Spawning {len(tasks)} agents in parallel")
+        start_time = time.time()
+
+        # Create all agent tasks FIRST
+        agent_tasks = []
+        agent_ids = []
+
         for i, task in enumerate(tasks):
             agent_id = f"parallel_{i}_{datetime.now().strftime('%H%M%S')}"
+            agent_ids.append(agent_id)
 
-            async def subagent_task(t=task, aid=agent_id, progress_callback=None):
-                from ..agent.graph import build_agent_graph_no_checkpoint
-                from ..agent.state import create_initial_state
-                from ..tools.file_ops import set_current_agent
-                from langchain_core.messages import AIMessage
+            # Create the coroutine for this agent
+            agent_tasks.append(self._run_agent_task(agent_id, task))
 
-                # Set current agent ID for file locking
-                set_current_agent(aid)
+        # Launch ALL agents at the SAME time
+        _log(f"Launching all {len(agent_tasks)} agents simultaneously")
+        results = await asyncio.gather(*agent_tasks, return_exceptions=True)
 
-                if progress_callback:
-                    await progress_callback(0.1, "Starting")
+        elapsed = time.time() - start_time
+        _log(f"All {len(tasks)} agents completed in {elapsed:.2f}s")
 
-                try:
-                    graph = build_agent_graph_no_checkpoint()
+        # Build response
+        lines = [f"Spawned {len(agent_ids)} parallel agents in {elapsed:.2f}s:"]
+        for i, (agent_id, result) in enumerate(zip(agent_ids, results)):
+            if isinstance(result, Exception):
+                lines.append(f"  - {agent_id}: FAILED - {result}")
+            else:
+                lines.append(f"  - {agent_id}: COMPLETED")
 
-                    # CRITICAL: Mark as subagent and limit allowed tools
-                    # Sub-agents cannot spawn more agents (prevent infinite recursion)
-                    subagent_allowed_tools = [
-                        "read_file", "write_file", "edit_file",
-                        "list_dir", "search_files", "search_content",
-                        "run_command", "web_search"
-                    ]
+        return "\n".join(lines)
 
-                    state = create_initial_state(
-                        t,
-                        thread_id=aid,
-                        is_subagent=True,
-                        allowed_tools=subagent_allowed_tools
-                    )
+    async def _run_agent_task(self, agent_id: str, task: str):
+        """Run a single agent task with logging."""
+        from ..agent.graph import build_agent_graph_no_checkpoint
+        from ..agent.state import create_initial_state
+        from ..tools.file_ops import set_current_agent
+        from langchain_core.messages import AIMessage
 
-                    # Add timeout to prevent hanging
-                    result = await asyncio.wait_for(
-                        graph.ainvoke(state),
-                        timeout=300  # 5 minute timeout
-                    )
+        _log(f"Agent {agent_id}: STARTED for task: {task[:50]}...")
 
-                    if progress_callback:
-                        await progress_callback(1.0, "Done")
+        # Set current agent ID for file locking
+        set_current_agent(agent_id)
 
-                    # Extract final response
-                    messages = result.get("messages", [])
-                    for msg in reversed(messages):
-                        if isinstance(msg, AIMessage) and not getattr(msg, 'tool_calls', None):
-                            return msg.content
-
-                    return messages[-1].content if messages else "No result"
-
-                except asyncio.TimeoutError:
-                    if progress_callback:
-                        await progress_callback(1.0, "Timeout")
-                    return "Error: Sub-agent execution timed out after 5 minutes"
-                except Exception as e:
-                    if progress_callback:
-                        await progress_callback(1.0, f"Error: {e}")
-                    return f"Error: {e}"
-
-            task_defs.append((agent_id, subagent_task, (), {}))
-
-        # Spawn all in parallel
         try:
-            agent_ids = await subagent_manager.spawn_parallel(task_defs)
-            return f"Spawned {len(agent_ids)} parallel agents:\n" + "\n".join(f"  - {aid}" for aid in agent_ids)
+            graph = build_agent_graph_no_checkpoint()
+
+            subagent_allowed_tools = [
+                "read_file", "write_file", "edit_file",
+                "list_dir", "search_files", "search_content",
+                "run_command", "web_search"
+            ]
+
+            state = create_initial_state(
+                task,
+                thread_id=agent_id,
+                is_subagent=True,
+                allowed_tools=subagent_allowed_tools
+            )
+
+            task_start = time.time()
+            result = await asyncio.wait_for(
+                graph.ainvoke(state),
+                timeout=180
+            )
+            task_elapsed = time.time() - task_start
+
+            _log(f"Agent {agent_id}: COMPLETED in {task_elapsed:.2f}s")
+
+            # Extract final response
+            messages = result.get("messages", [])
+            for msg in reversed(messages):
+                if isinstance(msg, AIMessage) and not getattr(msg, 'tool_calls', None):
+                    return msg.content
+
+            return messages[-1].content if messages else "No result"
+
+        except asyncio.TimeoutError:
+            _log(f"Agent {agent_id}: TIMEOUT")
+            return "Error: Sub-agent execution timed out after 180 seconds"
         except Exception as e:
-            return f"Error spawning parallel agents: {e}"
+            _log(f"Agent {agent_id}: FAILED - {e}")
+            return f"Error: {e}"
 
 
 # Register agent tools

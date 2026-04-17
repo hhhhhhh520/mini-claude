@@ -57,6 +57,7 @@ async def think_node(state: AgentState) -> AgentState:
             last_missing_files=state.get("last_missing_files"),
             consecutive_read_only_count=state.get("consecutive_read_only_count", 0),
             last_tool_names=state.get("last_tool_names"),
+            no_tool_call_count=state.get("no_tool_call_count", 0),
         )
 
     # Add system message if not present
@@ -81,6 +82,9 @@ async def think_node(state: AgentState) -> AgentState:
         allowed_tools=state.get("allowed_tools"),
         incomplete_check_count=state.get("incomplete_check_count", 0),
         last_missing_files=state.get("last_missing_files"),
+        consecutive_read_only_count=state.get("consecutive_read_only_count", 0),
+        last_tool_names=state.get("last_tool_names"),
+        no_tool_call_count=state.get("no_tool_call_count", 0),
     )
 
 
@@ -113,6 +117,9 @@ async def plan_node(state: AgentState) -> AgentState:
                 allowed_tools=state.get("allowed_tools"),
                 incomplete_check_count=state.get("incomplete_check_count", 0),
                 last_missing_files=state.get("last_missing_files"),
+                consecutive_read_only_count=state.get("consecutive_read_only_count", 0),
+                last_tool_names=state.get("last_tool_names"),
+                no_tool_call_count=state.get("no_tool_call_count", 0),
             )
 
     # Analyze the task and create a plan
@@ -194,6 +201,9 @@ async def plan_node(state: AgentState) -> AgentState:
                     allowed_tools=state.get("allowed_tools"),
                     incomplete_check_count=state.get("incomplete_check_count", 0),
                     last_missing_files=state.get("last_missing_files"),
+                    consecutive_read_only_count=state.get("consecutive_read_only_count", 0),
+                    last_tool_names=state.get("last_tool_names"),
+                    no_tool_call_count=state.get("no_tool_call_count", 0),
                 )
 
     if detected_actions:
@@ -219,6 +229,9 @@ async def plan_node(state: AgentState) -> AgentState:
         allowed_tools=state.get("allowed_tools"),
         incomplete_check_count=state.get("incomplete_check_count", 0),
         last_missing_files=state.get("last_missing_files"),
+        consecutive_read_only_count=state.get("consecutive_read_only_count", 0),
+        last_tool_names=state.get("last_tool_names"),
+        no_tool_call_count=state.get("no_tool_call_count", 0),
     )
 
 
@@ -250,8 +263,18 @@ async def act_node(state: AgentState) -> AgentState:
 
     try:
         # Call LLM with tools
-        # Force tool calling if plan indicates tools are needed
-        force_tools = state.get("plan") and "工具" in state.get("plan", "")
+        # Only force tool calling for write operations, not read operations
+        # Read operations (read_file, list_dir) should allow model to output text after getting results
+        plan = state.get("plan", "")
+
+        # Check if this is a read-only task (reading/summarizing, not creating)
+        read_only_keywords = ["读取", "总结", "告诉我", "查看", "列出", "搜索"]
+        is_read_only_task = any(kw in state.get("current_task", "") for kw in read_only_keywords)
+
+        # Only force tools for write operations, not for read operations
+        force_tools = plan and ("write_file" in plan or "创建" in plan or "edit_file" in plan)
+        force_tools = force_tools and not is_read_only_task
+
         effective_tool_choice = "required" if force_tools and litellm_tools else "auto"
 
         # Use streaming if enabled and not in subagent mode
@@ -360,7 +383,27 @@ async def act_node(state: AgentState) -> AgentState:
                     try:
                         tool_args = json.loads(tool_args)
                     except json.JSONDecodeError:
+                        safe_print(f"[DEBUG] Failed to parse tool args as JSON: {tool_args}")
                         tool_args = {}
+
+                # Validate required args for critical tools
+                if tool_name in ["write_file", "edit_file"]:
+                    if not tool_args.get("path"):
+                        error_msg = f"Error: Tool {tool_name} requires 'path' argument but got: {tool_args}"
+                        safe_print(f"[DEBUG] {error_msg}")
+                        messages.append(HumanMessage(
+                            content=error_msg,
+                            name=tool_name,
+                        ))
+                        continue
+                    if tool_name == "write_file" and not tool_args.get("content"):
+                        error_msg = f"Error: Tool write_file requires 'content' argument but got: {tool_args}"
+                        safe_print(f"[DEBUG] {error_msg}")
+                        messages.append(HumanMessage(
+                            content=error_msg,
+                            name=tool_name,
+                        ))
+                        continue
 
                 try:
                     safe_print(f"[DEBUG] Executing tool [{i+1}/{len(tool_calls)}]: {tool_name} with args: {tool_args}")
@@ -399,7 +442,7 @@ async def act_node(state: AgentState) -> AgentState:
         else:
             # No tool calls - check if multi-file task is incomplete
             original_task = state.get("current_task", "").lower()
-            multi_file_keywords = ["开发", "创建", "生成", "网站", "前端", "项目", "web"]
+            multi_file_keywords = ["开发", "创建", "生成", "网站", "前端", "项目", "web", "backend", "fastapi", "flask", "api"]
             is_multi_file_task = any(kw in original_task for kw in multi_file_keywords)
 
             if is_multi_file_task:
@@ -456,6 +499,7 @@ async def act_node(state: AgentState) -> AgentState:
             last_missing_files=state.get("last_missing_files"),
             consecutive_read_only_count=state.get("consecutive_read_only_count", 0),
             last_tool_names=state.get("last_tool_names"),
+            no_tool_call_count=state.get("no_tool_call_count", 0),
         )
 
     except Exception as e:
@@ -480,6 +524,7 @@ async def act_node(state: AgentState) -> AgentState:
             last_missing_files=state.get("last_missing_files"),
             consecutive_read_only_count=state.get("consecutive_read_only_count", 0),
             last_tool_names=state.get("last_tool_names"),
+            no_tool_call_count=state.get("no_tool_call_count", 0),
         )
 
 
@@ -494,6 +539,9 @@ async def observe_node(state: AgentState) -> AgentState:
     should_continue = False
     incomplete_count = state.get("incomplete_check_count", 0)
     missing = state.get("last_missing_files", [])
+
+    # Track consecutive iterations without tool calls (idle detection)
+    no_tool_call_count = state.get("no_tool_call_count", 0)
 
     # Check iteration limit first (use subagent limit if is_subagent)
     max_iter = settings.max_subagent_iterations if state.get("is_subagent") else settings.max_iterations
@@ -548,6 +596,7 @@ async def observe_node(state: AgentState) -> AgentState:
                     last_missing_files=[],
                     consecutive_read_only_count=0,
                     last_tool_names=[],
+                    no_tool_call_count=0,
                 )
 
         # SECOND: Check if we just executed tools - if so, continue to let LLM process results
@@ -566,84 +615,148 @@ async def observe_node(state: AgentState) -> AgentState:
             should_continue = True
             incomplete_count = state.get("incomplete_check_count", 0)
             missing = state.get("last_missing_files", [])
+            no_tool_call_count = 0  # Reset idle counter when we have tool results
+
+            # For subagents: check if we just wrote a file - if so, we're done
+            if state.get("is_subagent", False):
+                # Check if last tool was a write operation
+                for msg in reversed(messages):
+                    if isinstance(msg, HumanMessage) and hasattr(msg, 'name') and msg.name:
+                        if msg.name in ['write_file', 'edit_file']:
+                            safe_print(f"[DEBUG] observe_node: subagent completed write operation, stopping")
+                            should_continue = False
+                            break
+                        break
+
+            # Check if we just completed execute_parallel - if so, stop
+            # Only stop after execute_parallel, NOT after plan_parallel (need to continue to execute)
+            for msg in reversed(messages):
+                if isinstance(msg, HumanMessage) and hasattr(msg, 'name') and msg.name:
+                    if msg.name == 'execute_parallel':
+                        # Check if result indicates success/completion
+                        result_content = str(msg.content) if msg.content else ""
+                        completion_indicators = ['Completed:', 'Execution complete', '✓']
+                        if any(ind in result_content for ind in completion_indicators):
+                            safe_print(f"[DEBUG] observe_node: execute_parallel completed successfully, stopping")
+                            should_continue = False
+                            break
+                    break
         else:
-            # Check if the original task is a multi-file project that's incomplete
-            original_task = state.get("current_task", "").lower()
-            multi_file_keywords = ["开发", "创建", "生成", "网站", "前端", "项目", "web"]
+            # No tool results - increment idle counter
+            no_tool_call_count = state.get("no_tool_call_count", 0) + 1
+            safe_print(f"[DEBUG] observe_node: no tool results, idle count = {no_tool_call_count}")
 
-            is_multi_file_task = any(kw in original_task for kw in multi_file_keywords)
+            # Check for idle loop - if 3+ consecutive iterations without tool calls, stop
+            if no_tool_call_count >= 3:
+                safe_print(f"[DEBUG] observe_node: idle loop detected ({no_tool_call_count} iterations without tools), stopping")
+                should_continue = False
+            else:
+                # Check if the original task is a multi-file project that's incomplete
+                original_task = state.get("current_task", "").lower()
+                multi_file_keywords = ["开发", "创建", "生成", "网站", "前端", "项目", "web", "backend", "fastapi", "flask", "api"]
 
-            if is_multi_file_task:
-                # Check actual files on disk
-                import os
-                workspace = settings.workspace_root
+                is_multi_file_task = any(kw in original_task for kw in multi_file_keywords)
 
-                html_path = os.path.join(workspace, "index.html")
-                css_exists = os.path.exists(os.path.join(workspace, "style.css")) or \
-                             os.path.exists(os.path.join(workspace, "css", "style.css"))
-                js_exists = os.path.exists(os.path.join(workspace, "script.js")) or \
-                            os.path.exists(os.path.join(workspace, "js", "main.js"))
+                if is_multi_file_task:
+                    # Check actual files on disk
+                    import os
+                    workspace = settings.workspace_root
 
-                has_html = os.path.exists(html_path)
-                has_css = css_exists
-                has_js = js_exists
+                    # Check for web project (HTML/CSS/JS)
+                    html_path = os.path.join(workspace, "index.html")
+                    css_exists = os.path.exists(os.path.join(workspace, "style.css")) or \
+                                 os.path.exists(os.path.join(workspace, "css", "style.css"))
+                    js_exists = os.path.exists(os.path.join(workspace, "script.js")) or \
+                                os.path.exists(os.path.join(workspace, "js", "main.js"))
 
-                safe_print(f"[DEBUG] observe_node: checking disk: has_html={has_html}, has_css={has_css}, has_js={has_js}")
+                    has_html = os.path.exists(html_path)
+                    has_css = css_exists
+                    has_js = js_exists
 
-                # If HTML was created but CSS/JS are missing, continue
-                if has_html and not (has_css and has_js):
-                    # Check for infinite loop - if same missing files detected multiple times
-                    missing = []
-                    if not has_css:
-                        missing.append("style.css")
-                    if not has_js:
-                        missing.append("script.js")
+                    safe_print(f"[DEBUG] observe_node: checking disk: has_html={has_html}, has_css={has_css}, has_js={has_js}")
 
-                    last_missing = state.get("last_missing_files", [])
-                    incomplete_count = state.get("incomplete_check_count", 0)
+                    # If HTML was created but CSS/JS are missing, continue
+                    if has_html and not (has_css and has_js):
+                        # Check for infinite loop - if same missing files detected multiple times
+                        missing = []
+                        if not has_css:
+                            missing.append("style.css")
+                        if not has_js:
+                            missing.append("script.js")
 
-                    if missing == last_missing:
-                        incomplete_count += 1
-                    else:
-                        incomplete_count = 1
+                        last_missing = state.get("last_missing_files", [])
+                        incomplete_count = state.get("incomplete_check_count", 0)
 
-                    # Max 3 consecutive checks with same missing files
-                    if incomplete_count >= 3:
-                        safe_print(f"[DEBUG] observe_node: same missing files detected {incomplete_count} times, stopping")
-                        error_msg = f"无法自动创建缺失文件: {', '.join(missing)}。请手动处理或重新描述任务。"
-                        messages = messages + [AIMessage(content=error_msg)]
-                        should_continue = False
-                    else:
-                        safe_print(f"[DEBUG] observe_node: web project incomplete (missing CSS/JS), continuing (attempt {incomplete_count})")
-                        reminder = f"""重要提醒：项目文件不完整，缺少: {', '.join(missing)}
+                        if missing == last_missing:
+                            incomplete_count += 1
+                        else:
+                            incomplete_count = 1
+
+                        # Max 3 consecutive checks with same missing files
+                        if incomplete_count >= 3:
+                            safe_print(f"[DEBUG] observe_node: same missing files detected {incomplete_count} times, stopping")
+                            error_msg = f"无法自动创建缺失文件: {', '.join(missing)}。请手动处理或重新描述任务。"
+                            messages = messages + [AIMessage(content=error_msg)]
+                            should_continue = False
+                        else:
+                            safe_print(f"[DEBUG] observe_node: web project incomplete (missing CSS/JS), continuing (attempt {incomplete_count})")
+                            reminder = f"""重要提醒：项目文件不完整，缺少: {', '.join(missing)}
 
 请立即使用 write_file 工具创建这些文件：
 - write_file(path="script.js", content="...")
 
 禁止使用 read_file 或 list_dir，必须使用 write_file 创建新文件！"""
-                        messages = messages + [HumanMessage(content=reminder)]
-                        should_continue = True
-                else:
-                    incomplete_count = 0
-                    missing = []
-            else:
-                # No tool results, check for unexecuted tool calls
-                should_continue = False
-                for msg in reversed(messages):
-                    if isinstance(msg, AIMessage):
-                        tc = getattr(msg, 'tool_calls', None)
-                        if tc and len(tc) > 0:
-                            # Check if these tool calls have already been executed
-                            msg_idx = messages.index(msg)
-                            has_result = False
-                            for j in range(msg_idx + 1, len(messages)):
-                                if isinstance(messages[j], HumanMessage) and hasattr(messages[j], 'name'):
-                                    has_result = True
-                                    break
-                            if not has_result:
-                                safe_print(f"[DEBUG] observe_node: found unexecuted tool_calls")
+                            messages = messages + [HumanMessage(content=reminder)]
+                            should_continue = True
+                    else:
+                        # Check for backend project (Python files)
+                        main_py = os.path.join(workspace, "main.py")
+                        models_py = os.path.join(workspace, "models.py")
+                        has_main = os.path.exists(main_py)
+                        has_models = os.path.exists(models_py)
+
+                        # If task mentions backend files but they're missing
+                        backend_keywords = ["fastapi", "flask", "backend", "api", "main.py", "models.py"]
+                        is_backend_task = any(kw in original_task for kw in backend_keywords)
+
+                        if is_backend_task and not (has_main and has_models):
+                            missing = []
+                            if not has_main:
+                                missing.append("main.py")
+                            if not has_models:
+                                missing.append("models.py")
+
+                            if missing:
+                                safe_print(f"[DEBUG] observe_node: backend project incomplete, missing: {missing}")
+                                reminder = f"""重要提醒：后端项目文件不完整，缺少: {', '.join(missing)}
+
+请立即使用 write_file 工具创建这些文件。"""
+                                messages = messages + [HumanMessage(content=reminder)]
                                 should_continue = True
-                        break
+                            else:
+                                incomplete_count = 0
+                                missing = []
+                        else:
+                            incomplete_count = 0
+                            missing = []
+                else:
+                    # No tool results, check for unexecuted tool calls
+                    should_continue = False
+                    for msg in reversed(messages):
+                        if isinstance(msg, AIMessage):
+                            tc = getattr(msg, 'tool_calls', None)
+                            if tc and len(tc) > 0:
+                                # Check if these tool calls have already been executed
+                                msg_idx = messages.index(msg)
+                                has_result = False
+                                for j in range(msg_idx + 1, len(messages)):
+                                    if isinstance(messages[j], HumanMessage) and hasattr(messages[j], 'name'):
+                                        has_result = True
+                                        break
+                                if not has_result:
+                                    safe_print(f"[DEBUG] observe_node: found unexecuted tool_calls")
+                                    should_continue = True
+                            break
 
     # Detect read-only tool loop (auto-stop for non-web tasks)
     # Read-only tools: read_file, list_dir, search_files, search_content, web_search
@@ -670,10 +783,22 @@ async def observe_node(state: AgentState) -> AgentState:
     else:
         consecutive_read_only_count = 0
 
-    # If 4+ consecutive read-only tools, stop (task likely complete)
-    if consecutive_read_only_count >= 4 and should_continue:
-        safe_print(f"[DEBUG] observe_node: detected read-only loop ({consecutive_read_only_count} consecutive), stopping")
-        should_continue = False
+    # If 2+ consecutive read-only tools, add reminder and stop after this iteration
+    if consecutive_read_only_count >= 2 and should_continue:
+        safe_print(f"[DEBUG] observe_node: detected read-only loop ({consecutive_read_only_count} consecutive)")
+        # Add a reminder to help LLM understand it should output result
+        reminder = """你已经成功获取了所需信息。现在请直接输出结果回答用户的问题，不要再调用工具。
+
+例如：
+- 如果用户要求"读取并总结"，请直接输出总结内容
+- 如果用户要求"告诉我内容"，请直接告诉用户内容
+- 不要再次调用 read_file 或其他工具"""
+
+        messages = messages + [HumanMessage(content=reminder)]
+        # Continue one more time to let LLM output the result
+        should_continue = True
+        # Reset counter to prevent infinite loop
+        consecutive_read_only_count = 0
 
     safe_print(f"[DEBUG] observe_node: should_continue = {should_continue}")
 
@@ -695,6 +820,7 @@ async def observe_node(state: AgentState) -> AgentState:
         last_missing_files=missing if 'missing' in dir() else state.get("last_missing_files"),
         consecutive_read_only_count=consecutive_read_only_count,
         last_tool_names=recent_tool_names,
+        no_tool_call_count=no_tool_call_count if 'no_tool_call_count' in dir() else state.get("no_tool_call_count", 0),
     )
 
 

@@ -44,3 +44,9 @@ htmlcov/
 
 # Workspace (user files)
 workspace/
+
+# Development docs (not for GitHub)
+issues/
+PROGRESS.md
+*.txt
+test_*.py

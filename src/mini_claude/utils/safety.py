@@ -280,9 +280,6 @@ class SafetyChecker:
         if not is_valid:
             return is_valid, reason
 
-        # Check parent directory exists
-        parent = os.path.dirname(path)
-        if parent and not os.path.exists(parent):
-            return False, f"Parent directory does not exist: {parent}"
-
+        # Note: Parent directory will be created automatically by write_file
+        # So we don't need to check if it exists here
         return True, "OK"

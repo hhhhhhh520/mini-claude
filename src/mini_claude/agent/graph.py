@@ -73,6 +73,10 @@ def build_agent_graph_no_checkpoint():
     return graph.compile()
 
 
+# Default recursion limit for graph execution
+DEFAULT_RECURSION_LIMIT = 50
+
+
 # Default graph instance
 _agent_graph = None
 

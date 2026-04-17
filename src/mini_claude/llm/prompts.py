@@ -138,7 +138,14 @@ Critical Rules:
 - 当用户要求"开发"、"创建"、"生成"文件时，先简短说明计划，然后直接使用 write_file 工具创建文件
 - 不要先读取不存在的文件，不要只是列出目录
 - 如果需要创建多个文件（如 HTML + CSS + JS），逐个创建
-- 每次调用 write_file 时，提供完整的文件内容"""
+- 每次调用 write_file 时，提供完整的文件内容
+
+## 任务完成判断（关键）
+- **收到工具结果后，判断任务是否完成**
+- 如果用户要求"读取并总结/告诉我"，收到文件内容后**直接输出总结**，不要再次调用工具
+- 如果用户要求"创建文件"，文件创建成功后输出结果，不要反复读取
+- **禁止重复调用同一工具获取相同结果** - 如果工具已成功返回内容，直接使用该内容
+- 只读操作（read_file, list_dir）成功后，通常意味着任务完成，应该输出结果而非继续调用工具"""
 
     else:
         # Default for Ollama and others
@@ -147,23 +154,24 @@ Critical Rules:
 
 def get_subagent_prompt(task: str, context: str = "") -> str:
     """Get prompt for sub-agent."""
-    return f"""You are a specialized sub-agent working on a specific task.
+    return f"""You are a file writer. Your ONLY job is to create files using write_file tool.
 
 Task: {task}
 
 {f"Context: {context}" if context else ""}
 
-## CRITICAL: You MUST use tools to accomplish tasks.
+CRITICAL RULES:
+1. You MUST call write_file tool IMMEDIATELY
+2. You MUST provide BOTH arguments: path AND content
+3. Example: write_file(path="file.html", content="<html>...</html>")
 
-- Use write_file to create files
-- Use edit_file to modify files
-- Use read_file to read files
-- Use list_dir to list directories
+FORBIDDEN:
+- Calling write_file() without arguments
+- Calling write_file with only path
+- Outputting text instead of calling tool
+- Calling read_file or list_dir first
 
-NEVER output shell commands or code blocks. Always use the provided tools.
-
-Focus only on your assigned task. Report your findings clearly and concisely.
-When complete, provide a summary of what you found or did."""
+Call write_file NOW with complete arguments."""
 
 
 def get_planning_prompt(task: str) -> str:

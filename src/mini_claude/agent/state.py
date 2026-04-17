@@ -42,6 +42,9 @@ class AgentState(TypedDict):
     consecutive_read_only_count: int      # Consecutive read-only tool calls
     last_tool_names: Optional[List[str]]  # Last executed tool names
 
+    # Idle loop detection (no tool calls)
+    no_tool_call_count: int               # Consecutive iterations without tool calls
+
 
 def create_initial_state(
     user_input: str,
@@ -75,4 +78,5 @@ def create_initial_state(
         last_missing_files=None,
         consecutive_read_only_count=0,
         last_tool_names=None,
+        no_tool_call_count=0,
     )

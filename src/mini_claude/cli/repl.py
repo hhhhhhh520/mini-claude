@@ -113,7 +113,10 @@ class REPLSession:
                     # Run the graph with thread_id for checkpointer
                     result = await graph.ainvoke(
                         initial_state,
-                        config={"configurable": {"thread_id": self.thread_id}}
+                        config={
+                            "configurable": {"thread_id": self.thread_id},
+                            "recursion_limit": 50
+                        }
                     )
 
                     # Extract final response
