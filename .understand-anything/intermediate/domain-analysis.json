@@ -1,0 +1,443 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "mini-claude",
+    "languages": ["Python"],
+    "frameworks": ["LangGraph", "LiteLLM", "prompt_toolkit"],
+    "description": "A miniature AI coding assistant CLI that uses LangGraph state machine for multi-step task execution with parallel sub-agent support",
+    "analyzedAt": "2026-04-30T18:15:00+08:00",
+    "gitCommitHash": "2f6e4597dbbd1a29cea352518fb90430a98da2cb"
+  },
+  "nodes": [
+    {
+      "id": "domain:task-execution",
+      "type": "domain",
+      "name": "Task Execution",
+      "summary": "Core domain responsible for processing user requests through a THINK-PLAN-ACT-OBSERVE state machine loop. Handles single-step and multi-step tasks with tool orchestration.",
+      "tags": ["core", "state-machine", "langgraph"],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": ["AgentState", "AgentGraph", "UserRequest", "ToolResult"],
+        "businessRules": [
+          "Maximum 10 iterations for main agent, 5 for sub-agents",
+          "Idle loop detection stops after 3 consecutive iterations without tool calls",
+          "Read-only tool loop detection stops after 2 consecutive read-only operations"
+        ],
+        "crossDomainInteractions": [
+          "Invokes Tool System for file/command operations",
+          "Spawns Sub-Agent Management for parallel execution",
+          "Uses LLM Integration for reasoning and response generation"
+        ]
+      }
+    },
+    {
+      "id": "domain:tool-system",
+      "type": "domain",
+      "name": "Tool System",
+      "summary": "Registry and execution layer for all available tools. Provides file operations, command execution, web search, and agent management tools with safety checks and file locking.",
+      "tags": ["tools", "registry", "safety"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entities": ["BaseTool", "ToolRegistry", "SafetyChecker", "FileLock"],
+        "businessRules": [
+          "All tools must extend BaseTool and implement execute()",
+          "File operations require safety checks before execution",
+          "Write operations acquire file locks to prevent conflicts"
+        ],
+        "crossDomainInteractions": [
+          "Called by Task Execution domain during ACT phase",
+          "Used by Sub-Agent Management for parallel file operations",
+          "Reports results back to AgentState"
+        ]
+      }
+    },
+    {
+      "id": "domain:sub-agent-management",
+      "type": "domain",
+      "name": "Sub-Agent Management",
+      "summary": "Manages parallel execution of sub-agents with semaphore-based concurrency control. Coordinates task distribution, result aggregation, and conflict detection.",
+      "tags": ["parallel", "async", "concurrency"],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": ["SubAgentManager", "ParallelCoordinator", "DistributedTask", "AgentInfo"],
+        "businessRules": [
+          "Maximum 3 concurrent sub-agents by default",
+          "Sub-agents cannot spawn more agents (prevents infinite recursion)",
+          "180-second timeout per sub-agent execution",
+          "Dependency analysis determines execution order with topological sort"
+        ],
+        "crossDomainInteractions": [
+          "Invokes Task Execution domain logic within each sub-agent",
+          "Uses Tool System for file locking and conflict detection",
+          "Returns aggregated results to main agent"
+        ]
+      }
+    },
+    {
+      "id": "domain:llm-integration",
+      "type": "domain",
+      "name": "LLM Integration",
+      "summary": "Multi-provider LLM abstraction layer using LiteLLM. Handles message formatting, tool calling, streaming output, and provider-specific prompt customization.",
+      "tags": ["llm", "litellm", "streaming"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entities": ["LLMProvider", "ModelProvider", "SystemPrompt"],
+        "businessRules": [
+          "Supports Claude, OpenAI, Gemini, DeepSeek, Ollama providers",
+          "Each provider has customized system prompt format",
+          "Streaming disabled for sub-agents to simplify result collection"
+        ],
+        "crossDomainInteractions": [
+          "Called by Task Execution during THINK and ACT phases",
+          "Tool definitions converted to LiteLLM format",
+          "Messages converted from LangChain format to LiteLLM format"
+        ]
+      }
+    },
+    {
+      "id": "domain:user-interaction",
+      "type": "domain",
+      "name": "User Interaction",
+      "summary": "REPL-based command-line interface with history, auto-suggest, and session management. Handles slash commands, streaming display, and multi-thread conversations.",
+      "tags": ["cli", "repl", "ux"],
+      "complexity": "simple",
+      "domainMeta": {
+        "entities": ["REPLSession", "Display", "SessionManager"],
+        "businessRules": [
+          "Conversation history limited to last 20 messages",
+          "Auto-save sessions to SQLite database",
+          "Thread switching preserves separate conversation states"
+        ],
+        "crossDomainInteractions": [
+          "Triggers Task Execution domain with user input",
+          "Displays results from agent responses",
+          "Manages session persistence"
+        ]
+      }
+    },
+    {
+      "id": "flow:process-user-request",
+      "type": "flow",
+      "name": "Process User Request",
+      "summary": "Main request processing flow through THINK-PLAN-ACT-OBSERVE state machine loop.",
+      "tags": ["main-flow", "state-machine"],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "REPL input or API call",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:process-user-request:receive-input",
+      "type": "step",
+      "name": "Receive Input",
+      "summary": "Accept user input from REPL or API, handle slash commands if present.",
+      "tags": ["input", "cli"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/cli/repl.py",
+      "lineRange": [72, 88]
+    },
+    {
+      "id": "step:process-user-request:think",
+      "type": "step",
+      "name": "Think",
+      "summary": "Analyze the request, check iteration limits, inject system prompt, prepare for planning.",
+      "tags": ["reasoning", "state"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "lineRange": [33, 88]
+    },
+    {
+      "id": "step:process-user-request:plan",
+      "type": "step",
+      "name": "Plan",
+      "summary": "Create execution plan based on task keywords, detect required tools, check for multi-file project completion.",
+      "tags": ["planning", "analysis"],
+      "complexity": "moderate",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "lineRange": [91, 235]
+    },
+    {
+      "id": "step:process-user-request:act",
+      "type": "step",
+      "name": "Act",
+      "summary": "Execute tools via LLM tool calling, handle streaming output, process tool results immediately.",
+      "tags": ["execution", "tools"],
+      "complexity": "complex",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "lineRange": [238, 528]
+    },
+    {
+      "id": "step:process-user-request:observe",
+      "type": "step",
+      "name": "Observe",
+      "summary": "Process tool results, detect completion conditions, check for idle loops, decide whether to continue.",
+      "tags": ["observation", "control-flow"],
+      "complexity": "complex",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "lineRange": [531, 824]
+    },
+    {
+      "id": "step:process-user-request:respond",
+      "type": "step",
+      "name": "Respond",
+      "summary": "Extract final response from messages, display to user, update conversation history.",
+      "tags": ["output", "response"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/cli/repl.py",
+      "lineRange": [122, 138]
+    },
+    {
+      "id": "flow:execute-file-operation",
+      "type": "flow",
+      "name": "Execute File Operation",
+      "summary": "Handle file read/write/edit operations with safety checks and file locking.",
+      "tags": ["file-ops", "tools"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "Tool call from ACT phase",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:execute-file-operation:validate-request",
+      "type": "step",
+      "name": "Validate Request",
+      "summary": "Check path safety, resolve relative paths to workspace, validate parameters.",
+      "tags": ["validation", "safety"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/tools/file_ops.py",
+      "lineRange": [59, 69]
+    },
+    {
+      "id": "step:execute-file-operation:acquire-lock",
+      "type": "step",
+      "name": "Acquire Lock",
+      "summary": "Acquire read or write lock on target file, check for conflicts with other agents.",
+      "tags": ["locking", "concurrency"],
+      "complexity": "moderate",
+      "filePath": "src/mini_claude/tools/file_ops.py",
+      "lineRange": [71, 75]
+    },
+    {
+      "id": "step:execute-file-operation:execute-operation",
+      "type": "step",
+      "name": "Execute Operation",
+      "summary": "Perform the actual file read/write/edit operation, create parent directories if needed.",
+      "tags": ["execution", "io"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/tools/file_ops.py",
+      "lineRange": [147, 159]
+    },
+    {
+      "id": "step:execute-file-operation:release-lock",
+      "type": "step",
+      "name": "Release Lock",
+      "summary": "Release file lock, update version tracking for write operations.",
+      "tags": ["cleanup", "locking"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/tools/file_ops.py",
+      "lineRange": [157, 164]
+    },
+    {
+      "id": "flow:spawn-parallel-agents",
+      "type": "flow",
+      "name": "Spawn Parallel Agents",
+      "summary": "Create and execute multiple sub-agents in parallel for independent tasks.",
+      "tags": ["parallel", "sub-agents"],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "spawn_parallel or execute_parallel tool call",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:spawn-parallel-agents:analyze-dependencies",
+      "type": "step",
+      "name": "Analyze Dependencies",
+      "summary": "Build dependency graph, perform topological sort, identify execution levels.",
+      "tags": ["analysis", "dependencies"],
+      "complexity": "moderate",
+      "filePath": "src/mini_claude/agent/coordinator.py",
+      "lineRange": [100, 139]
+    },
+    {
+      "id": "step:spawn-parallel-agents:detect-conflicts",
+      "type": "step",
+      "name": "Detect Conflicts",
+      "summary": "Identify tasks that modify the same files, warn about potential conflicts.",
+      "tags": ["conflict-detection", "safety"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/tools/parallel.py",
+      "lineRange": [123, 138]
+    },
+    {
+      "id": "step:spawn-parallel-agents:launch-agents",
+      "type": "step",
+      "name": "Launch Agents",
+      "summary": "Create asyncio tasks for each agent, use semaphore to limit concurrency.",
+      "tags": ["async", "spawn"],
+      "complexity": "moderate",
+      "filePath": "src/mini_claude/tools/parallel.py",
+      "lineRange": [190, 205]
+    },
+    {
+      "id": "step:spawn-parallel-agents:wait-completion",
+      "type": "step",
+      "name": "Wait for Completion",
+      "summary": "Use asyncio.gather to wait for all agents, handle timeouts and exceptions.",
+      "tags": ["async", "waiting"],
+      "complexity": "moderate",
+      "filePath": "src/mini_claude/tools/parallel.py",
+      "lineRange": [205, 210]
+    },
+    {
+      "id": "step:spawn-parallel-agents:aggregate-results",
+      "type": "step",
+      "name": "Aggregate Results",
+      "summary": "Collect results from all completed agents, generate summary report.",
+      "tags": ["aggregation", "reporting"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/agent/coordinator.py",
+      "lineRange": [255, 293]
+    },
+    {
+      "id": "flow:sub-agent-execution",
+      "type": "flow",
+      "name": "Sub-Agent Execution",
+      "summary": "Execute a task within a sub-agent context with limited tools and iterations.",
+      "tags": ["sub-agent", "isolation"],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "Sub-agent spawn from main agent",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:sub-agent-execution:create-state",
+      "type": "step",
+      "name": "Create State",
+      "summary": "Initialize sub-agent state with task description, mark is_subagent=True, set allowed_tools.",
+      "tags": ["initialization", "state"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/tools/agent_spawn.py",
+      "lineRange": [95, 100]
+    },
+    {
+      "id": "step:sub-agent-execution:run-graph",
+      "type": "step",
+      "name": "Run Graph",
+      "summary": "Execute the same THINK-PLAN-ACT-OBSERVE graph with sub-agent constraints.",
+      "tags": ["execution", "graph"],
+      "complexity": "moderate",
+      "filePath": "src/mini_claude/tools/agent_spawn.py",
+      "lineRange": [104, 107]
+    },
+    {
+      "id": "step:sub-agent-execution:extract-result",
+      "type": "step",
+      "name": "Extract Result",
+      "summary": "Find the last AI message without tool calls as the final result.",
+      "tags": ["extraction", "result"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/tools/agent_spawn.py",
+      "lineRange": [114, 120]
+    },
+    {
+      "id": "step:sub-agent-execution:auto-fallback",
+      "type": "step",
+      "name": "Auto Fallback",
+      "summary": "If LLM fails to create file, auto-create with basic content based on task description.",
+      "tags": ["fallback", "auto-create"],
+      "complexity": "moderate",
+      "filePath": "src/mini_claude/tools/parallel.py",
+      "lineRange": [333, 350]
+    },
+    {
+      "id": "flow:manage-session",
+      "type": "flow",
+      "name": "Manage Session",
+      "summary": "Handle conversation session persistence, thread switching, and history management.",
+      "tags": ["session", "persistence"],
+      "complexity": "simple",
+      "domainMeta": {
+        "entryPoint": "Slash command or auto-save trigger",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:manage-session:save-session",
+      "type": "step",
+      "name": "Save Session",
+      "summary": "Serialize conversation messages to SQLite database with thread ID.",
+      "tags": ["persistence", "sqlite"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/utils/session.py",
+      "lineRange": [1, 50]
+    },
+    {
+      "id": "step:manage-session:load-session",
+      "type": "step",
+      "name": "Load Session",
+      "summary": "Retrieve conversation history from database by thread ID.",
+      "tags": ["retrieval", "history"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/cli/repl.py",
+      "lineRange": [315, 322]
+    },
+    {
+      "id": "step:manage-session:switch-thread",
+      "type": "step",
+      "name": "Switch Thread",
+      "summary": "Change active thread ID and clear current conversation buffer.",
+      "tags": ["threading", "switching"],
+      "complexity": "simple",
+      "filePath": "src/mini_claude/cli/repl.py",
+      "lineRange": [306, 311]
+    }
+  ],
+  "edges": [
+    { "source": "domain:task-execution", "target": "flow:process-user-request", "type": "contains_flow", "direction": "forward", "weight": 1.0 },
+    { "source": "domain:tool-system", "target": "flow:execute-file-operation", "type": "contains_flow", "direction": "forward", "weight": 1.0 },
+    { "source": "domain:sub-agent-management", "target": "flow:spawn-parallel-agents", "type": "contains_flow", "direction": "forward", "weight": 1.0 },
+    { "source": "domain:sub-agent-management", "target": "flow:sub-agent-execution", "type": "contains_flow", "direction": "forward", "weight": 1.0 },
+    { "source": "domain:user-interaction", "target": "flow:manage-session", "type": "contains_flow", "direction": "forward", "weight": 1.0 },
+
+    { "source": "flow:process-user-request", "target": "step:process-user-request:receive-input", "type": "flow_step", "direction": "forward", "weight": 0.1 },
+    { "source": "flow:process-user-request", "target": "step:process-user-request:think", "type": "flow_step", "direction": "forward", "weight": 0.3 },
+    { "source": "flow:process-user-request", "target": "step:process-user-request:plan", "type": "flow_step", "direction": "forward", "weight": 0.5 },
+    { "source": "flow:process-user-request", "target": "step:process-user-request:act", "type": "flow_step", "direction": "forward", "weight": 0.7 },
+    { "source": "flow:process-user-request", "target": "step:process-user-request:observe", "type": "flow_step", "direction": "forward", "weight": 0.9 },
+    { "source": "flow:process-user-request", "target": "step:process-user-request:respond", "type": "flow_step", "direction": "forward", "weight": 1.0 },
+
+    { "source": "flow:execute-file-operation", "target": "step:execute-file-operation:validate-request", "type": "flow_step", "direction": "forward", "weight": 0.2 },
+    { "source": "flow:execute-file-operation", "target": "step:execute-file-operation:acquire-lock", "type": "flow_step", "direction": "forward", "weight": 0.4 },
+    { "source": "flow:execute-file-operation", "target": "step:execute-file-operation:execute-operation", "type": "flow_step", "direction": "forward", "weight": 0.6 },
+    { "source": "flow:execute-file-operation", "target": "step:execute-file-operation:release-lock", "type": "flow_step", "direction": "forward", "weight": 0.8 },
+
+    { "source": "flow:spawn-parallel-agents", "target": "step:spawn-parallel-agents:analyze-dependencies", "type": "flow_step", "direction": "forward", "weight": 0.2 },
+    { "source": "flow:spawn-parallel-agents", "target": "step:spawn-parallel-agents:detect-conflicts", "type": "flow_step", "direction": "forward", "weight": 0.4 },
+    { "source": "flow:spawn-parallel-agents", "target": "step:spawn-parallel-agents:launch-agents", "type": "flow_step", "direction": "forward", "weight": 0.6 },
+    { "source": "flow:spawn-parallel-agents", "target": "step:spawn-parallel-agents:wait-completion", "type": "flow_step", "direction": "forward", "weight": 0.8 },
+    { "source": "flow:spawn-parallel-agents", "target": "step:spawn-parallel-agents:aggregate-results", "type": "flow_step", "direction": "forward", "weight": 1.0 },
+
+    { "source": "flow:sub-agent-execution", "target": "step:sub-agent-execution:create-state", "type": "flow_step", "direction": "forward", "weight": 0.2 },
+    { "source": "flow:sub-agent-execution", "target": "step:sub-agent-execution:run-graph", "type": "flow_step", "direction": "forward", "weight": 0.4 },
+    { "source": "flow:sub-agent-execution", "target": "step:sub-agent-execution:extract-result", "type": "flow_step", "direction": "forward", "weight": 0.6 },
+    { "source": "flow:sub-agent-execution", "target": "step:sub-agent-execution:auto-fallback", "type": "flow_step", "direction": "forward", "weight": 0.8 },
+
+    { "source": "flow:manage-session", "target": "step:manage-session:save-session", "type": "flow_step", "direction": "forward", "weight": 0.3 },
+    { "source": "flow:manage-session", "target": "step:manage-session:load-session", "type": "flow_step", "direction": "forward", "weight": 0.6 },
+    { "source": "flow:manage-session", "target": "step:manage-session:switch-thread", "type": "flow_step", "direction": "forward", "weight": 0.9 },
+
+    { "source": "domain:task-execution", "target": "domain:tool-system", "type": "cross_domain", "direction": "forward", "description": "Task Execution invokes tools during ACT phase to perform file/command operations", "weight": 0.8 },
+    { "source": "domain:task-execution", "target": "domain:sub-agent-management", "type": "cross_domain", "direction": "forward", "description": "Task Execution spawns sub-agents for parallel task execution via spawn_parallel tool", "weight": 0.7 },
+    { "source": "domain:task-execution", "target": "domain:llm-integration", "type": "cross_domain", "direction": "forward", "description": "Task Execution calls LLM for reasoning (THINK), planning (PLAN), and tool selection (ACT)", "weight": 0.9 },
+    { "source": "domain:task-execution", "target": "domain:user-interaction", "type": "cross_domain", "direction": "forward", "description": "Task Execution receives input from User Interaction and returns responses", "weight": 0.7 },
+    { "source": "domain:sub-agent-management", "target": "domain:tool-system", "type": "cross_domain", "direction": "forward", "description": "Sub-agents use Tool System for file locking and conflict detection during parallel writes", "weight": 0.6 },
+    { "source": "domain:sub-agent-management", "target": "domain:llm-integration", "type": "cross_domain", "direction": "forward", "description": "Sub-agents call LLM independently with sub-agent specific prompts and constraints", "weight": 0.5 },
+    { "source": "domain:user-interaction", "target": "domain:llm-integration", "type": "cross_domain", "direction": "forward", "description": "User Interaction displays streaming output from LLM Integration", "weight": 0.4 }
+  ],
+  "layers": [],
+  "tour": []
+}

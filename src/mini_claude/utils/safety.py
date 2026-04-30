@@ -2,10 +2,17 @@
 
 import os
 import re
-from typing import Tuple
+from typing import Tuple, Set, Optional
 from pathlib import Path
 
 from mini_claude.config.settings import settings
+
+
+# Approved paths cache (persists during session)
+_approved_paths: Set[str] = set()
+
+# Paths pending confirmation (for async confirmation flow)
+_pending_confirmations: dict = {}
 
 
 # Dangerous command patterns
@@ -134,13 +141,48 @@ def validate_command(command: str) -> Tuple[bool, str]:
     return True, "OK"
 
 
-def validate_path(path: str, workspace: str = None, allow_outside: bool = False) -> Tuple[bool, str]:
+def is_path_approved(path: str) -> bool:
+    """Check if a path has been approved by user."""
+    path_abs = os.path.abspath(path)
+    # Check if path or any parent directory is approved
+    for approved in _approved_paths:
+        if path_abs.startswith(approved):
+            return True
+    return False
+
+
+def approve_path(path: str) -> None:
+    """Add a path to the approved list."""
+    path_abs = os.path.abspath(path)
+    _approved_paths.add(path_abs)
+
+
+def clear_approved_paths() -> None:
+    """Clear all approved paths."""
+    _approved_paths.clear()
+
+
+def get_approved_paths() -> Set[str]:
+    """Get all approved paths."""
+    return _approved_paths.copy()
+
+
+class PathConfirmationRequired(Exception):
+    """Exception raised when path requires user confirmation."""
+    def __init__(self, path: str, reason: str):
+        self.path = path
+        self.reason = reason
+        super().__init__(f"Path requires confirmation: {path} - {reason}")
+
+
+def validate_path(path: str, workspace: str = None, allow_outside: bool = False, require_confirmation: bool = True) -> Tuple[bool, str]:
     """Validate a file path is within workspace.
 
     Args:
         path: The path to validate
         workspace: The workspace root directory
         allow_outside: If True, allow paths outside workspace (for read operations)
+        require_confirmation: If True, raise exception for paths needing confirmation
 
     Returns:
         Tuple of (is_valid, reason)
@@ -200,6 +242,15 @@ def validate_path(path: str, workspace: str = None, allow_outside: bool = False)
         if re.match(r'^[a-zA-Z]:', normalized):
             drive_path = os.path.abspath(path)
             if not allow_outside and not drive_path.startswith(workspace_abs):
+                # Check if already approved
+                if is_path_approved(drive_path):
+                    return True, "OK"
+                # Raise confirmation exception if enabled
+                if require_confirmation:
+                    raise PathConfirmationRequired(
+                        drive_path,
+                        f"Path is outside workspace ({workspace})"
+                    )
                 return False, f"Absolute Windows path outside workspace: {path}"
 
     # 5. Check for protected paths
@@ -211,6 +262,15 @@ def validate_path(path: str, workspace: str = None, allow_outside: bool = False)
 
     # 6. Check path is within workspace (skip if allow_outside)
     if not allow_outside and not path_real.startswith(workspace_abs):
+        # Check if already approved
+        if is_path_approved(path_real):
+            return True, "OK"
+        # Raise confirmation exception if enabled
+        if require_confirmation:
+            raise PathConfirmationRequired(
+                path_real,
+                f"Path is outside workspace ({workspace})"
+            )
         return False, f"Path outside workspace: {path}"
 
     return True, "OK"
@@ -251,14 +311,14 @@ class SafetyChecker:
         """Check if a command is safe to execute."""
         return validate_command(command)
 
-    def check_path(self, path: str, allow_outside: bool = False) -> Tuple[bool, str]:
+    def check_path(self, path: str, allow_outside: bool = False, require_confirmation: bool = True) -> Tuple[bool, str]:
         """Check if a path is safe to access."""
-        return validate_path(path, self.workspace, allow_outside)
+        return validate_path(path, self.workspace, allow_outside, require_confirmation)
 
-    def check_file_read(self, path: str) -> Tuple[bool, str]:
+    def check_file_read(self, path: str, require_confirmation: bool = True) -> Tuple[bool, str]:
         """Check if a file can be safely read."""
         # Allow reading files outside workspace for read operations
-        is_valid, reason = self.check_path(path, allow_outside=True)
+        is_valid, reason = self.check_path(path, allow_outside=True, require_confirmation=require_confirmation)
         if not is_valid:
             return is_valid, reason
 
@@ -274,9 +334,9 @@ class SafetyChecker:
 
         return True, "OK"
 
-    def check_file_write(self, path: str) -> Tuple[bool, str]:
+    def check_file_write(self, path: str, require_confirmation: bool = True) -> Tuple[bool, str]:
         """Check if a file can be safely written."""
-        is_valid, reason = self.check_path(path)
+        is_valid, reason = self.check_path(path, require_confirmation=require_confirmation)
         if not is_valid:
             return is_valid, reason
 

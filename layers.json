@@ -1,0 +1,68 @@
+[
+  {
+    "id": "layer:cli",
+    "name": "CLI Layer",
+    "description": "用户交互入口，包含Click命令行定义、REPL交互式会话和Rich输出格式化",
+    "nodeIds": [
+      "file:src/mini_claude/cli/main.py",
+      "file:src/mini_claude/cli/repl.py",
+      "file:src/mini_claude/cli/display.py",
+      "file:src/mini_claude/cli/__init__.py"
+    ]
+  },
+  {
+    "id": "layer:agent",
+    "name": "Agent Layer",
+    "description": "核心Agent逻辑，LangGraph状态机驱动的THINK-PLAN-ACT-OBSERVE循环，支持并发子Agent执行",
+    "nodeIds": [
+      "file:src/mini_claude/agent/graph.py",
+      "file:src/mini_claude/agent/nodes.py",
+      "file:src/mini_claude/agent/state.py",
+      "file:src/mini_claude/agent/subagent.py",
+      "file:src/mini_claude/agent/coordinator.py",
+      "file:src/mini_claude/agent/__init__.py"
+    ]
+  },
+  {
+    "id": "layer:services",
+    "name": "Services Layer",
+    "description": "基础设施服务，LLM统一接口、提示词管理、安全检查、文件锁和会话持久化",
+    "nodeIds": [
+      "file:src/mini_claude/llm/provider.py",
+      "file:src/mini_claude/llm/prompts.py",
+      "file:src/mini_claude/llm/__init__.py",
+      "file:src/mini_claude/utils/safety.py",
+      "file:src/mini_claude/utils/file_lock.py",
+      "file:src/mini_claude/utils/session.py",
+      "file:src/mini_claude/utils/memory.py",
+      "file:src/mini_claude/utils/__init__.py"
+    ]
+  },
+  {
+    "id": "layer:tools",
+    "name": "Tools Layer",
+    "description": "16个工具实现，包括文件操作、命令执行、网络搜索、子Agent生成和并行执行规划",
+    "nodeIds": [
+      "file:src/mini_claude/tools/base.py",
+      "file:src/mini_claude/tools/file_ops.py",
+      "file:src/mini_claude/tools/bash.py",
+      "file:src/mini_claude/tools/web_search.py",
+      "file:src/mini_claude/tools/agent_spawn.py",
+      "file:src/mini_claude/tools/parallel.py",
+      "file:src/mini_claude/tools/__init__.py"
+    ]
+  },
+  {
+    "id": "layer:config",
+    "name": "Config Layer",
+    "description": "配置管理，Pydantic Settings定义API密钥、模型参数、Agent设置和工作空间路径",
+    "nodeIds": [
+      "file:src/mini_claude/config/settings.py",
+      "file:src/mini_claude/config/__init__.py",
+      "file:src/mini_claude/__init__.py",
+      "file:pyproject.toml",
+      "file:.env",
+      "file:.env.example"
+    ]
+  }
+]

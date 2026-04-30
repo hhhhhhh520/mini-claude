@@ -1,0 +1,330 @@
+{
+  "name": "mini-claude",
+  "description": "迷你版 Claude Code CLI 工具，支持工具调用和多Agent并发处理复杂任务。基于 LangGraph 构建主Agent + 子Agent架构，支持文件操作、命令执行、Web搜索等工具，以及文件锁机制实现多Agent安全并行开发。",
+  "languages": [
+    "markdown",
+    "python",
+    "toml"
+  ],
+  "frameworks": [
+    "LangChain",
+    "LangGraph",
+    "LiteLLM",
+    "Pydantic"
+  ],
+  "files": [
+    {
+      "path": ".env.example",
+      "language": "unknown",
+      "sizeLines": 15,
+      "fileCategory": "config"
+    },
+    {
+      "path": "CLAUDE.md",
+      "language": "markdown",
+      "sizeLines": 53,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "issues/ISSUE-001-streaming-tool-calls.md",
+      "language": "markdown",
+      "sizeLines": 68,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "issues/ISSUE-002-observe-unbound-variable.md",
+      "language": "markdown",
+      "sizeLines": 55,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "issues/ISSUE-003-model-loop-read-file.md",
+      "language": "markdown",
+      "sizeLines": 47,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "issues/ISSUE-004-streaming-tool-args.md",
+      "language": "markdown",
+      "sizeLines": 95,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "issues/ISSUE-005-session-syntax-error.md",
+      "language": "markdown",
+      "sizeLines": 34,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "PROGRESS.md",
+      "language": "markdown",
+      "sizeLines": 114,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "pyproject.toml",
+      "language": "toml",
+      "sizeLines": 50,
+      "fileCategory": "config"
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "sizeLines": 216,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "src/mini_claude/__init__.py",
+      "language": "python",
+      "sizeLines": 4,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/agent/__init__.py",
+      "language": "python",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/agent/coordinator.py",
+      "language": "python",
+      "sizeLines": 304,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/agent/graph.py",
+      "language": "python",
+      "sizeLines": 90,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/agent/nodes.py",
+      "language": "python",
+      "sizeLines": 830,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/agent/state.py",
+      "language": "python",
+      "sizeLines": 83,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/agent/subagent.py",
+      "language": "python",
+      "sizeLines": 157,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/cli/__init__.py",
+      "language": "python",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/cli/display.py",
+      "language": "python",
+      "sizeLines": 169,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/cli/main.py",
+      "language": "python",
+      "sizeLines": 156,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/cli/repl.py",
+      "language": "python",
+      "sizeLines": 357,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/config/__init__.py",
+      "language": "python",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/config/settings.py",
+      "language": "python",
+      "sizeLines": 87,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/llm/__init__.py",
+      "language": "python",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/llm/prompts.py",
+      "language": "python",
+      "sizeLines": 193,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/llm/provider.py",
+      "language": "python",
+      "sizeLines": 243,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/tools/__init__.py",
+      "language": "python",
+      "sizeLines": 84,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/tools/agent_spawn.py",
+      "language": "python",
+      "sizeLines": 345,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/tools/base.py",
+      "language": "python",
+      "sizeLines": 91,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/tools/bash.py",
+      "language": "python",
+      "sizeLines": 123,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/tools/file_ops.py",
+      "language": "python",
+      "sizeLines": 540,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/tools/parallel.py",
+      "language": "python",
+      "sizeLines": 569,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/tools/web_search.py",
+      "language": "python",
+      "sizeLines": 92,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/utils/__init__.py",
+      "language": "python",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/utils/file_lock.py",
+      "language": "python",
+      "sizeLines": 213,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/utils/memory.py",
+      "language": "python",
+      "sizeLines": 116,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/utils/safety.py",
+      "language": "python",
+      "sizeLines": 286,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/mini_claude/utils/session.py",
+      "language": "python",
+      "sizeLines": 139,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/__init__.py",
+      "language": "python",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_agent/__init__.py",
+      "language": "python",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_agent/test_graph.py",
+      "language": "python",
+      "sizeLines": 359,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_tools/__init__.py",
+      "language": "python",
+      "sizeLines": 2,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_tools/test_file_ops.py",
+      "language": "python",
+      "sizeLines": 720,
+      "fileCategory": "code"
+    },
+    {
+      "path": "tests/test_utils/__init__.py",
+      "language": "python",
+      "sizeLines": 1,
+      "fileCategory": "code"
+    }
+  ],
+  "totalFiles": 44,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "moderate",
+  "importMap": {
+    ".env.example": [],
+    "CLAUDE.md": [],
+    "issues/ISSUE-001-streaming-tool-calls.md": [],
+    "issues/ISSUE-002-observe-unbound-variable.md": [],
+    "issues/ISSUE-003-model-loop-read-file.md": [],
+    "issues/ISSUE-004-streaming-tool-args.md": [],
+    "issues/ISSUE-005-session-syntax-error.md": [],
+    "PROGRESS.md": [],
+    "pyproject.toml": [],
+    "README.md": [],
+    "src/mini_claude/__init__.py": [],
+    "src/mini_claude/agent/__init__.py": [],
+    "src/mini_claude/agent/coordinator.py": [],
+    "src/mini_claude/agent/graph.py": [],
+    "src/mini_claude/agent/nodes.py": [],
+    "src/mini_claude/agent/state.py": [],
+    "src/mini_claude/agent/subagent.py": [],
+    "src/mini_claude/cli/__init__.py": [],
+    "src/mini_claude/cli/display.py": [],
+    "src/mini_claude/cli/main.py": [],
+    "src/mini_claude/cli/repl.py": [],
+    "src/mini_claude/config/__init__.py": [],
+    "src/mini_claude/config/settings.py": [],
+    "src/mini_claude/llm/__init__.py": [],
+    "src/mini_claude/llm/prompts.py": [],
+    "src/mini_claude/llm/provider.py": [],
+    "src/mini_claude/tools/__init__.py": [],
+    "src/mini_claude/tools/agent_spawn.py": [],
+    "src/mini_claude/tools/base.py": [],
+    "src/mini_claude/tools/bash.py": [],
+    "src/mini_claude/tools/file_ops.py": [],
+    "src/mini_claude/tools/parallel.py": [],
+    "src/mini_claude/tools/web_search.py": [],
+    "src/mini_claude/utils/__init__.py": [],
+    "src/mini_claude/utils/file_lock.py": [],
+    "src/mini_claude/utils/memory.py": [],
+    "src/mini_claude/utils/safety.py": [],
+    "src/mini_claude/utils/session.py": [],
+    "tests/__init__.py": [],
+    "tests/test_agent/__init__.py": [],
+    "tests/test_agent/test_graph.py": [],
+    "tests/test_tools/__init__.py": [],
+    "tests/test_tools/test_file_ops.py": [],
+    "tests/test_utils/__init__.py": []
+  }
+}

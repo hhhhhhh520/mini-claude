@@ -44,6 +44,7 @@ class REPLSession:
         self.running = False
         self.messages = []
         self.thread_id = "default"  # Thread ID for LangGraph checkpointer
+        self.pending_confirmation_path: Optional[str] = None  # 待确认的路径
 
     def initialize(self):
         """Initialize the REPL session."""
@@ -86,6 +87,17 @@ class REPLSession:
                     if handled:
                         continue
 
+                # Check for path confirmation response
+                user_lower = user_input.strip().lower()
+                if user_lower in ('yes', 'y', '确认', '同意'):
+                    # Check if we have a pending confirmation path
+                    if self.pending_confirmation_path:
+                        from ..utils.safety import approve_path
+                        approve_path(self.pending_confirmation_path)
+                        display.console.print(f"[green]✓ 已批准路径: {self.pending_confirmation_path}[/]")
+                        self.pending_confirmation_path = None
+                        user_input = "请继续执行之前的任务"
+
                 # Process with LangGraph
                 display.user_message(user_input)
                 display.show_thinking()
@@ -126,6 +138,9 @@ class REPLSession:
                         response_text = last_message.content if hasattr(last_message, 'content') else str(last_message)
                     else:
                         response_text = "抱歉，我无法处理这个请求。"
+
+                    # Check for pending confirmation path
+                    self.pending_confirmation_path = result.get("pending_confirmation_path")
 
                     # Update history (keep last 20 messages, convert to dict for storage)
                     self.messages = []

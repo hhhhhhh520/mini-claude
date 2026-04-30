@@ -1,10 +1,10 @@
-"""Tests for agent state and graph."""
+"""Tests for agent state and graph - Updated for refactored state."""
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
-from mini_claude.agent.state import AgentState, create_initial_state
+from mini_claude.agent.state import AgentState, StopReason, create_initial_state
 from mini_claude.agent.nodes import think_node, should_continue_router
 
 
@@ -19,7 +19,7 @@ class TestAgentStateCreation:
         assert state["current_task"] == "Hello"
         assert state["thread_id"] == "test"
         assert state["iteration"] == 0
-        assert state["should_continue"] is True
+        assert state["stop_reason"] == StopReason.CONTINUE
 
     def test_create_initial_state_with_history(self):
         """测试带历史消息创建状态"""
@@ -71,32 +71,30 @@ class TestAgentStateCreation:
         state = create_initial_state("Task", thread_id="test")
         assert len(state["messages"]) == 1
 
-    def test_create_initial_state_plan_none(self):
-        """测试计划初始为空"""
+    def test_create_initial_state_retry_count_zero(self):
+        """测试重试计数初始为零"""
         state = create_initial_state("Task", thread_id="test")
-        assert state["plan"] is None
-
-    def test_create_initial_state_tool_results_empty(self):
-        """测试工具结果初始为空"""
-        state = create_initial_state("Task", thread_id="test")
-        assert state["tool_results"] == []
+        assert state["retry_count"] == 0
 
     def test_create_initial_state_sub_agents_empty(self):
         """测试子代理初始为空"""
         state = create_initial_state("Task", thread_id="test")
         assert state["sub_agents"] == {}
 
-    def test_create_initial_state_errors_none(self):
-        """测试错误初始为空"""
+    def test_create_initial_state_errors_empty(self):
+        """测试错误初始为空列表"""
         state = create_initial_state("Task", thread_id="test")
-        assert state["errors"] is None
+        assert state["errors"] == []
 
-    def test_create_initial_state_counters_zero(self):
-        """测试计数器初始为零"""
+    def test_create_initial_state_stop_reason_continue(self):
+        """测试停止原因初始为 CONTINUE"""
         state = create_initial_state("Task", thread_id="test")
-        assert state["incomplete_check_count"] == 0
-        assert state["consecutive_read_only_count"] == 0
-        assert state["no_tool_call_count"] == 0
+        assert state["stop_reason"] == StopReason.CONTINUE
+
+    def test_create_initial_state_sub_agent_results_empty(self):
+        """测试子代理结果初始为空"""
+        state = create_initial_state("Task", thread_id="test")
+        assert state["sub_agent_results"] == {}
 
 
 # ========== Router Tests (10个) ==========
@@ -106,71 +104,163 @@ class TestShouldContinueRouter:
 
     def test_router_should_continue_true(self):
         """测试继续为True"""
-        state = AgentState(should_continue=True)
+        state = AgentState(
+            messages=[],
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.CONTINUE,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
+            errors=[],
+            retry_count=0,
+        )
         assert should_continue_router(state) is True
 
     def test_router_should_continue_false(self):
         """测试继续为False"""
-        state = AgentState(should_continue=False)
+        state = AgentState(
+            messages=[],
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.TASK_COMPLETE,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
+            errors=[],
+            retry_count=0,
+        )
         assert should_continue_router(state) is False
 
     def test_router_with_messages(self):
         """测试带消息的路由"""
         state = AgentState(
             messages=[HumanMessage(content="test")],
-            should_continue=True
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.CONTINUE,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
+            errors=[],
+            retry_count=0,
         )
         assert should_continue_router(state) is True
 
     def test_router_with_iteration(self):
         """测试带迭代计数的路由"""
         state = AgentState(
+            messages=[],
+            current_task="test",
             iteration=5,
-            should_continue=True
+            stop_reason=StopReason.CONTINUE,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
+            errors=[],
+            retry_count=0,
         )
         assert should_continue_router(state) is True
 
-    def test_router_with_tool_results(self):
-        """测试带工具结果的路由"""
+    def test_router_with_stop_reason_error(self):
+        """测试停止原因为错误"""
         state = AgentState(
-            tool_results=[{"result": "success"}],
-            should_continue=False
+            messages=[],
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.ERROR,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
+            errors=["error"],
+            retry_count=0,
         )
         assert should_continue_router(state) is False
 
     def test_router_with_sub_agents(self):
         """测试带子代理的路由"""
         state = AgentState(
+            messages=[],
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.CONTINUE,
+            thread_id="test",
             sub_agents={"agent1": "running"},
-            should_continue=True
+            sub_agent_results={},
+            is_subagent=False,
+            errors=[],
+            retry_count=0,
         )
         assert should_continue_router(state) is True
 
     def test_router_with_errors(self):
         """测试带错误的路由"""
         state = AgentState(
+            messages=[],
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.CONTINUE,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
             errors=["Some error"],
-            should_continue=True
+            retry_count=0,
         )
         assert should_continue_router(state) is True
 
-    def test_router_with_plan(self):
-        """测试带计划的路由"""
+    def test_router_with_max_iterations(self):
+        """测试达到最大迭代"""
         state = AgentState(
-            plan=["Step 1", "Step 2"],
-            should_continue=True
+            messages=[],
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.MAX_ITERATIONS,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
+            errors=[],
+            retry_count=0,
         )
-        assert should_continue_router(state) is True
+        assert should_continue_router(state) is False
 
     def test_router_state_immutability(self):
         """测试路由不修改状态"""
-        state = AgentState(should_continue=True)
+        state = AgentState(
+            messages=[],
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.CONTINUE,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
+            errors=[],
+            retry_count=0,
+        )
         _ = should_continue_router(state)
-        assert state["should_continue"] is True
+        assert state["stop_reason"] == StopReason.CONTINUE
 
     def test_router_multiple_calls(self):
         """测试多次调用路由"""
-        state = AgentState(should_continue=True)
+        state = AgentState(
+            messages=[],
+            current_task="test",
+            iteration=0,
+            stop_reason=StopReason.CONTINUE,
+            thread_id="test",
+            sub_agents={},
+            sub_agent_results={},
+            is_subagent=False,
+            errors=[],
+            retry_count=0,
+        )
         for _ in range(10):
             assert should_continue_router(state) is True
 
@@ -186,7 +276,6 @@ class TestThinkNode:
         state = create_initial_state("Test task")
         result = await think_node(state)
         assert result["iteration"] == 1
-        assert len(result["messages"]) > 0
 
     @pytest.mark.asyncio
     async def test_think_node_adds_system_message(self):
@@ -247,15 +336,16 @@ class TestThinkNode:
         """测试子代理模式"""
         state = create_initial_state("Task", is_subagent=True)
         result = await think_node(state)
-        assert result["is_subagent"] is True
+        assert result.get("stop_reason") in [StopReason.CONTINUE, StopReason.MAX_ITERATIONS]
 
     @pytest.mark.asyncio
     async def test_think_node_multiple_iterations(self):
         """测试多次迭代"""
         state = create_initial_state("Task")
         for i in range(3):
-            state = await think_node(state)
-            assert state["iteration"] == i + 1
+            result = await think_node(state)
+            assert result["iteration"] == i + 1
+            state["iteration"] = result["iteration"]
 
 
 # ========== State Transition Tests (15个) ==========
@@ -269,11 +359,11 @@ class TestStateTransitions:
         state["messages"].append(AIMessage(content="Response"))
         assert len(state["messages"]) == 2
 
-    def test_state_transition_tool_results_append(self):
-        """测试工具结果追加"""
+    def test_state_transition_errors_append(self):
+        """测试错误追加"""
         state = create_initial_state("Task")
-        state["tool_results"].append({"tool": "test", "result": "ok"})
-        assert len(state["tool_results"]) == 1
+        state["errors"].append("Error 1")
+        assert len(state["errors"]) == 1
 
     def test_state_transition_sub_agents_update(self):
         """测试子代理更新"""
@@ -287,25 +377,12 @@ class TestStateTransitions:
         state["sub_agent_results"]["agent1"] = {"output": "done"}
         assert state["sub_agent_results"]["agent1"]["output"] == "done"
 
-    def test_state_transition_plan_set(self):
-        """测试计划设置"""
+    def test_state_transition_stop_reason_change(self):
+        """测试停止原因变更"""
         state = create_initial_state("Task")
-        state["plan"] = ["Step 1", "Step 2", "Step 3"]
-        assert len(state["plan"]) == 3
-
-    def test_state_transition_errors_append(self):
-        """测试错误追加"""
-        state = create_initial_state("Task")
-        state["errors"] = []
-        state["errors"].append("Error 1")
-        assert len(state["errors"]) == 1
-
-    def test_state_transition_should_continue_toggle(self):
-        """测试继续标志切换"""
-        state = create_initial_state("Task")
-        assert state["should_continue"] is True
-        state["should_continue"] = False
-        assert state["should_continue"] is False
+        assert state["stop_reason"] == StopReason.CONTINUE
+        state["stop_reason"] = StopReason.TASK_COMPLETE
+        assert state["stop_reason"] == StopReason.TASK_COMPLETE
 
     def test_state_transition_iteration_increment(self):
         """测试迭代递增"""
@@ -314,45 +391,51 @@ class TestStateTransitions:
             state["iteration"] = i + 1
         assert state["iteration"] == 10
 
-    def test_state_transition_incomplete_check_increment(self):
-        """测试不完整检查计数"""
+    def test_state_transition_retry_count_increment(self):
+        """测试重试计数递增"""
         state = create_initial_state("Task")
-        state["incomplete_check_count"] = 1
-        state["incomplete_check_count"] += 1
-        assert state["incomplete_check_count"] == 2
-
-    def test_state_transition_last_missing_files(self):
-        """测试缺失文件记录"""
-        state = create_initial_state("Task")
-        state["last_missing_files"] = ["file1.py", "file2.py"]
-        assert len(state["last_missing_files"]) == 2
-
-    def test_state_transition_read_only_count(self):
-        """测试只读计数"""
-        state = create_initial_state("Task")
-        state["consecutive_read_only_count"] = 3
-        assert state["consecutive_read_only_count"] == 3
-
-    def test_state_transition_last_tool_names(self):
-        """测试工具名称记录"""
-        state = create_initial_state("Task")
-        state["last_tool_names"] = ["read_file", "search_content"]
-        assert "read_file" in state["last_tool_names"]
-
-    def test_state_transition_no_tool_call_count(self):
-        """测试无工具调用计数"""
-        state = create_initial_state("Task")
-        state["no_tool_call_count"] = 2
-        assert state["no_tool_call_count"] == 2
-
-    def test_state_transition_pending_tool_calls(self):
-        """测试待执行工具调用"""
-        state = create_initial_state("Task")
-        state["pending_tool_calls"] = [{"name": "read_file", "args": {}}]
-        assert len(state["pending_tool_calls"]) == 1
+        state["retry_count"] = 1
+        state["retry_count"] += 1
+        assert state["retry_count"] == 2
 
     def test_state_transition_allowed_tools(self):
         """测试允许工具列表"""
         state = create_initial_state("Task", allowed_tools=["read_file"])
         state["allowed_tools"].append("write_file")
         assert "write_file" in state["allowed_tools"]
+
+    def test_state_transition_thread_id_preserved(self):
+        """测试线程ID保留"""
+        state = create_initial_state("Task", thread_id="custom_thread")
+        assert state["thread_id"] == "custom_thread"
+
+    def test_state_transition_is_subagent_flag(self):
+        """测试子代理标志"""
+        state = create_initial_state("Task", is_subagent=True)
+        assert state["is_subagent"] is True
+
+    def test_state_transition_errors_list_type(self):
+        """测试错误列表类型"""
+        state = create_initial_state("Task")
+        assert isinstance(state["errors"], list)
+
+    def test_state_transition_sub_agents_dict_type(self):
+        """测试子代理字典类型"""
+        state = create_initial_state("Task")
+        assert isinstance(state["sub_agents"], dict)
+
+    def test_state_transition_sub_agent_results_dict_type(self):
+        """测试子代理结果字典类型"""
+        state = create_initial_state("Task")
+        assert isinstance(state["sub_agent_results"], dict)
+
+    def test_state_transition_multiple_errors(self):
+        """测试多个错误"""
+        state = create_initial_state("Task")
+        state["errors"].extend(["Error 1", "Error 2", "Error 3"])
+        assert len(state["errors"]) == 3
+
+    def test_state_transition_allowed_tools_none(self):
+        """测试允许工具为None"""
+        state = create_initial_state("Task")
+        assert state["allowed_tools"] is None

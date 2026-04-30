@@ -1,0 +1,1084 @@
+{
+  "nodes": [
+    {
+      "id": "file:src/mini_claude/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "src/mini_claude/__init__.py",
+      "summary": "Package entry point defining the mini_claude module with version metadata.",
+      "tags": ["entry-point", "package-root"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/agent/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "src/mini_claude/agent/__init__.py",
+      "summary": "Agent module package marker.",
+      "tags": ["barrel", "package-marker"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/agent/coordinator.py",
+      "type": "file",
+      "name": "coordinator.py",
+      "filePath": "src/mini_claude/agent/coordinator.py",
+      "summary": "Parallel execution coordinator with task dependency analysis, topological sorting, and result aggregation for multi-agent workflows.",
+      "tags": ["orchestration", "parallel-execution", "task-scheduling", "coordination"],
+      "complexity": "moderate",
+      "languageNotes": "Uses dataclasses for task/agent info, implements topological sort for dependency resolution."
+    },
+    {
+      "id": "class:src/mini_claude/agent/coordinator.py:ParallelCoordinator",
+      "type": "class",
+      "name": "ParallelCoordinator",
+      "filePath": "src/mini_claude/agent/coordinator.py",
+      "lineRange": [55, 299],
+      "summary": "Core coordinator class managing parallel agent execution with dependency-aware task distribution, progress callbacks, and result aggregation.",
+      "tags": ["orchestration", "task-coordinator", "parallel-execution"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/mini_claude/agent/graph.py",
+      "type": "file",
+      "name": "graph.py",
+      "filePath": "src/mini_claude/agent/graph.py",
+      "summary": "LangGraph state machine definition implementing the THINK-PLAN-ACT-OBSERVE agent loop with conditional routing and checkpointing.",
+      "tags": ["state-machine", "agent-loop", "langgraph", "workflow"],
+      "complexity": "moderate",
+      "languageNotes": "Uses LangGraph's StateGraph for declarative agent workflow definition with MemorySaver for state persistence."
+    },
+    {
+      "id": "function:src/mini_claude/agent/graph.py:build_agent_graph",
+      "type": "function",
+      "name": "build_agent_graph",
+      "filePath": "src/mini_claude/agent/graph.py",
+      "lineRange": [16, 53],
+      "summary": "Constructs the main agent graph with THINK-PLAN-ACT-OBSERVE nodes and conditional loop routing.",
+      "tags": ["graph-builder", "agent-setup", "factory"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/mini_claude/agent/graph.py:get_agent_graph",
+      "type": "function",
+      "name": "get_agent_graph",
+      "filePath": "src/mini_claude/agent/graph.py",
+      "lineRange": [84, 90],
+      "summary": "Singleton accessor for the default agent graph instance with lazy initialization.",
+      "tags": ["singleton", "accessor", "factory"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/agent/nodes.py",
+      "type": "file",
+      "name": "nodes.py",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "summary": "Core agent node implementations: think_node for iteration management, plan_node for task analysis, act_node for tool execution with streaming, and observe_node for loop control and completion detection.",
+      "tags": ["agent-nodes", "tool-execution", "streaming", "loop-control"],
+      "complexity": "complex",
+      "languageNotes": "Implements sophisticated multi-file project completion detection and read-only tool loop prevention."
+    },
+    {
+      "id": "function:src/mini_claude/agent/nodes.py:think_node",
+      "type": "function",
+      "name": "think_node",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "lineRange": [33, 88],
+      "summary": "Initial analysis node that sets up system prompt and checks iteration limits before planning.",
+      "tags": ["agent-node", "initialization", "iteration-control"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/mini_claude/agent/nodes.py:plan_node",
+      "type": "function",
+      "name": "plan_node",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "lineRange": [91, 235],
+      "summary": "Task analysis node that creates execution plans by detecting required tools from task keywords and checking file completion status.",
+      "tags": ["agent-node", "planning", "task-analysis"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/mini_claude/agent/nodes.py:act_node",
+      "type": "function",
+      "name": "act_node",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "lineRange": [238, 503],
+      "summary": "Tool execution node with streaming support, tool call validation, and immediate execution of tool results.",
+      "tags": ["agent-node", "tool-execution", "streaming"],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/mini_claude/agent/nodes.py:observe_node",
+      "type": "function",
+      "name": "observe_node",
+      "filePath": "src/mini_claude/agent/nodes.py",
+      "lineRange": [531, 824],
+      "summary": "Loop control node that determines continuation based on tool results, multi-file completion checks, and idle loop detection.",
+      "tags": ["agent-node", "loop-control", "completion-detection"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/mini_claude/agent/state.py",
+      "type": "file",
+      "name": "state.py",
+      "filePath": "src/mini_claude/agent/state.py",
+      "summary": "AgentState TypedDict defining the complete state schema for the agent graph including messages, tools, sub-agents, and loop control fields.",
+      "tags": ["type-definition", "state-schema", "typeddict"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:src/mini_claude/agent/state.py:AgentState",
+      "type": "class",
+      "name": "AgentState",
+      "filePath": "src/mini_claude/agent/state.py",
+      "lineRange": [7, 46],
+      "summary": "TypedDict defining agent state with conversation history, task tracking, tool execution, sub-agent management, and control flow fields.",
+      "tags": ["state-schema", "typeddict", "type-definition"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/mini_claude/agent/state.py:create_initial_state",
+      "type": "function",
+      "name": "create_initial_state",
+      "filePath": "src/mini_claude/agent/state.py",
+      "lineRange": [49, 83],
+      "summary": "Factory function creating initial agent state from user input with optional history and sub-agent configuration.",
+      "tags": ["factory", "initialization", "state-creation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/agent/subagent.py",
+      "type": "file",
+      "name": "subagent.py",
+      "filePath": "src/mini_claude/agent/subagent.py",
+      "summary": "Sub-agent manager implementing asyncio-based parallel agent spawning with semaphore-based concurrency control and progress tracking.",
+      "tags": ["subagent-management", "parallel-execution", "asyncio", "concurrency"],
+      "complexity": "moderate",
+      "languageNotes": "Uses asyncio.Semaphore for concurrent agent limit, asyncio.Queue for progress updates."
+    },
+    {
+      "id": "class:src/mini_claude/agent/subagent.py:SubAgentManager",
+      "type": "class",
+      "name": "SubAgentManager",
+      "filePath": "src/mini_claude/agent/subagent.py",
+      "lineRange": [33, 152],
+      "summary": "Manages parallel sub-agent execution with concurrency limiting, progress tracking via queues, and result collection.",
+      "tags": ["subagent-manager", "concurrency-control", "async-orchestration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/mini_claude/cli/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "src/mini_claude/cli/__init__.py",
+      "summary": "CLI module package marker.",
+      "tags": ["barrel", "package-marker"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/cli/display.py",
+      "type": "file",
+      "name": "display.py",
+      "filePath": "src/mini_claude/cli/display.py",
+      "summary": "Rich-based terminal display handler with streaming output, tool call visualization, and markdown rendering for CLI interactions.",
+      "tags": ["ui", "display", "rich", "terminal", "streaming"],
+      "complexity": "moderate",
+      "languageNotes": "Forces UTF-8 encoding on Windows for proper Chinese character display."
+    },
+    {
+      "id": "class:src/mini_claude/cli/display.py:AgentDisplay",
+      "type": "class",
+      "name": "AgentDisplay",
+      "filePath": "src/mini_claude/cli/display.py",
+      "lineRange": [25, 164],
+      "summary": "Rich console wrapper providing formatted output for user messages, agent responses, tool calls, and streaming text.",
+      "tags": ["display", "console-output", "streaming", "ui-component"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/mini_claude/cli/main.py",
+      "type": "file",
+      "name": "main.py",
+      "filePath": "src/mini_claude/cli/main.py",
+      "summary": "Click-based CLI entry point with REPL mode, single-prompt ask command, and status display subcommands.",
+      "tags": ["entry-point", "cli", "click", "command-handler"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/mini_claude/cli/main.py:main",
+      "type": "function",
+      "name": "main",
+      "filePath": "src/mini_claude/cli/main.py",
+      "lineRange": [25, 39],
+      "summary": "Main CLI entry point using Click group that launches REPL mode by default.",
+      "tags": ["entry-point", "cli-command", "click-group"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/cli/repl.py",
+      "type": "file",
+      "name": "repl.py",
+      "filePath": "src/mini_claude/cli/repl.py",
+      "summary": "Interactive REPL session manager with prompt_toolkit history, slash command handling, and LangGraph integration for conversations.",
+      "tags": ["repl", "interactive-session", "prompt-toolkit", "langgraph-integration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:src/mini_claude/cli/repl.py:REPLSession",
+      "type": "class",
+      "name": "REPLSession",
+      "filePath": "src/mini_claude/cli/repl.py",
+      "lineRange": [38, 356],
+      "summary": "REPL session handler with conversation history, slash command processing, and integration with the LangGraph agent state machine.",
+      "tags": ["repl", "session-management", "command-handler"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/mini_claude/config/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "src/mini_claude/config/__init__.py",
+      "summary": "Config module package marker.",
+      "tags": ["barrel", "package-marker"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/config/settings.py",
+      "type": "file",
+      "name": "settings.py",
+      "filePath": "src/mini_claude/config/settings.py",
+      "summary": "Pydantic Settings configuration for API keys, model selection, agent limits, workspace paths, and environment variable loading.",
+      "tags": ["configuration", "pydantic", "settings", "environment"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:src/mini_claude/config/settings.py:Settings",
+      "type": "class",
+      "name": "Settings",
+      "filePath": "src/mini_claude/config/settings.py",
+      "lineRange": [19, 74],
+      "summary": "Pydantic settings class managing API keys, model provider configuration, agent concurrency limits, and workspace settings.",
+      "tags": ["configuration", "settings", "pydantic-model"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/llm/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "src/mini_claude/llm/__init__.py",
+      "summary": "LLM module package marker.",
+      "tags": ["barrel", "package-marker"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/llm/prompts.py",
+      "type": "file",
+      "name": "prompts.py",
+      "filePath": "src/mini_claude/llm/prompts.py",
+      "summary": "Provider-specific system prompts for Claude, OpenAI, Gemini, and DeepSeek with tool usage instructions and critical rules.",
+      "tags": ["prompts", "system-prompt", "llm-configuration", "provider-specific"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/mini_claude/llm/prompts.py:get_system_prompt",
+      "type": "function",
+      "name": "get_system_prompt",
+      "filePath": "src/mini_claude/llm/prompts.py",
+      "lineRange": [62, 153],
+      "summary": "Returns provider-specific system prompt with tool usage instructions tailored to each LLM provider's preferred format.",
+      "tags": ["prompt-generator", "provider-specific"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/mini_claude/llm/prompts.py:get_subagent_prompt",
+      "type": "function",
+      "name": "get_subagent_prompt",
+      "filePath": "src/mini_claude/llm/prompts.py",
+      "lineRange": [155, 174],
+      "summary": "Generates focused prompt for sub-agents with explicit write_file tool instructions and forbidden actions.",
+      "tags": ["prompt-generator", "subagent-prompt"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/llm/provider.py",
+      "type": "file",
+      "name": "provider.py",
+      "filePath": "src/mini_claude/llm/provider.py",
+      "summary": "LiteLLM-based unified LLM provider supporting Claude, OpenAI, DeepSeek, Gemini, and Ollama with streaming and tool calling.",
+      "tags": ["llm-provider", "litellm", "multi-provider", "streaming"],
+      "complexity": "moderate",
+      "languageNotes": "Uses LiteLLM for unified API across providers, supports tool streaming with incremental argument collection."
+    },
+    {
+      "id": "class:src/mini_claude/llm/provider.py:LLMProvider",
+      "type": "class",
+      "name": "LLMProvider",
+      "filePath": "src/mini_claude/llm/provider.py",
+      "lineRange": [12, 223],
+      "summary": "Unified LLM provider wrapping LiteLLM with streaming support, tool calling, and automatic provider detection from model name.",
+      "tags": ["llm-provider", "streaming", "tool-calling"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/mini_claude/llm/provider.py:convert_tools_to_litellm",
+      "type": "function",
+      "name": "convert_tools_to_litellm",
+      "filePath": "src/mini_claude/llm/provider.py",
+      "lineRange": [227, 243],
+      "summary": "Converts internal tool definitions to LiteLLM/OpenAI function calling format.",
+      "tags": ["utility", "tool-conversion", "litellm"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/tools/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "src/mini_claude/tools/__init__.py",
+      "summary": "Tools barrel module exporting all tool classes and helper functions for tool registry access and execution.",
+      "tags": ["barrel", "tool-registry", "exports"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/tools/agent_spawn.py",
+      "type": "file",
+      "name": "agent_spawn.py",
+      "filePath": "src/mini_claude/tools/agent_spawn.py",
+      "summary": "Agent spawning tools for parallel sub-agent creation with timeout protection, tool restrictions, and result retrieval.",
+      "tags": ["tool", "agent-spawning", "parallel-execution", "subagent-management"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:src/mini_claude/tools/agent_spawn.py:SpawnAgentTool",
+      "type": "class",
+      "name": "SpawnAgentTool",
+      "filePath": "src/mini_claude/tools/agent_spawn.py",
+      "lineRange": [20, 132],
+      "summary": "Tool for spawning a single sub-agent with restricted tool access and 180-second timeout protection.",
+      "tags": ["tool", "agent-spawning", "subagent-creation"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:src/mini_claude/tools/agent_spawn.py:SpawnParallelTool",
+      "type": "class",
+      "name": "SpawnParallelTool",
+      "filePath": "src/mini_claude/tools/agent_spawn.py",
+      "lineRange": [227, 337],
+      "summary": "Tool for spawning multiple sub-agents simultaneously using asyncio.gather with concurrent execution.",
+      "tags": ["tool", "parallel-spawning", "async-execution"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/mini_claude/tools/base.py",
+      "type": "file",
+      "name": "base.py",
+      "filePath": "src/mini_claude/tools/base.py",
+      "summary": "Base tool infrastructure with abstract BaseTool class, ToolRegistry for registration, and JSON schema support.",
+      "tags": ["base-class", "tool-registry", "abstraction"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:src/mini_claude/tools/base.py:BaseTool",
+      "type": "class",
+      "name": "BaseTool",
+      "filePath": "src/mini_claude/tools/base.py",
+      "lineRange": [18, 50],
+      "summary": "Abstract base class for all tools defining name, description, parameters, and async execute interface.",
+      "tags": ["base-class", "abstraction", "tool-interface"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:src/mini_claude/tools/base.py:ToolRegistry",
+      "type": "class",
+      "name": "ToolRegistry",
+      "filePath": "src/mini_claude/tools/base.py",
+      "lineRange": [53, 80],
+      "summary": "Global tool registry managing tool registration, lookup, and execution by name.",
+      "tags": ["registry", "tool-management", "singleton"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/tools/bash.py",
+      "type": "file",
+      "name": "bash.py",
+      "filePath": "src/mini_claude/tools/bash.py",
+      "summary": "Shell command execution tools with safety validation, timeout support, and background execution capability.",
+      "tags": ["tool", "shell-execution", "command-runner", "safety"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/tools/file_ops.py",
+      "type": "file",
+      "name": "file_ops.py",
+      "filePath": "src/mini_claude/tools/file_ops.py",
+      "summary": "File operation tools (read, write, edit, list, search) with file locking for parallel agent safety and conflict detection.",
+      "tags": ["tool", "file-operations", "file-locking", "parallel-safe"],
+      "complexity": "moderate",
+      "languageNotes": "Implements optimistic locking with MD5 hash comparison for conflict detection in parallel agent scenarios."
+    },
+    {
+      "id": "class:src/mini_claude/tools/file_ops.py:ReadFileTool",
+      "type": "class",
+      "name": "ReadFileTool",
+      "filePath": "src/mini_claude/tools/file_ops.py",
+      "lineRange": [27, 92],
+      "summary": "Tool for reading file contents with optional line range, safety checks, and read lock acquisition.",
+      "tags": ["tool", "file-reading", "read-lock"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:src/mini_claude/tools/file_ops.py:WriteFileTool",
+      "type": "class",
+      "name": "WriteFileTool",
+      "filePath": "src/mini_claude/tools/file_ops.py",
+      "lineRange": [95, 164],
+      "summary": "Tool for writing files with automatic parent directory creation, write lock acquisition, and conflict detection.",
+      "tags": ["tool", "file-writing", "write-lock", "auto-create"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/mini_claude/tools/parallel.py",
+      "type": "file",
+      "name": "parallel.py",
+      "filePath": "src/mini_claude/tools/parallel.py",
+      "summary": "Parallel execution tools implementing plan-execute-aggregate workflow with dependency analysis, file conflict detection, and auto-file creation fallback.",
+      "tags": ["tool", "parallel-execution", "dependency-analysis", "workflow"],
+      "complexity": "complex",
+      "languageNotes": "Implements sophisticated fallback logic that auto-creates files when sub-agents fail to do so."
+    },
+    {
+      "id": "class:src/mini_claude/tools/parallel.py:PlanParallelTool",
+      "type": "class",
+      "name": "PlanParallelTool",
+      "filePath": "src/mini_claude/tools/parallel.py",
+      "lineRange": [23, 138],
+      "summary": "Tool for planning parallel execution with dependency analysis, topological sorting, and file conflict detection.",
+      "tags": ["tool", "planning", "dependency-analysis"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:src/mini_claude/tools/parallel.py:ExecuteParallelTool",
+      "type": "class",
+      "name": "ExecuteParallelTool",
+      "filePath": "src/mini_claude/tools/parallel.py",
+      "lineRange": [141, 281],
+      "summary": "Tool for executing planned parallel tasks with auto-aggregation and automatic file creation fallback.",
+      "tags": ["tool", "execution", "parallel-tasks", "auto-fallback"],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/mini_claude/tools/web_search.py",
+      "type": "file",
+      "name": "web_search.py",
+      "filePath": "src/mini_claude/tools/web_search.py",
+      "summary": "DuckDuckGo-based web search tool with error handling for network issues and rate limiting.",
+      "tags": ["tool", "web-search", "duckduckgo", "information-retrieval"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/utils/__init__.py",
+      "type": "file",
+      "name": "__init__.py",
+      "filePath": "src/mini_claude/utils/__init__.py",
+      "summary": "Utils module package marker.",
+      "tags": ["barrel", "package-marker"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/mini_claude/utils/file_lock.py",
+      "type": "file",
+      "name": "file_lock.py",
+      "filePath": "src/mini_claude/utils/file_lock.py",
+      "summary": "File locking system for parallel agent coordination with read/write locks, MD5-based conflict detection, and version tracking.",
+      "tags": ["file-locking", "concurrency", "conflict-detection", "parallel-safe"],
+      "complexity": "moderate",
+      "languageNotes": "Implements optimistic locking with hash comparison, supports shared read locks and exclusive write locks."
+    },
+    {
+      "id": "class:src/mini_claude/utils/file_lock.py:FileLockManager",
+      "type": "class",
+      "name": "FileLockManager",
+      "filePath": "src/mini_claude/utils/file_lock.py",
+      "lineRange": [38, 208],
+      "summary": "Async file lock manager supporting shared read locks, exclusive write locks, MD5-based conflict detection, and version tracking.",
+      "tags": ["file-locking", "concurrency-control", "async"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:src/mini_claude/agent/graph.py",
+      "target": "file:src/mini_claude/agent/state.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/graph.py",
+      "target": "file:src/mini_claude/agent/nodes.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "file:src/mini_claude/agent/state.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "file:src/mini_claude/agent/subagent.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "file:src/mini_claude/llm/provider.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "file:src/mini_claude/llm/prompts.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "file:src/mini_claude/tools/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "file:src/mini_claude/cli/display.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/coordinator.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/subagent.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/main.py",
+      "target": "file:src/mini_claude/cli/display.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/main.py",
+      "target": "file:src/mini_claude/cli/repl.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/main.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/main.py",
+      "target": "file:src/mini_claude/llm/provider.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/main.py",
+      "target": "file:src/mini_claude/tools/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/repl.py",
+      "target": "file:src/mini_claude/cli/display.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/repl.py",
+      "target": "file:src/mini_claude/agent/graph.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/repl.py",
+      "target": "file:src/mini_claude/agent/state.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/repl.py",
+      "target": "file:src/mini_claude/llm/prompts.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/repl.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/repl.py",
+      "target": "file:src/mini_claude/llm/provider.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/cli/repl.py",
+      "target": "file:src/mini_claude/tools/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/llm/prompts.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/llm/provider.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/__init__.py",
+      "target": "file:src/mini_claude/tools/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/__init__.py",
+      "target": "file:src/mini_claude/tools/file_ops.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/__init__.py",
+      "target": "file:src/mini_claude/tools/bash.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/__init__.py",
+      "target": "file:src/mini_claude/tools/agent_spawn.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/__init__.py",
+      "target": "file:src/mini_claude/tools/web_search.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/__init__.py",
+      "target": "file:src/mini_claude/tools/parallel.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/agent_spawn.py",
+      "target": "file:src/mini_claude/tools/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/agent_spawn.py",
+      "target": "file:src/mini_claude/agent/subagent.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/agent_spawn.py",
+      "target": "file:src/mini_claude/agent/state.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/agent_spawn.py",
+      "target": "file:src/mini_claude/llm/prompts.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/agent_spawn.py",
+      "target": "file:src/mini_claude/agent/graph.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/agent_spawn.py",
+      "target": "file:src/mini_claude/tools/file_ops.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/bash.py",
+      "target": "file:src/mini_claude/tools/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/file_ops.py",
+      "target": "file:src/mini_claude/tools/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/file_ops.py",
+      "target": "file:src/mini_claude/utils/file_lock.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/file_ops.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/tools/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/agent/coordinator.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/agent/subagent.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/utils/file_lock.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/config/settings.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/agent/graph.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/agent/state.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/tools/file_ops.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "file:src/mini_claude/tools/__init__.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/tools/web_search.py",
+      "target": "file:src/mini_claude/tools/base.py",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:src/mini_claude/agent/coordinator.py",
+      "target": "class:src/mini_claude/agent/coordinator.py:ParallelCoordinator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/state.py",
+      "target": "class:src/mini_claude/agent/state.py:AgentState",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/state.py",
+      "target": "function:src/mini_claude/agent/state.py:create_initial_state",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/subagent.py",
+      "target": "class:src/mini_claude/agent/subagent.py:SubAgentManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/graph.py",
+      "target": "function:src/mini_claude/agent/graph.py:build_agent_graph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/graph.py",
+      "target": "function:src/mini_claude/agent/graph.py:get_agent_graph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "function:src/mini_claude/agent/nodes.py:think_node",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "function:src/mini_claude/agent/nodes.py:plan_node",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "function:src/mini_claude/agent/nodes.py:act_node",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/agent/nodes.py",
+      "target": "function:src/mini_claude/agent/nodes.py:observe_node",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/cli/display.py",
+      "target": "class:src/mini_claude/cli/display.py:AgentDisplay",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/cli/main.py",
+      "target": "function:src/mini_claude/cli/main.py:main",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/cli/repl.py",
+      "target": "class:src/mini_claude/cli/repl.py:REPLSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/config/settings.py",
+      "target": "class:src/mini_claude/config/settings.py:Settings",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/llm/prompts.py",
+      "target": "function:src/mini_claude/llm/prompts.py:get_system_prompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/llm/prompts.py",
+      "target": "function:src/mini_claude/llm/prompts.py:get_subagent_prompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/llm/provider.py",
+      "target": "class:src/mini_claude/llm/provider.py:LLMProvider",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/llm/provider.py",
+      "target": "function:src/mini_claude/llm/provider.py:convert_tools_to_litellm",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/tools/base.py",
+      "target": "class:src/mini_claude/tools/base.py:BaseTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/tools/base.py",
+      "target": "class:src/mini_claude/tools/base.py:ToolRegistry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/tools/agent_spawn.py",
+      "target": "class:src/mini_claude/tools/agent_spawn.py:SpawnAgentTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/tools/agent_spawn.py",
+      "target": "class:src/mini_claude/tools/agent_spawn.py:SpawnParallelTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/tools/file_ops.py",
+      "target": "class:src/mini_claude/tools/file_ops.py:ReadFileTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/tools/file_ops.py",
+      "target": "class:src/mini_claude/tools/file_ops.py:WriteFileTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "class:src/mini_claude/tools/parallel.py:PlanParallelTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/tools/parallel.py",
+      "target": "class:src/mini_claude/tools/parallel.py:ExecuteParallelTool",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "file:src/mini_claude/utils/file_lock.py",
+      "target": "class:src/mini_claude/utils/file_lock.py:FileLockManager",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "function:src/mini_claude/cli/main.py:main",
+      "target": "file:src/mini_claude/cli/main.py",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:src/mini_claude/tools/base.py:BaseTool",
+      "target": "file:src/mini_claude/tools/base.py",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:src/mini_claude/tools/base.py:ToolRegistry",
+      "target": "file:src/mini_claude/tools/base.py",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/mini_claude/cli/main.py:main",
+      "target": "file:src/mini_claude/__init__.py",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}
