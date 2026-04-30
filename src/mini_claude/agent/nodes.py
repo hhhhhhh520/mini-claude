@@ -475,6 +475,22 @@ async def check_completion_node(state: AgentState) -> dict:
     current_task = state["current_task"]
     messages = state["messages"]
 
+    # 快速检查：如果最近有工具结果但没有 AI 的文本回复，直接返回 INCOMPLETE
+    # 这避免了 LLM 在还没告诉用户结果时就判断完成
+    recent_messages = messages[-5:]
+    has_tool_result = any(
+        isinstance(m, HumanMessage) and hasattr(m, 'name') and m.name
+        for m in recent_messages
+    )
+    has_ai_text_reply = any(
+        isinstance(m, AIMessage) and m.content and len(m.content.strip()) > 5  # 有实质性回复
+        for m in recent_messages
+    )
+
+    if has_tool_result and not has_ai_text_reply:
+        safe_print(f"[DEBUG] check_completion_node: has tool result but no AI reply, returning INCOMPLETE")
+        return {"stop_reason": StopReason.CONTINUE}
+
     # 构建检查提示 - 更明确的判断标准
     recent_messages = messages[-10:]
     messages_text = "\n".join([
