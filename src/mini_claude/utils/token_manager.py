@@ -1,8 +1,9 @@
 """Token counting and budget management."""
 
 from typing import List, Dict, Any, Optional, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+import time
 
 try:
     import tiktoken
@@ -16,6 +17,11 @@ class TokenLimitStrategy(str, Enum):
     WARN = "warn"  # Log warning when approaching limit
     TRUNCATE = "truncate"  # Truncate oldest messages
     SUMMARIZE = "summarize"  # Summarize old messages
+
+
+# Circuit breaker configuration for summarization
+CIRCUIT_BREAKER_MAX_FAILURES = 3  # Stop retrying after 3 consecutive failures
+CIRCUIT_BREAKER_RESET_AFTER = 300  # Reset failure count after 300 seconds (5 minutes)
 
 
 @dataclass
@@ -59,8 +65,8 @@ class TokenCounter:
     def __init__(
         self,
         model: str = "deepseek-chat",
-        budget_ratio: float = 0.8,  # Use 80% of context window for input
-        warn_ratio: float = 0.75,  # Warn at 75% usage (reduced noise)
+        budget_ratio: float = 0.65,  # Trigger compression earlier (was 0.8)
+        warn_ratio: float = 0.55,  # Warn at 55% usage (was 0.75)
         strategy: TokenLimitStrategy = TokenLimitStrategy.WARN,
     ):
         self.model = model
@@ -81,6 +87,11 @@ class TokenCounter:
             except Exception:
                 pass
 
+        # Circuit breaker state for summarization
+        self._summarize_failures: int = 0
+        self._last_failure_time: float = 0
+        self._circuit_open: bool = False
+
     def _get_model_limits(self, model: str) -> ModelTokenLimits:
         """Get token limits for a model."""
         model_lower = model.lower()
@@ -96,6 +107,49 @@ class TokenCounter:
 
         # Default
         return MODEL_LIMITS["default"]
+
+    def _check_circuit_breaker(self) -> bool:
+        """Check if circuit breaker allows summarization.
+
+        Returns:
+            True if summarization is allowed, False if circuit is open
+        """
+        current_time = time.time()
+
+        # Reset circuit breaker after cooldown period
+        if self._circuit_open and (current_time - self._last_failure_time) > CIRCUIT_BREAKER_RESET_AFTER:
+            self._summarize_failures = 0
+            self._circuit_open = False
+            return True
+
+        # Check if circuit is open
+        if self._circuit_open:
+            return False
+
+        return True
+
+    def _record_summarize_failure(self) -> None:
+        """Record a summarization failure for circuit breaker."""
+        self._summarize_failures += 1
+        self._last_failure_time = time.time()
+
+        if self._summarize_failures >= CIRCUIT_BREAKER_MAX_FAILURES:
+            self._circuit_open = True
+
+    def _record_summarize_success(self) -> None:
+        """Record a successful summarization, reset failure count."""
+        self._summarize_failures = 0
+        self._circuit_open = False
+
+    def get_circuit_breaker_status(self) -> Dict[str, Any]:
+        """Get current circuit breaker status for debugging."""
+        return {
+            "failures": self._summarize_failures,
+            "max_failures": CIRCUIT_BREAKER_MAX_FAILURES,
+            "circuit_open": self._circuit_open,
+            "last_failure_time": self._last_failure_time,
+            "reset_after_seconds": CIRCUIT_BREAKER_RESET_AFTER,
+        }
 
     def count_tokens(self, text: str) -> int:
         """Count tokens in text."""
@@ -312,6 +366,12 @@ class TokenCounter:
             # Not enough messages to summarize
             return messages, None
 
+        # Check circuit breaker before attempting summarization
+        if not self._check_circuit_breaker():
+            # Circuit is open, fall back to truncation immediately
+            print(f"[WARN] Circuit breaker open - summarization disabled after {self._summarize_failures} failures")
+            return self.truncate_messages(messages, keep_first=keep_first, keep_last=keep_last), None
+
         # Split messages
         first = messages[:keep_first]
         middle = messages[keep_first:-keep_last]
@@ -360,6 +420,9 @@ class TokenCounter:
 
             result = first + [summary_message] + last
 
+            # Record success - reset circuit breaker
+            self._record_summarize_success()
+
             # Verify the result fits within budget
             stats = self.get_usage_stats(result)
             if stats["is_over_budget"]:
@@ -369,9 +432,12 @@ class TokenCounter:
             return result, summary
 
         except Exception as e:
+            # Record failure for circuit breaker
+            self._record_summarize_failure()
+
             # If summarization fails, fall back to truncation
             import traceback
-            print(f"[WARN] Summarization failed: {e}")
+            print(f"[WARN] Summarization failed (attempt {self._summarize_failures}/{CIRCUIT_BREAKER_MAX_FAILURES}): {e}")
             print(f"[DEBUG] Traceback: {traceback.format_exc()}")
             return self.truncate_messages(messages, keep_first=keep_first, keep_last=keep_last), None
 

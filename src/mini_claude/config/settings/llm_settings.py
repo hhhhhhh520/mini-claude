@@ -68,8 +68,10 @@ class LLMSettings(BaseSettings):
     streaming_enabled: bool = Field(default=True)
 
     # Token budget settings
-    token_budget_ratio: float = Field(default=0.8)
-    token_warn_ratio: float = Field(default=0.7)
+    # Note: budget_ratio lowered from 0.8 to 0.65 to trigger compression earlier
+    # This leaves more headroom for summarization to succeed
+    token_budget_ratio: float = Field(default=0.65)
+    token_warn_ratio: float = Field(default=0.55)
     token_strategy: str = Field(default="summarize")
     token_reserved_output: int = Field(default=4096)
 

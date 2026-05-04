@@ -311,8 +311,11 @@ class TestTokenBudgetIntegration:
         from mini_claude.config.settings import settings
 
         counter = get_token_counter(settings.default_model)
+        # Need to update the counter with new ratios to recalculate budget
         counter.budget_ratio = settings.token_budget_ratio
         counter.warn_ratio = settings.token_warn_ratio
+        counter.token_budget = int(counter.limits.context_window * settings.token_budget_ratio)
+        counter.warn_threshold = int(counter.limits.context_window * settings.token_warn_ratio)
 
         # Verify ratios are applied
         expected_budget = int(counter.limits.context_window * settings.token_budget_ratio)
@@ -543,3 +546,91 @@ class TestSummarizeMessages:
         # Should be truncated to ~1000 chars
         assert len(formatted) < 2000
         assert "已截断" in formatted
+
+
+class TestCircuitBreaker:
+    """Test circuit breaker functionality for summarization."""
+
+    def test_circuit_breaker_initial_state(self):
+        """Test circuit breaker starts in closed state."""
+        counter = TokenCounter()
+        status = counter.get_circuit_breaker_status()
+
+        assert status["failures"] == 0
+        assert status["circuit_open"] is False
+        assert status["max_failures"] == 3
+
+    def test_circuit_breaker_records_failures(self):
+        """Test circuit breaker records failures."""
+        counter = TokenCounter()
+
+        # Record some failures
+        counter._record_summarize_failure()
+        assert counter._summarize_failures == 1
+        assert not counter._circuit_open
+
+        counter._record_summarize_failure()
+        assert counter._summarize_failures == 2
+        assert not counter._circuit_open
+
+        # Third failure opens the circuit
+        counter._record_summarize_failure()
+        assert counter._summarize_failures == 3
+        assert counter._circuit_open
+
+    def test_circuit_breaker_success_resets(self):
+        """Test successful summarization resets circuit breaker."""
+        counter = TokenCounter()
+
+        # Record some failures
+        counter._record_summarize_failure()
+        counter._record_summarize_failure()
+
+        # Success resets
+        counter._record_summarize_success()
+        assert counter._summarize_failures == 0
+        assert not counter._circuit_open
+
+    def test_circuit_breaker_blocks_when_open(self):
+        """Test circuit breaker blocks summarization when open."""
+        counter = TokenCounter()
+
+        # Open the circuit
+        counter._record_summarize_failure()
+        counter._record_summarize_failure()
+        counter._record_summarize_failure()
+
+        assert not counter._check_circuit_breaker()
+
+    def test_circuit_breaker_allows_when_closed(self):
+        """Test circuit breaker allows summarization when closed."""
+        counter = TokenCounter()
+        assert counter._check_circuit_breaker()
+
+    @pytest.mark.asyncio
+    async def test_summarize_falls_back_when_circuit_open(self):
+        """Test summarization falls back to truncation when circuit is open."""
+        counter = TokenCounter()
+
+        # Open the circuit
+        counter._record_summarize_failure()
+        counter._record_summarize_failure()
+        counter._record_summarize_failure()
+
+        messages = [
+            {"role": "system", "content": "System"},
+            {"role": "user", "content": "A" * 1000},
+            {"role": "assistant", "content": "B" * 1000},
+            {"role": "user", "content": "C" * 1000},
+            {"role": "assistant", "content": "D" * 1000},
+        ]
+
+        # This should fall back to truncation immediately
+        summarized, summary_text = await counter.summarize_messages(
+            messages,
+            llm_chat_func=None,  # Won't be called
+        )
+
+        # Should be truncated, not summarized
+        assert len(summarized) <= len(messages)
+        assert summary_text is None

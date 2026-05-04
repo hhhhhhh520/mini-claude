@@ -43,6 +43,11 @@ async def handle_error_node(state: AgentState) -> dict:
     suggestion = suggestion_engine.analyze_error(error_msg)
     suggestion_text = suggestion_engine.format_suggestion(suggestion)
 
+    # 检测是否为 text_not_found 错误，添加特定提示
+    if "text not found" in error_msg.lower() or "old_text" in error_msg.lower():
+        text_not_found_hint = "\n\n💡 提示：文件内容可能已更改。请先使用 read_file 工具获取文件最新内容，然后使用正确的 old_text 参数重新编辑。"
+        suggestion_text += text_not_found_hint
+
     return {
         "messages": [HumanMessage(content=f"上一步出错：{error_msg}\n\n{suggestion_text}\n\n请尝试修复或使用其他方法完成任务。")],
         "retry_count": retry_count + 1,

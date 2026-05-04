@@ -17,6 +17,7 @@ class ErrorType(Enum):
     TOOL_FAILURE = "tool_failure"            # 工具失败
     MODEL_ERROR = "model_error"              # 模型错误
     FILE_NOT_FOUND = "file_not_found"        # 文件不存在
+    TEXT_NOT_FOUND = "text_not_found"        # 文本未找到
     INVALID_PARAMETER = "invalid_parameter"  # 参数无效
     UNKNOWN = "unknown"                      # 未知错误
 
@@ -132,6 +133,12 @@ class SuggestionEngine:
         "value error": ErrorType.INVALID_PARAMETER,
         "参数错误": ErrorType.INVALID_PARAMETER,
         "参数无效": ErrorType.INVALID_PARAMETER,
+
+        # Text Not Found patterns
+        "text not found": ErrorType.TEXT_NOT_FOUND,
+        "old_text": ErrorType.TEXT_NOT_FOUND,
+        "文本未找到": ErrorType.TEXT_NOT_FOUND,
+        "expected text": ErrorType.TEXT_NOT_FOUND,
     }
 
     # Suggestions for each error type (Chinese)
@@ -298,6 +305,18 @@ class SuggestionEngine:
                     "检查参数类型是否正确",
                     "确认必需参数是否提供",
                     "检查 JSON 格式是否有效",
+                ],
+                priority=Priority.HIGH,
+            ),
+        ],
+        ErrorType.TEXT_NOT_FOUND: [
+            Suggestion(
+                title="文本未找到",
+                description="edit_file 工具无法在文件中找到指定的文本",
+                actions=[
+                    "使用 read_file 工具获取文件最新内容",
+                    "检查 old_text 参数是否与文件实际内容完全匹配",
+                    "注意文件可能已被其他操作修改",
                 ],
                 priority=Priority.HIGH,
             ),
@@ -480,6 +499,18 @@ class SuggestionEngine:
                     "Check parameter types",
                     "Confirm required parameters",
                     "Validate JSON format",
+                ],
+                priority=Priority.HIGH,
+            ),
+        ],
+        ErrorType.TEXT_NOT_FOUND: [
+            Suggestion(
+                title="Text Not Found",
+                description="The edit_file tool cannot find the specified text in the file",
+                actions=[
+                    "Use read_file tool to get the latest file content",
+                    "Check if old_text parameter matches the actual file content exactly",
+                    "Note that the file may have been modified by other operations",
                 ],
                 priority=Priority.HIGH,
             ),

@@ -274,7 +274,19 @@ class EditFileTool(BaseTool):
                 content = f.read()
 
             if old_text not in content:
-                return "Error: Text not found in file"
+                # Generate detailed error message
+                preview_length = 200
+                content_preview = content[:preview_length] if len(content) > preview_length else content
+                old_text_preview = old_text[:100] if len(old_text) > 100 else old_text
+
+                return (
+                    f"Error: Text not found in file.\n\n"
+                    f"File path: {path}\n"
+                    f"Expected text (preview): \"{old_text_preview}\"\n\n"
+                    f"Current file content (preview):\n"
+                    f"---BEGIN---\n{content_preview}\n---END---\n\n"
+                    f"Suggestion: Use read_file tool to get the latest content before editing."
+                )
 
             new_content = content.replace(old_text, new_text, 1)
 
