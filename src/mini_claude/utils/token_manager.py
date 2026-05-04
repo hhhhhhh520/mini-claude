@@ -44,9 +44,9 @@ MODEL_LIMITS: Dict[str, ModelTokenLimits] = {
     "gpt-4o-mini": ModelTokenLimits(128000, 16384, "cl100k_base"),
 
     # DeepSeek models
-    "deepseek-chat": ModelTokenLimits(64000, 8192, "cl100k_base"),
-    "deepseek-coder": ModelTokenLimits(64000, 8192, "cl100k_base"),
-    "deepseek-v4-flash": ModelTokenLimits(64000, 16384, "cl100k_base"),
+    "deepseek-chat": ModelTokenLimits(128000, 8192, "cl100k_base"),
+    "deepseek-coder": ModelTokenLimits(128000, 8192, "cl100k_base"),
+    "deepseek-v4-flash": ModelTokenLimits(128000, 16384, "cl100k_base"),
 
     # Default fallback
     "default": ModelTokenLimits(128000, 4096, "cl100k_base"),
