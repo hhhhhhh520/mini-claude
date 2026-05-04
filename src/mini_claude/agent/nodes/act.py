@@ -190,7 +190,8 @@ async def _call_llm_with_retry(
 
                 if use_streaming:
                     result = await _streaming_llm_call(
-                        local_provider, litellm_messages, litellm_tools
+                        local_provider, litellm_messages, litellm_tools,
+                        max_tokens=settings.llm_max_tokens
                     )
                     content = result.get("content", "")
                     raw_tool_calls = result.get("tool_calls")
@@ -199,6 +200,7 @@ async def _call_llm_with_retry(
                         messages=litellm_messages,
                         tools=litellm_tools if litellm_tools else None,
                         tool_choice="auto",
+                        max_tokens=settings.llm_max_tokens,
                     )
                     message = response.choices[0].message
                     content = message.content or ""

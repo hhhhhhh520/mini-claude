@@ -73,6 +73,9 @@ class LLMSettings(BaseSettings):
     token_strategy: str = Field(default="summarize")
     token_reserved_output: int = Field(default=4096)
 
+    # LLM output settings
+    llm_max_tokens: int = Field(default=16384)  # Max output tokens for LLM calls
+
     @field_validator("max_iterations")
     @classmethod
     def validate_max_iterations(cls, v: int) -> int:
@@ -103,6 +106,14 @@ class LLMSettings(BaseSettings):
         """Validate token_warn_ratio is in valid range (0.1-1.0)."""
         if not 0.1 <= v <= 1.0:
             raise ValueError(f"token_warn_ratio must be between 0.1 and 1.0, got {v}")
+        return v
+
+    @field_validator("llm_max_tokens")
+    @classmethod
+    def validate_llm_max_tokens(cls, v: int) -> int:
+        """Validate llm_max_tokens is in valid range (1024-128000)."""
+        if not 1024 <= v <= 128000:
+            raise ValueError(f"llm_max_tokens must be between 1024 and 128000, got {v}")
         return v
 
     def get_model_provider(self, model: Optional[str] = None) -> ModelProvider:
