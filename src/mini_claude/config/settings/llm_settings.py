@@ -45,7 +45,7 @@ class LLMSettings(BaseSettings):
     openai_base_url: Optional[str] = None
 
     # Model settings
-    default_model: str = Field(default="deepseek-chat")
+    default_model: str = Field(default="deepseek-v4-flash")
     ollama_base_url: str = Field(default="http://localhost:11434")
 
     # Agent settings
