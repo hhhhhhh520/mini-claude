@@ -1,86 +1,51 @@
-"""Pydantic Settings configuration."""
+"""Settings configuration module - backward compatible entry point.
 
-import os
-from enum import Enum
-from typing import Optional, List
+This module provides backward compatibility by re-exporting all settings
+from the new layered configuration structure under settings/ directory.
 
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+All configuration items remain accessible from this module:
+    from mini_claude.config.settings import Settings, settings
 
+The actual implementation is in:
+- settings/base_settings.py: Environment, enums, base config
+- settings/llm_settings.py: LLM, API keys, tokens
+- settings/logging_settings.py: Logging configuration
+- settings/monitoring_settings.py: Health checks, tracing, alerts
+- settings/security_settings.py: Rate limiting, vector db, profiles
+- settings/composite_settings.py: Unified Settings class
+"""
 
-class ModelProvider(str, Enum):
-    CLAUDE = "claude"
-    OPENAI = "openai"
-    GEMINI = "gemini"
-    DEEPSEEK = "deepseek"
-    OLLAMA = "ollama"
+# Import all components from the layered settings module
+from mini_claude.config.settings.base_settings import (
+    ModelProvider,
+    VectorDBType,
+    Environment,
+    ConfigChange,
+    ConfigReloadResult,
+)
+from mini_claude.config.settings.composite_settings import (
+    Settings,
+    settings,
+    register_config_callback,
+    unregister_config_callback,
+    clear_config_callbacks,
+    _config_callbacks,
+)
 
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-
-    # API Keys
-    anthropic_api_key: Optional[str] = None
-    openai_api_key: Optional[str] = None
-    google_api_key: Optional[str] = None
-
-    # OpenAI compatible (DeepSeek, etc.)
-    openai_base_url: Optional[str] = None
-
-    # Model settings
-    default_model: str = Field(default="deepseek-chat")
-    ollama_base_url: str = Field(default="http://localhost:11434")
-
-    # Agent settings
-    max_sub_agents: int = Field(default=3)
-    max_iterations: int = Field(default=10)
-
-    # Sub-agent settings
-    max_subagent_iterations: int = Field(default=5)
-    subagent_allowed_tools: List[str] = Field(default=[
-        "read_file", "write_file", "edit_file",
-        "list_dir", "search_files", "search_content",
-        "run_command", "web_search"
-    ])
-
-    # Session settings
-    auto_save_enabled: bool = Field(default=True)
-    session_db_path: str = Field(default="sessions.db")
-
-    # Streaming settings
-    streaming_enabled: bool = Field(default=True)  # Enable streaming output
-
-    # Workspace
-    workspace_root: str = Field(default="D:/my project/mini-claude/workspace")
-
-    def get_model_provider(self, model: Optional[str] = None) -> ModelProvider:
-        """Detect model provider from model name."""
-        model_name = model or self.default_model
-        model_lower = model_name.lower()
-
-        if "claude" in model_lower or model_lower.startswith("anthropic"):
-            return ModelProvider.CLAUDE
-        elif "deepseek" in model_lower:
-            return ModelProvider.DEEPSEEK
-        elif "gpt" in model_lower or "o1" in model_lower or model_lower.startswith("openai"):
-            return ModelProvider.OPENAI
-        elif "gemini" in model_lower:
-            return ModelProvider.GEMINI
-        else:
-            return ModelProvider.OLLAMA
-
-
-# Global settings instance
-settings = Settings()
-
-# Set environment variables for LiteLLM
-if settings.openai_api_key:
-    os.environ["OPENAI_API_KEY"] = settings.openai_api_key
-if settings.openai_base_url:
-    os.environ["OPENAI_BASE_URL"] = settings.openai_base_url
-if settings.anthropic_api_key:
-    os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
+# Re-export all public items for backward compatibility
+__all__ = [
+    # Enums
+    "ModelProvider",
+    "VectorDBType",
+    "Environment",
+    # Data classes
+    "ConfigChange",
+    "ConfigReloadResult",
+    # Main settings
+    "Settings",
+    "settings",
+    # Callback functions
+    "register_config_callback",
+    "unregister_config_callback",
+    "clear_config_callbacks",
+]

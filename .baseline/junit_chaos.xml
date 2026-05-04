@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="13.332" timestamp="2026-05-03T13:45:04.220095+08:00" hostname="不知道叫什么"><testcase classname="tests.test_chaos.TestChaosMarker" name="test_chaos_marker_example" time="0.001" /></testsuite></testsuites>

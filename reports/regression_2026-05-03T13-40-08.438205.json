@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-05-03T13:40:08.438205",
+  "duration": 15.76079273223877,
+  "summary": {
+    "total_tests": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "success_rate": 100.0
+  },
+  "groups": [
+    {
+      "name": "incremental",
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 15.76079273223877,
+      "success_rate": 100.0,
+      "failed_tests": []
+    }
+  ],
+  "baseline_comparison": null
+}

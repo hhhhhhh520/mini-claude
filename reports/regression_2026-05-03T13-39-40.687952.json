@@ -1,0 +1,257 @@
+{
+  "timestamp": "2026-05-03T13:39:40.687952",
+  "duration": 89.73187255859375,
+  "summary": {
+    "total_tests": 42,
+    "passed": 39,
+    "failed": 2,
+    "skipped": 0,
+    "success_rate": 92.85714285714286
+  },
+  "groups": [
+    {
+      "name": "unit",
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 7.379151105880737,
+      "success_rate": 100.0,
+      "failed_tests": []
+    },
+    {
+      "name": "integration",
+      "total": 20,
+      "passed": 19,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 17.511042833328247,
+      "success_rate": 95.0,
+      "failed_tests": [
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestConcurrentSubAgents::test_multiple_subagents_parallel",
+          "message": "TypeError: SubAgentManager.wait_for_all() takes 1 positional argument but 2 were given",
+          "traceback": "tests\\test_integration\\test_e2e_user_flow.py:531: in test_multiple_subagents_parallel\n    results = await subagent_manager.wait_for_all([\"agent_fast\", \"agent_slow\"])\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   TypeError: SubAgentManager.wait_for_all() takes 1 positional argument but 2 were given"
+        }
+      ]
+    },
+    {
+      "name": "e2e",
+      "total": 3,
+      "passed": 1,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 1,
+      "duration": 18.200793504714966,
+      "success_rate": 33.33333333333333,
+      "failed_tests": [
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_full_graph_execution",
+          "message": "ValueError: I/O operation on closed file.",
+          "traceback": "tests\\test_integration\\test_e2e_user_flow.py:630: in test_full_graph_execution\n    assert stop_reason in [StopReason.TASK_COMPLETE, StopReason.CONTINUE, StopReason.MAX_ITERATIONS]\nE   AssertionError: assert <StopReason.IDLE_LOOP: 'idle_loop'> in [<StopReason.TASK_COMPLETE: 'task_complete'>, <StopReason.CONTINUE: 'continue'>, <StopReason.MAX_ITERATIONS: 'max_iterations'>]\n\nDuring handling of the above exception, another exception occurred:\ntests\\test_integration\\test_e2e_user_flow.py:634: in test_full_graph_execution\n    pytest.skip(f\"Graph execution failed: {e}\")\nE   Skipped: Graph execution failed: assert <StopReason.IDLE_LOOP: 'idle_loop'> in [<StopReason.TASK_COMPLETE: 'task_complete'>, <StopReason.CONTINUE: 'continue'>, <StopReason.MAX_ITERATIONS: 'max_iterations'>]\n\nDuring handling of the above exception, another exception occurred:\nD:\\python\\3.12.10\\Lib\\contextlib.py:158: in __exit__\n    self.gen.throw(value)\nE   ValueError: I/O operation on closed file."
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_full_graph_execution",
+          "message": "failed on teardown with \"ValueError: I/O operation on closed file\"",
+          "traceback": "D:\\python\\3.12.10\\Lib\\contextlib.py:137: in __enter__\n    return next(self.gen)\n           ^^^^^^^^^^^^^^\nD:\\python\\3.12.10\\Lib\\tempfile.py:499: in func_wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\nE   ValueError: I/O operation on closed file"
+        }
+      ]
+    },
+    {
+      "name": "stress",
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 30.703836917877197,
+      "success_rate": 100.0,
+      "failed_tests": []
+    },
+    {
+      "name": "chaos",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 15.937048196792603,
+      "success_rate": 100.0,
+      "failed_tests": []
+    }
+  ],
+  "baseline_comparison": {
+    "regressions": [],
+    "improvements": [],
+    "new_failures": [
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestConcurrentSubAgents::test_multiple_subagents_parallel",
+        "status": "failed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_full_graph_execution",
+        "status": "error"
+      }
+    ],
+    "new_passes": [
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestCompleteUserSessionFlow::test_user_input_to_agent_response",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestCompleteUserSessionFlow::test_session_save_on_completion",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestCompleteUserSessionFlow::test_session_list_after_multiple_sessions",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestMultiTurnDialogue::test_conversation_history_preserved",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestMultiTurnDialogue::test_context_window_management",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestMultiTurnDialogue::test_state_accumulation_prevention",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestToolCallChains::test_sequential_tool_calls",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestToolCallChains::test_tool_error_recovery",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestToolCallChains::test_tool_result_formatting",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestSessionPersistenceAndRecovery::test_session_full_persistence",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestSessionPersistenceAndRecovery::test_execution_state_persistence",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestSessionPersistenceAndRecovery::test_interrupted_session_listing",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestSessionPersistenceAndRecovery::test_session_deletion_with_state",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestTokenBudgetManagement::test_token_budget_check",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestTokenBudgetManagement::test_token_budget_exceeded_warning",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestTokenBudgetManagement::test_token_truncation_strategy",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestTokenBudgetManagement::test_token_summary_generation",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestConcurrentSubAgents::test_subagent_spawn_and_wait",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestConcurrentSubAgents::test_file_lock_with_subagents",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_real_llm_simple_query",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestConcurrentSessionCreation::test_basic_concurrent_sessions",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestConcurrentSessionCreation::test_high_concurrency_sessions",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestConcurrentSessionCreation::test_gradual_pressure_sessions",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestConcurrentToolCalls::test_concurrent_tool_calls",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestConcurrentToolCalls::test_mixed_tool_calls",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestConcurrentToolCalls::test_tool_call_with_resource_limits",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestConcurrentFileOperations::test_concurrent_file_reads",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestConcurrentFileOperations::test_concurrent_file_locks",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestMemoryStability::test_memory_stability_long_running",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestMemoryStability::test_no_memory_leak_in_subagents",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestResourceLimits::test_max_sub_agents_limit",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestResourceLimits::test_task_queue_overflow",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestErrorRecovery::test_partial_failure_recovery",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestErrorRecovery::test_cascading_failure_prevention",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestPerformanceBenchmarks::test_throughput_benchmark",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestPerformanceBenchmarks::test_latency_benchmark",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestSubAgentManagerStress::test_rapid_spawn_and_wait",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_stress.TestSubAgentManagerStress::test_progress_tracking_under_load",
+        "status": "passed"
+      },
+      {
+        "name": "tests.test_chaos.TestChaosMarker::test_chaos_marker_example",
+        "status": "passed"
+      }
+    ]
+  }
+}

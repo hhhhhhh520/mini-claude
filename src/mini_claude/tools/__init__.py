@@ -19,11 +19,37 @@ from .agent_spawn import (
     SpawnParallelTool,
 )
 from .web_search import WebSearchTool
+from .web_fetch import WebFetchTool
+from .weather import WeatherTool
 from .parallel import (
     PlanParallelTool,
     ExecuteParallelTool,
     ParallelStatusTool,
     AggregateResultsTool,
+)
+from .health_check import (
+    ToolHealthChecker,
+    ToolHealthStatus,
+    ToolHealthResult,
+    ToolHealthSummary,
+    get_tool_health_checker,
+    check_tool_health,
+    check_all_tools_health,
+)
+from .cache import (
+    ToolCache,
+    CacheEntry,
+    CacheStats,
+    get_tool_cache,
+    reset_tool_cache,
+)
+from .dependencies import (
+    ToolDependency,
+    DependencyGraph,
+    DependencyType,
+    CyclicDependencyError,
+    get_dependency_graph,
+    reset_dependency_graph,
 )
 
 
@@ -75,6 +101,29 @@ __all__ = [
     "AggregateResultsTool",
     # Web tools
     "WebSearchTool",
+    "WebFetchTool",
+    "WeatherTool",
+    # Health check
+    "ToolHealthChecker",
+    "ToolHealthStatus",
+    "ToolHealthResult",
+    "ToolHealthSummary",
+    "get_tool_health_checker",
+    "check_tool_health",
+    "check_all_tools_health",
+    # Cache
+    "ToolCache",
+    "CacheEntry",
+    "CacheStats",
+    "get_tool_cache",
+    "reset_tool_cache",
+    # Dependencies
+    "ToolDependency",
+    "DependencyGraph",
+    "DependencyType",
+    "CyclicDependencyError",
+    "get_dependency_graph",
+    "reset_dependency_graph",
     # Helper functions
     "get_all_tools",
     "get_tool",

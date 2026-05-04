@@ -9,12 +9,15 @@ from .nodes import (
     plan_node,
     act_node,
     observe_node,
+    reflect_node,
     check_completion_node,
     handle_error_node,
     retry_node,
+    should_continue_router,
 )
 from .routers import (
     route_after_observe,
+    route_after_reflect,
     route_completion_check,
     route_on_error,
 )
@@ -23,12 +26,13 @@ from .routers import (
 def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
     """Build the main agent graph - 改进版架构
 
-    Graph structure (7 nodes):
-        THINK → PLAN → ACT → OBSERVE → CHECK_COMPLETION → (循环/END)
+    Graph structure (8 nodes):
+        THINK → PLAN → ACT → OBSERVE → REFLECT → CHECK_COMPLETION → (循环/END)
                                           ↓
                                     HANDLE_ERROR → RETRY → ACT
 
     新增功能：
+    - 反思机制（reflect_node，仅复杂任务）
     - 错误恢复机制（handle_error + retry）
     - 任务完成检查（check_completion）
     - 统一的路由函数
@@ -43,6 +47,7 @@ def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
     graph.add_node("observe", observe_node)
 
     # 新增节点
+    graph.add_node("reflect", reflect_node)
     graph.add_node("check_completion", check_completion_node)
     graph.add_node("handle_error", handle_error_node)
     graph.add_node("retry", retry_node)
@@ -60,9 +65,19 @@ def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
         "observe",
         route_after_observe,
         {
-            "continue": "check_completion",  # 继续检查完成度
+            "reflect": "reflect",          # 复杂任务：先反思
+            "continue": "check_completion", # 简单任务：直接检查完成度
             "error": "handle_error",         # 错误处理
             "complete": END,                 # 任务完成
+        }
+    )
+
+    # Reflect 后进入 check_completion
+    graph.add_conditional_edges(
+        "reflect",
+        route_after_reflect,
+        {
+            "continue": "check_completion",
         }
     )
 
@@ -101,8 +116,6 @@ def build_agent_graph_simple():
     简化版图结构（用于测试）：
         THINK → PLAN → ACT → OBSERVE → (循环/END)
     """
-    from .nodes import should_continue_router
-
     graph = StateGraph(AgentState)
 
     graph.add_node("think", think_node)
@@ -131,6 +144,7 @@ def build_agent_graph_no_checkpoint():
     graph.add_node("plan", plan_node)
     graph.add_node("act", act_node)
     graph.add_node("observe", observe_node)
+    graph.add_node("reflect", reflect_node)
     graph.add_node("check_completion", check_completion_node)
     graph.add_node("handle_error", handle_error_node)
     graph.add_node("retry", retry_node)
@@ -143,7 +157,17 @@ def build_agent_graph_no_checkpoint():
     graph.add_conditional_edges(
         "observe",
         route_after_observe,
-        {"continue": "check_completion", "error": "handle_error", "complete": END}
+        {
+            "reflect": "reflect",
+            "continue": "check_completion",
+            "error": "handle_error",
+            "complete": END,
+        }
+    )
+    graph.add_conditional_edges(
+        "reflect",
+        route_after_reflect,
+        {"continue": "check_completion"}
     )
     graph.add_conditional_edges(
         "check_completion",

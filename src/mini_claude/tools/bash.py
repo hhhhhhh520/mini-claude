@@ -1,11 +1,10 @@
 """Command execution tools."""
 
 import asyncio
-import subprocess
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from .base import BaseTool, register_tool
-from ..utils.safety import validate_command, SafetyChecker
+from ..utils.safety import validate_command
 
 
 class RunCommandTool(BaseTool):
@@ -35,6 +34,26 @@ class RunCommandTool(BaseTool):
             },
             "required": ["command"],
         }
+
+    @property
+    def examples(self) -> list:
+        return [
+            {
+                "description": "List files with details (prefer list_dir tool instead)",
+                "input": {"command": "ls -la"},
+                "expected_output": "Exit code: 0\ntotal 24\ndrwxr-xr-x 2 user user 4096...",
+            },
+            {
+                "description": "Run Python script",
+                "input": {"command": "python script.py", "timeout": 60},
+                "expected_output": "Exit code: 0\nScript output here...",
+            },
+            {
+                "description": "Check git status",
+                "input": {"command": "git status"},
+                "expected_output": "Exit code: 0\nOn branch main\nnothing to commit...",
+            },
+        ]
 
     async def execute(self, command: str, timeout: int = 30) -> str:
         # Validate command

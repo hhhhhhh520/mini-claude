@@ -1,19 +1,23 @@
 """Router functions for agent graph - 路由函数模块."""
 
 from .state import AgentState, StopReason
+from ..utils.logger import get_logger
+
+logger = get_logger("mini_claude.agent.routers")
 
 
 def route_after_observe(state: AgentState) -> str:
     """Observe 节点后的路由
 
     Returns:
+        "reflect": 进入反思节点（复杂任务）
         "continue": 继续执行 check_completion
         "error": 进入错误处理
         "complete": 任务完成，结束
     """
     stop_reason = state.get("stop_reason", StopReason.CONTINUE)
 
-    print(f"[DEBUG] route_after_observe: stop_reason = {stop_reason}")
+    logger.debug("route_after_observe", stop_reason=str(stop_reason))
 
     if stop_reason == StopReason.ERROR:
         return "error"
@@ -28,7 +32,24 @@ def route_after_observe(state: AgentState) -> str:
         # 等待用户确认，停止执行
         return "complete"
     else:
+        # 对于复杂任务，先进行反思
+        from .complexity import TaskComplexityAnalyzer, ComplexityLevel
+        current_task = state.get("current_task", "")
+        analyzer = TaskComplexityAnalyzer()
+        complexity = analyzer.analyze(current_task)
+        if complexity.level == ComplexityLevel.COMPLEX:
+            return "reflect"
         return "continue"
+
+
+def route_after_reflect(state: AgentState) -> str:
+    """Reflect 节点后的路由
+
+    Returns:
+        "continue": 继续执行 check_completion
+    """
+    logger.debug("route_after_reflect: proceeding to check_completion")
+    return "continue"
 
 
 def route_completion_check(state: AgentState) -> str:
@@ -42,7 +63,7 @@ def route_completion_check(state: AgentState) -> str:
     stop_reason = state.get("stop_reason", StopReason.CONTINUE)
     retry_count = state.get("retry_count", 0)
 
-    print(f"[DEBUG] route_completion_check: stop_reason = {stop_reason}, retry_count = {retry_count}")
+    logger.debug("route_completion_check", stop_reason=str(stop_reason), retry_count=retry_count)
 
     if stop_reason == StopReason.TASK_COMPLETE:
         return "complete"
@@ -66,7 +87,7 @@ def route_on_error(state: AgentState) -> str:
     """
     retry_count = state.get("retry_count", 0)
 
-    print(f"[DEBUG] route_on_error: retry_count = {retry_count}")
+    logger.debug("route_on_error", retry_count=retry_count)
 
     if retry_count >= 3:
         return "abort"

@@ -47,11 +47,15 @@ class FileLockManager:
         """Normalize file path for consistent key."""
         return os.path.abspath(path).replace("\\", "/")
 
+    # 最大哈希计算字节数（1MB），避免大文件阻塞
+    MAX_HASH_BYTES = 1_000_000
+
     def _compute_hash(self, path: str) -> Optional[str]:
-        """Compute MD5 hash of file content."""
+        """Compute MD5 hash of file content (limited to MAX_HASH_BYTES for performance)."""
         try:
             with open(path, "rb") as f:
-                return hashlib.md5(f.read()).hexdigest()
+                data = f.read(self.MAX_HASH_BYTES)
+                return hashlib.md5(data, usedforsecurity=False).hexdigest()
         except FileNotFoundError:
             return None
         except Exception:
@@ -77,7 +81,7 @@ class FileLockManager:
 
                 # Read locks can share with other read locks
                 if lock_type == "read" and existing.lock_type == "read":
-                    return True, f"Shared read lock granted"
+                    return True, "Shared read lock granted"
 
                 # Write lock conflicts with any existing lock
                 if existing.agent_id != agent_id:

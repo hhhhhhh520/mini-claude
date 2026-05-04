@@ -2,19 +2,17 @@
 
 import asyncio
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from datetime import datetime
 
 from .base import BaseTool, register_tool
 from ..agent.subagent import subagent_manager, AgentStatus
 from ..agent.state import create_initial_state
 from ..llm.prompts import get_subagent_prompt
+from ..utils import generate_agent_id
+from ..utils.logger import get_logger
 
-
-def _log(msg: str):
-    """Thread-safe logging with timestamp."""
-    timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-    print(f"[{timestamp}] [SPAWN] {msg}")
+logger = get_logger("mini_claude.tools.agent_spawn")
 
 
 class SpawnAgentTool(BaseTool):
@@ -49,6 +47,35 @@ class SpawnAgentTool(BaseTool):
             "required": ["task"],
         }
 
+    @property
+    def examples(self) -> list:
+        return [
+            {
+                "description": "Spawn agent to analyze a file",
+                "input": {
+                    "task": "Analyze the code structure in src/main.py and identify potential improvements",
+                    "context": "Focus on code quality and performance",
+                },
+                "expected_output": "Spawned sub-agent: subagent_001\nTask: Analyze the code structure...",
+            },
+            {
+                "description": "Spawn agent for documentation generation",
+                "input": {
+                    "task": "Generate API documentation for the endpoints in routes.py",
+                    "agent_id": "doc_gen_01",
+                },
+                "expected_output": "Spawned sub-agent: doc_gen_01\nTask: Generate API documentation...",
+            },
+            {
+                "description": "Spawn agent for code review",
+                "input": {
+                    "task": "Review the authentication module for security issues",
+                    "context": "Check for OWASP Top 10 vulnerabilities",
+                },
+                "expected_output": "Spawned sub-agent: subagent_002\nTask: Review the authentication module...",
+            },
+        ]
+
     async def execute(
         self,
         task: str,
@@ -57,14 +84,11 @@ class SpawnAgentTool(BaseTool):
     ) -> str:
         # Generate agent ID if not provided
         if not agent_id:
-            timestamp = datetime.now().strftime("%H%M%S")
-            agent_id = f"subagent_{timestamp}"
+            agent_id = generate_agent_id("subagent")
 
         # Create sub-agent task with full tool loop
         async def subagent_task(progress_callback=None):
             from ..agent.graph import build_agent_graph_no_checkpoint
-            from ..agent.state import create_initial_state
-            from ..llm.prompts import get_subagent_prompt
             from ..tools.file_ops import set_current_agent
             from langchain_core.messages import AIMessage
 
@@ -253,7 +277,7 @@ class SpawnParallelTool(BaseTool):
         if not tasks:
             return "Error: No tasks provided"
 
-        _log(f"Spawning {len(tasks)} agents in parallel")
+        logger.info("Spawning agents in parallel", count=len(tasks))
         start_time = time.time()
 
         # Create all agent tasks FIRST
@@ -268,11 +292,11 @@ class SpawnParallelTool(BaseTool):
             agent_tasks.append(self._run_agent_task(agent_id, task))
 
         # Launch ALL agents at the SAME time
-        _log(f"Launching all {len(agent_tasks)} agents simultaneously")
+        logger.debug("Launching all agents simultaneously", count=len(agent_tasks))
         results = await asyncio.gather(*agent_tasks, return_exceptions=True)
 
         elapsed = time.time() - start_time
-        _log(f"All {len(tasks)} agents completed in {elapsed:.2f}s")
+        logger.info("All agents completed", count=len(tasks), elapsed=elapsed)
 
         # Build response
         lines = [f"Spawned {len(agent_ids)} parallel agents in {elapsed:.2f}s:"]
@@ -287,11 +311,10 @@ class SpawnParallelTool(BaseTool):
     async def _run_agent_task(self, agent_id: str, task: str):
         """Run a single agent task with logging."""
         from ..agent.graph import build_agent_graph_no_checkpoint
-        from ..agent.state import create_initial_state
         from ..tools.file_ops import set_current_agent
         from langchain_core.messages import AIMessage
 
-        _log(f"Agent {agent_id}: STARTED for task: {task[:50]}...")
+        logger.debug("Agent started", agent_id=agent_id, task_preview=task[:50])
 
         # Set current agent ID for file locking
         set_current_agent(agent_id)
@@ -319,7 +342,7 @@ class SpawnParallelTool(BaseTool):
             )
             task_elapsed = time.time() - task_start
 
-            _log(f"Agent {agent_id}: COMPLETED in {task_elapsed:.2f}s")
+            logger.debug("Agent completed", agent_id=agent_id, elapsed=task_elapsed)
 
             # Extract final response
             messages = result.get("messages", [])
@@ -330,10 +353,10 @@ class SpawnParallelTool(BaseTool):
             return messages[-1].content if messages else "No result"
 
         except asyncio.TimeoutError:
-            _log(f"Agent {agent_id}: TIMEOUT")
+            logger.warning("Agent timeout", agent_id=agent_id)
             return "Error: Sub-agent execution timed out after 180 seconds"
         except Exception as e:
-            _log(f"Agent {agent_id}: FAILED - {e}")
+            logger.error("Agent failed", agent_id=agent_id, error=str(e))
             return f"Error: {e}"
 
 

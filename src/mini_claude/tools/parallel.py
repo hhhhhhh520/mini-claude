@@ -2,22 +2,17 @@
 
 import asyncio
 import time
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+from typing import Dict, Any, List
 
 from .base import BaseTool, register_tool
 from ..agent.coordinator import (
-    parallel_coordinator, DistributedTask, TaskPriority, TaskStatus
+    parallel_coordinator, DistributedTask, TaskPriority
 )
-from ..agent.subagent import subagent_manager
-from ..utils.file_lock import file_lock_manager
 from ..config.settings import settings
+from ..utils import generate_agent_id
+from ..utils.logger import get_logger
 
-
-def _log(msg: str):
-    """Thread-safe logging with timestamp."""
-    timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-    print(f"[{timestamp}] [PARALLEL] {msg}")
+logger = get_logger("mini_claude.tools.parallel")
 
 
 class PlanParallelTool(BaseTool):
@@ -174,13 +169,13 @@ class ExecuteParallelTool(BaseTool):
 
         total_tasks = len(parallel_coordinator.tasks)
         lines = [f"Starting parallel execution of {total_tasks} tasks...\n"]
-        _log(f"Total tasks: {total_tasks}, levels: {len(levels)}")
+        logger.info("Starting parallel execution", total_tasks=total_tasks, levels=len(levels))
 
         # Execute level by level
         for level_name, task_ids in levels.items():
             level_num = level_name.split("_")[1]
             lines.append(f"[Level {level_num}] Executing {len(task_ids)} task(s) in parallel...")
-            _log(f"Level {level_num}: Starting {len(task_ids)} tasks: {task_ids}")
+            logger.debug("Starting level", level=level_num, tasks=task_ids)
 
             # Print immediate status for user feedback (force flush)
             import sys
@@ -190,22 +185,21 @@ class ExecuteParallelTool(BaseTool):
             # Create all task coroutines FIRST (don't await yet)
             task_coroutines = []
             for task_id in task_ids:
-                task = parallel_coordinator.tasks[task_id]
-                agent_id = f"agent_{task_id}"
+                agent_id = generate_agent_id(f"agent_{task_id}")
                 task_coroutines.append(self._run_task_with_logging(task_id, agent_id))
 
             # Launch ALL tasks at the SAME time using asyncio.gather
-            _log(f"Level {level_num}: Launching all {len(task_coroutines)} tasks simultaneously")
+            logger.debug("Launching all tasks simultaneously", level=level_num, count=len(task_coroutines))
             start_time = time.time()
 
             # Show progress indicator while waiting (force flush)
-            sys.stdout.write(f"[PARALLEL] Waiting for tasks to complete (timeout: 180s)...\n")
+            sys.stdout.write("[PARALLEL] Waiting for tasks to complete (timeout: 180s)...\n")
             sys.stdout.flush()
 
             results = await asyncio.gather(*task_coroutines, return_exceptions=True)
 
             elapsed = time.time() - start_time
-            _log(f"Level {level_num}: All tasks completed in {elapsed:.2f}s")
+            logger.debug("Level completed", level=level_num, elapsed=elapsed)
             sys.stdout.write(f"[PARALLEL] All tasks completed in {elapsed:.2f}s\n")
             sys.stdout.flush()
 
@@ -218,7 +212,7 @@ class ExecuteParallelTool(BaseTool):
                     status = "✓" if success else "✗"
                     lines.append(f"  {status} {task_id}")
 
-        lines.append(f"\nExecution complete!")
+        lines.append("\nExecution complete!")
 
         # Auto-aggregate if requested
         if auto_aggregate:
@@ -236,7 +230,7 @@ class ExecuteParallelTool(BaseTool):
         parallel_coordinator.assign_task(task_id, agent_id)
         parallel_coordinator.mark_task_running(task_id)
 
-        _log(f"Task {task_id} ({agent_id}): STARTED")
+        logger.debug("Task started", task_id=task_id, agent_id=agent_id)
         sys.stdout.write(f"  [{task_id}] Started...\n")
         sys.stdout.flush()
 
@@ -244,13 +238,13 @@ class ExecuteParallelTool(BaseTool):
             # Execute via sub-agent
             result = await self._execute_task_via_agent(task, agent_id)
             parallel_coordinator.mark_task_completed(task_id, result)
-            _log(f"Task {task_id} ({agent_id}): COMPLETED")
+            logger.debug("Task completed", task_id=task_id, agent_id=agent_id)
             sys.stdout.write(f"  [{task_id}] ✓ Completed\n")
             sys.stdout.flush()
             return task_id, True, result
         except Exception as e:
             parallel_coordinator.mark_task_failed(task_id, str(e))
-            _log(f"Task {task_id} ({agent_id}): FAILED - {e}")
+            logger.error("Task failed", task_id=task_id, agent_id=agent_id, error=str(e))
             sys.stdout.write(f"  [{task_id}] ✗ Failed: {e}\n")
             sys.stdout.flush()
             return task_id, False, str(e)
@@ -293,7 +287,7 @@ write_file(path="{target_file}", content="{content_hint[:50]}...")
 
 DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"""
 
-        _log(f"Agent {agent_id}: Building graph for task '{task.id}'")
+        logger.debug("Building graph for task", agent_id=agent_id, task_id=task.id)
 
         # Execute
         graph = build_agent_graph_no_checkpoint()
@@ -315,7 +309,7 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
 
         # Add timeout to prevent hanging
         try:
-            _log(f"Agent {agent_id}: Starting graph execution")
+            logger.debug("Starting graph execution", agent_id=agent_id)
             start = time.time()
 
             result = await asyncio.wait_for(
@@ -324,10 +318,10 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
             )
 
             elapsed = time.time() - start
-            _log(f"Agent {agent_id}: Graph completed in {elapsed:.2f}s")
+            logger.debug("Graph completed", agent_id=agent_id, elapsed=elapsed)
 
         except asyncio.TimeoutError:
-            _log(f"Agent {agent_id}: TIMEOUT after 180 seconds")
+            logger.warning("Graph execution timeout", agent_id=agent_id, timeout=180)
             return "Error: Task execution timed out after 180 seconds"
 
         # Check if file was created - if not, create it directly
@@ -337,7 +331,7 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
         full_path = os.path.join(workspace, target_file) if not os.path.isabs(target_file) else target_file
 
         if not os.path.exists(full_path):
-            _log(f"Agent {agent_id}: File not created, auto-creating {target_file}")
+            logger.debug("File not created, auto-creating", agent_id=agent_id, target_file=target_file)
             # Auto-create with basic content based on task description
             auto_content = self._generate_basic_content(task.description, target_file)
             try:
@@ -345,9 +339,9 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
                     "path": target_file,
                     "content": auto_content
                 })
-                _log(f"Agent {agent_id}: Auto-created file: {create_result}")
+                logger.debug("Auto-created file", agent_id=agent_id, result=create_result)
             except Exception as e:
-                _log(f"Agent {agent_id}: Failed to auto-create: {e}")
+                logger.error("Failed to auto-create", agent_id=agent_id, error=str(e))
 
         # Extract result
         messages = result.get("messages", [])

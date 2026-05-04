@@ -2,8 +2,11 @@
 
 import os
 import re
-from typing import Tuple, Set, Optional
-from pathlib import Path
+import time
+import threading
+from typing import Tuple, Set, Dict, List, Any, Optional
+from collections import defaultdict
+from dataclasses import dataclass, field
 
 from mini_claude.config.settings import settings
 
@@ -23,8 +26,11 @@ DANGEROUS_PATTERNS = [
     r"rm\s+/",
     r"dd\s+if=",
     r"chmod\s+777",
+    r"chmod\s+-R\s+777",      # 全系统权限开放
+    r"chown\s+-R",            # 批量修改所有权
     r">\s*/dev/sd",
     r">\s*/dev/hd",
+    r">\s*/etc/",             # 系统配置覆盖
     r"mkfs",
     r":\(\)\{\s*:\|:&\s*\};:",  # Fork bomb
     r"curl.*\|\s*bash",
@@ -80,10 +86,100 @@ PROTECTED_PATHS = [
     "~/.bash_history",
     "~/.netrc",
     "~/.pgpass",
+    # 容器与云凭证
+    "~/.docker/config.json",   # Docker 凭证
+    "~/.kube/config",          # Kubernetes 凭证
+    "~/.npmrc",                # npm 凭证
+    "~/.pypirc",               # PyPI 凭证
+    # Windows 敏感目录
+    "~/AppData/Roaming/Microsoft/Credentials",
+    "~/AppData/Local/Microsoft/Credentials",
 ]
 
 # Shell chaining characters
 SHELL_CHAIN_CHARS = [";", "&&", "||", "|", "`", "$("]
+
+
+# Sensitive information patterns for input filtering
+# Each pattern is a tuple of (regex_pattern, category, severity)
+SENSITIVE_PATTERNS = [
+    # API Key patterns - High severity
+    (r'\bsk-[a-zA-Z0-9]{10,}', 'api_key', 'high'),  # OpenAI API key (at least 10 chars after sk-)
+    (r'\bsk-proj-[a-zA-Z0-9]{10,}', 'api_key', 'high'),  # OpenAI project key
+    (r'\bapi[_-]?key\s*=\s*["\']?[^\s"\']{4,}["\']?', 'api_key', 'high'),  # api_key=xxx or api-key=xxx
+    (r'\bx-api-key\s*[:=]\s*["\']?[^\s"\']{4,}["\']?', 'api_key', 'high'),  # x-api-key: xxx
+    (r'\bAKIA[A-Z0-9]{16}\b', 'api_key', 'high'),  # AWS access key
+
+    # Password patterns - Medium/High severity
+    (r'\bpassword\s*=\s*["\']?[^\s"\']{3,}["\']?', 'password', 'medium'),  # password=xxx
+    (r'\bpasswd\s*=\s*["\']?[^\s"\']{3,}["\']?', 'password', 'medium'),  # passwd=xxx
+    (r'\bpwd\s*=\s*["\']?[^\s"\']{3,}["\']?', 'password', 'medium'),  # pwd=xxx
+
+    # Token patterns - High severity
+    (r'\bbearer\s+[a-zA-Z0-9_\-\.]{4,}', 'token', 'high'),  # Bearer xxx
+    (r'\btoken\s*=\s*["\']?[^\s"\']{4,}["\']?', 'token', 'high'),  # token=xxx
+    (r'\bjwt\s+[a-zA-Z0-9_\-]{20,}', 'token', 'high'),  # jwt xxx (longer, real JWT format)
+    (r'\bghp_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub personal access token
+    (r'\bgho_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub OAuth token
+    (r'\bghr_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub refresh token
+    (r'\bghu_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub user-to-server token
+    (r'\bghs_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub server-to-server token
+
+    # Connection strings with credentials - High severity
+    (r'\bmysql://[^:]+:[^@]+@[^/\s]+', 'connection_string', 'high'),  # mysql://user:pass@host
+    (r'\bpostgresql://[^:]+:[^@]+@[^/\s]+', 'connection_string', 'high'),  # postgresql://user:pass@host
+    (r'\bmongodb(\+srv)?://[^:]+:[^@]+@[^/\s]+', 'connection_string', 'high'),  # mongodb://user:pass@host
+    (r'\bredis://[^:]*:[^@]+@[^/\s]+', 'connection_string', 'high'),  # redis://:pass@host
+    (r'\bpostgres://[^:]+:[^@]+@[^/\s]+', 'connection_string', 'high'),  # postgres://user:pass@host
+]
+
+
+def check_sensitive_input(text: str) -> Dict[str, Any]:
+    """Check input text for sensitive information patterns.
+
+    Args:
+        text: The input text to check for sensitive patterns.
+
+    Returns:
+        Dictionary with keys:
+        - detected: bool - True if sensitive patterns were found
+        - patterns: List[str] - List of pattern categories detected
+        - severity: str - "high", "medium", "low", or "none"
+        - matches: List[Dict] - Detailed match information (for logging)
+    """
+    if not text or not text.strip():
+        return {
+            "detected": False,
+            "patterns": [],
+            "severity": "none",
+            "matches": []
+        }
+
+    detected_patterns: Set[str] = set()
+    matches: List[Dict[str, Any]] = []
+    max_severity = "none"
+
+    severity_order = {"none": 0, "low": 1, "medium": 2, "high": 3}
+
+    for pattern, category, severity in SENSITIVE_PATTERNS:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            detected_patterns.add(category)
+            matches.append({
+                "category": category,
+                "severity": severity,
+                "match_start": match.start(),
+                "match_end": match.end(),
+            })
+            if severity_order.get(severity, 0) > severity_order.get(max_severity, 0):
+                max_severity = severity
+
+    return {
+        "detected": bool(detected_patterns),
+        "patterns": sorted(list(detected_patterns)),
+        "severity": max_severity if detected_patterns else "none",
+        "matches": matches
+    }
 
 
 def validate_command(command: str) -> Tuple[bool, str]:
@@ -92,8 +188,6 @@ def validate_command(command: str) -> Tuple[bool, str]:
     Returns:
         Tuple of (is_safe, reason)
     """
-    command_stripped = command.strip()
-
     # Check for dangerous patterns first
     for pattern in DANGEROUS_PATTERNS:
         if re.search(pattern, command, re.IGNORECASE):
@@ -111,7 +205,6 @@ def validate_command(command: str) -> Tuple[bool, str]:
             if chain_char == "|":
                 # Check if it's a safe read-only pipe (e.g., cat file | grep pattern)
                 pipe_parts = command.split("|")
-                first_cmd = pipe_parts[0].strip().split()[0] if pipe_parts[0].strip() else ""
                 read_only_cmds = ["cat", "head", "tail", "less", "more", "grep", "find", "ls", "echo", "sort", "uniq", "wc", "awk", "sed"]
 
                 # Check all parts are read-only
@@ -343,3 +436,323 @@ class SafetyChecker:
         # Note: Parent directory will be created automatically by write_file
         # So we don't need to check if it exists here
         return True, "OK"
+
+    def check_sensitive(self, text: str) -> Dict[str, Any]:
+        """Check input text for sensitive information patterns.
+
+        Args:
+            text: The input text to check.
+
+        Returns:
+            Dictionary with detected, patterns, severity, and matches keys.
+        """
+        return check_sensitive_input(text)
+
+
+# =============================================================================
+# RATE LIMITING
+# =============================================================================
+
+@dataclass
+class RateLimitEntry:
+    """Entry for rate limit tracking."""
+    count: int = 0
+    window_start: float = 0.0
+    timestamps: List[float] = field(default_factory=list)  # For sliding window
+    tokens: float = 0.0  # For token bucket
+    last_update: float = 0.0
+
+
+class RateLimiter:
+    """Rate limiter with multiple strategies.
+
+    Supports three strategies:
+    - fixed_window: Simple counting within fixed time windows (per minute)
+    - sliding_window: More accurate counting using sliding time window
+    - token_bucket: Allows burst traffic up to burst_size
+
+    All strategies use in-memory storage with thread-safe operations.
+    """
+
+    def __init__(
+        self,
+        requests_per_minute: int = 60,
+        strategy: str = "sliding_window",
+        burst_size: int = 10,
+        enabled: bool = True,
+    ):
+        """Initialize rate limiter.
+
+        Args:
+            requests_per_minute: Maximum requests allowed per minute
+            strategy: Rate limiting strategy (fixed_window, sliding_window, token_bucket)
+            burst_size: Maximum burst size for token_bucket strategy
+            enabled: Whether rate limiting is enabled
+        """
+        self.requests_per_minute = requests_per_minute
+        self.strategy = strategy
+        self.burst_size = burst_size
+        self.enabled = enabled
+
+        # Thread-safe storage
+        self._lock = threading.RLock()
+        self._entries: Dict[str, RateLimitEntry] = defaultdict(RateLimitEntry)
+
+        # Token bucket: tokens refill rate (tokens per second)
+        self._refill_rate = requests_per_minute / 60.0
+
+    def check_limit(self, identifier: str) -> bool:
+        """Check if the identifier is within rate limits.
+
+        Args:
+            identifier: Unique identifier (e.g., user_id, ip_address, session_id)
+
+        Returns:
+            True if within limits (request allowed), False if exceeded (request denied)
+        """
+        if not self.enabled:
+            return True
+
+        with self._lock:
+            current_time = time.time()
+
+            if self.strategy == "fixed_window":
+                return self._check_fixed_window(identifier, current_time)
+            elif self.strategy == "sliding_window":
+                return self._check_sliding_window(identifier, current_time)
+            elif self.strategy == "token_bucket":
+                return self._check_token_bucket(identifier, current_time)
+            else:
+                # Unknown strategy, default to allowing
+                return True
+
+    def _check_fixed_window(self, identifier: str, current_time: float) -> bool:
+        """Fixed window rate limiting.
+
+        Divides time into fixed windows (1 minute each).
+        Simple but can allow 2x rate at window boundaries.
+        """
+        entry = self._entries[identifier]
+        window_start = int(current_time / 60) * 60  # Start of current minute
+
+        if entry.window_start != window_start:
+            # New window, reset count
+            entry.count = 0
+            entry.window_start = window_start
+
+        if entry.count >= self.requests_per_minute:
+            return False
+
+        entry.count += 1
+        entry.last_update = current_time
+        return True
+
+    def _check_sliding_window(self, identifier: str, current_time: float) -> bool:
+        """Sliding window rate limiting.
+
+        More accurate than fixed window by tracking individual timestamps.
+        Counts requests in the last 60 seconds.
+        """
+        entry = self._entries[identifier]
+
+        # Remove timestamps older than 60 seconds
+        cutoff = current_time - 60.0
+        entry.timestamps = [ts for ts in entry.timestamps if ts > cutoff]
+
+        if len(entry.timestamps) >= self.requests_per_minute:
+            return False
+
+        entry.timestamps.append(current_time)
+        entry.last_update = current_time
+        return True
+
+    def _check_token_bucket(self, identifier: str, current_time: float) -> bool:
+        """Token bucket rate limiting.
+
+        Allows burst traffic up to burst_size.
+        Tokens refill at rate of requests_per_minute / 60 per second.
+        """
+        entry = self._entries[identifier]
+
+        # Initialize bucket if needed
+        if entry.last_update == 0.0:
+            entry.tokens = float(self.burst_size)
+            entry.last_update = current_time
+
+        # Refill tokens based on time elapsed
+        elapsed = current_time - entry.last_update
+        entry.tokens = min(
+            self.burst_size,
+            entry.tokens + elapsed * self._refill_rate
+        )
+
+        if entry.tokens < 1.0:
+            return False
+
+        entry.tokens -= 1.0
+        entry.last_update = current_time
+        return True
+
+    def get_remaining(self, identifier: str) -> int:
+        """Get remaining requests for the identifier.
+
+        Args:
+            identifier: Unique identifier
+
+        Returns:
+            Number of remaining requests in current window/bucket
+        """
+        if not self.enabled:
+            return self.requests_per_minute  # Unlimited when disabled
+
+        with self._lock:
+            current_time = time.time()
+            entry = self._entries.get(identifier)
+
+            if entry is None:
+                if self.strategy == "token_bucket":
+                    return self.burst_size
+                return self.requests_per_minute
+
+            if self.strategy == "fixed_window":
+                window_start = int(current_time / 60) * 60
+                if entry.window_start != window_start:
+                    return self.requests_per_minute
+                return max(0, self.requests_per_minute - entry.count)
+
+            elif self.strategy == "sliding_window":
+                cutoff = current_time - 60.0
+                active_count = len([ts for ts in entry.timestamps if ts > cutoff])
+                return max(0, self.requests_per_minute - active_count)
+
+            elif self.strategy == "token_bucket":
+                # Refill and get current tokens
+                elapsed = current_time - entry.last_update
+                tokens = min(
+                    self.burst_size,
+                    entry.tokens + elapsed * self._refill_rate
+                )
+                return int(tokens)
+
+            return self.requests_per_minute
+
+    def reset(self, identifier: str) -> None:
+        """Reset rate limit for the identifier.
+
+        Args:
+            identifier: Unique identifier to reset
+        """
+        with self._lock:
+            if identifier in self._entries:
+                del self._entries[identifier]
+
+    def reset_all(self) -> None:
+        """Reset all rate limit entries."""
+        with self._lock:
+            self._entries.clear()
+
+    def get_retry_after(self, identifier: str) -> float:
+        """Get seconds until the identifier can make another request.
+
+        Args:
+            identifier: Unique identifier
+
+        Returns:
+            Seconds to wait (0 if not rate limited)
+        """
+        if not self.enabled:
+            return 0.0
+
+        with self._lock:
+            current_time = time.time()
+            entry = self._entries.get(identifier)
+
+            if entry is None:
+                return 0.0
+
+            if self.strategy == "fixed_window":
+                # Time until next window
+                window_end = (int(current_time / 60) + 1) * 60
+                return window_end - current_time
+
+            elif self.strategy == "sliding_window":
+                if not entry.timestamps:
+                    return 0.0
+                # Time until oldest request expires
+                oldest = min(entry.timestamps)
+                return max(0.0, 60.0 - (current_time - oldest))
+
+            elif self.strategy == "token_bucket":
+                if entry.tokens >= 1.0:
+                    return 0.0
+                # Time until one token is refilled
+                return (1.0 - entry.tokens) / self._refill_rate
+
+            return 0.0
+
+    def get_stats(self, identifier: str) -> Dict[str, Any]:
+        """Get statistics for the identifier.
+
+        Args:
+            identifier: Unique identifier
+
+        Returns:
+            Dictionary with rate limit statistics
+        """
+        return {
+            "identifier": identifier,
+            "strategy": self.strategy,
+            "enabled": self.enabled,
+            "limit": self.requests_per_minute,
+            "remaining": self.get_remaining(identifier),
+            "retry_after": self.get_retry_after(identifier),
+        }
+
+
+# Global rate limiter instance (lazy initialization)
+_rate_limiter: Optional[RateLimiter] = None
+
+
+def get_rate_limiter() -> RateLimiter:
+    """Get or create the global rate limiter instance.
+
+    This function provides backward compatibility with existing code.
+    New code should prefer ApplicationContext.rate_limiter.
+    """
+    global _rate_limiter
+    if _rate_limiter is None:
+        # Try to use ApplicationContext first
+        try:
+            from mini_claude.context import get_context
+            ctx = get_context()
+            if ctx._rate_limiter.is_initialized():
+                _rate_limiter = ctx.rate_limiter
+            else:
+                _rate_limiter = RateLimiter(
+                    requests_per_minute=settings.rate_limit_requests_per_minute,
+                    strategy=settings.rate_limit_strategy,
+                    burst_size=settings.rate_limit_burst_size,
+                    enabled=settings.rate_limit_enabled,
+                )
+                ctx.rate_limiter = _rate_limiter
+        except ImportError:
+            _rate_limiter = RateLimiter(
+                requests_per_minute=settings.rate_limit_requests_per_minute,
+                strategy=settings.rate_limit_strategy,
+                burst_size=settings.rate_limit_burst_size,
+                enabled=settings.rate_limit_enabled,
+            )
+    return _rate_limiter
+
+
+def reset_rate_limiter() -> None:
+    """Reset the global rate limiter (for testing)."""
+    global _rate_limiter
+    _rate_limiter = None
+    # Also reset in context
+    try:
+        from mini_claude.context import get_context
+        ctx = get_context()
+        ctx._rate_limiter.reset()
+    except ImportError:
+        pass

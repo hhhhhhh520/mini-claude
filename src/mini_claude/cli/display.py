@@ -2,17 +2,14 @@
 
 import sys
 import io
-from typing import Dict, List, Optional
+from typing import Dict, List
 from enum import Enum
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.syntax import Syntax
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.live import Live
 from rich.table import Table
-from rich.text import Text
 
 
 class AgentStatus(Enum):
@@ -20,6 +17,69 @@ class AgentStatus(Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class SuggestionDisplay:
+    """Display suggestions using Rich panels."""
+
+    def __init__(self, console: Console):
+        self.console = console
+
+    def show_suggestion(self, suggestion) -> None:
+        """Display a single suggestion with Rich Panel.
+
+        Args:
+            suggestion: Suggestion object from suggestion module
+        """
+        # Import here to avoid circular dependency
+        from ..agent.suggestion import Priority
+
+        # Determine color based on priority
+        color_map = {
+            Priority.HIGH: "red",
+            Priority.MEDIUM: "yellow",
+            Priority.LOW: "blue",
+        }
+        color = color_map.get(suggestion.priority, "white")
+
+        # Build content
+        lines = [suggestion.description, ""]
+
+        if suggestion.actions:
+            lines.append("[bold]Suggested Actions:[/]")
+            for i, action in enumerate(suggestion.actions, 1):
+                lines.append(f"  {i}. {action}")
+            lines.append("")
+
+        if suggestion.command:
+            lines.append(f"[bold]Quick Command:[/] [cyan]{suggestion.command}[/]")
+
+        if suggestion.doc_link:
+            lines.append(f"[bold]Documentation:[/] [link={suggestion.doc_link}]{suggestion.doc_link}[/]")
+
+        content = "\n".join(lines)
+
+        # Create panel with priority-based styling
+        self.console.print(Panel(
+            content,
+            title=f"[bold {color}]💡 {suggestion.title}[/]",
+            border_style=color,
+            padding=(1, 2),
+        ))
+
+    def show_suggestions(self, suggestions: List, title: str = "Suggestions") -> None:
+        """Display multiple suggestions.
+
+        Args:
+            suggestions: List of Suggestion objects
+            title: Panel title
+        """
+        if not suggestions:
+            return
+
+        self.console.print(f"\n[bold]{title}:[/]")
+        for suggestion in suggestions:
+            self.show_suggestion(suggestion)
 
 
 class AgentDisplay:
@@ -33,6 +93,7 @@ class AgentDisplay:
         self.console = Console()
         self._streaming_text = ""
         self._is_streaming = False
+        self._suggestion_display = SuggestionDisplay(self.console)
 
     def welcome(self):
         """Display welcome message."""
@@ -49,7 +110,7 @@ class AgentDisplay:
 
     def agent_message(self, message: str):
         """Display agent response."""
-        self.console.print(f"\n[bold blue]Assistant:[/]")
+        self.console.print("\n[bold blue]Assistant:[/]")
         # Try to render as markdown if it looks like markdown
         if any(marker in message for marker in ["```", "##", "**", "- "]):
             self.console.print(Markdown(message))
@@ -60,7 +121,7 @@ class AgentDisplay:
         """Start streaming output."""
         self._streaming_text = ""
         self._is_streaming = True
-        self.console.print(f"\n[bold blue]Assistant:[/] ", end="")
+        self.console.print("\n[bold blue]Assistant:[/] ", end="")
 
     def stream_token(self, token: str):
         """Stream a single token."""
@@ -162,6 +223,23 @@ class AgentDisplay:
         """Prompt for user input."""
         from rich.prompt import Prompt
         return Prompt.ask(message)
+
+    def show_suggestion(self, suggestion) -> None:
+        """Display a suggestion with Rich Panel.
+
+        Args:
+            suggestion: Suggestion object from suggestion module
+        """
+        self._suggestion_display.show_suggestion(suggestion)
+
+    def show_suggestions(self, suggestions: List, title: str = "Suggestions") -> None:
+        """Display multiple suggestions.
+
+        Args:
+            suggestions: List of Suggestion objects
+            title: Panel title
+        """
+        self._suggestion_display.show_suggestions(suggestions, title)
 
 
 # Global display instance

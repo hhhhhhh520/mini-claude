@@ -4,6 +4,8 @@ from typing import TypedDict, List, Optional, Dict, Any, Annotated
 from langchain_core.messages import BaseMessage
 from enum import Enum
 from operator import add
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
 
 
 class StopReason(Enum):
@@ -15,6 +17,63 @@ class StopReason(Enum):
     IDLE_LOOP = "idle_loop"            # 空转循环（无工具调用）
     USER_CANCEL = "user_cancel"        # 用户取消
     WAITING_CONFIRMATION = "waiting_confirmation"  # 等待用户确认（路径/命令等）
+
+
+@dataclass
+class ExecutionState:
+    """执行状态 - 用于断点续跑
+
+    Attributes:
+        current_node: 当前执行的节点名
+        iteration_count: 迭代次数
+        last_error: 最后一个错误信息
+        pending_tools: 待执行的工具列表
+        checkpoint_data: 检查点数据（LangGraph checkpoint config）
+        created_at: 创建时间
+        updated_at: 更新时间
+    """
+    current_node: str = ""
+    iteration_count: int = 0
+    last_error: Optional[str] = None
+    pending_tools: List[str] = field(default_factory=list)
+    checkpoint_data: Dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典用于 JSON 序列化"""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ExecutionState":
+        """从字典创建实例"""
+        return cls(
+            current_node=data.get("current_node", ""),
+            iteration_count=data.get("iteration_count", 0),
+            last_error=data.get("last_error"),
+            pending_tools=data.get("pending_tools", []),
+            checkpoint_data=data.get("checkpoint_data", {}),
+            created_at=data.get("created_at", datetime.now().isoformat()),
+            updated_at=data.get("updated_at", datetime.now().isoformat()),
+        )
+
+    def is_valid(self) -> bool:
+        """验证状态完整性
+
+        Returns:
+            True 如果状态有效可恢复
+        """
+        # 必须有当前节点或检查点数据
+        has_node = bool(self.current_node)
+        has_checkpoint = bool(self.checkpoint_data)
+        # 迭代次数不能为负
+        valid_iteration = self.iteration_count >= 0
+        return (has_node or has_checkpoint) and valid_iteration
+
+    def update_timestamp(self) -> "ExecutionState":
+        """更新时间戳并返回自身"""
+        self.updated_at = datetime.now().isoformat()
+        return self
 
 
 class AgentState(TypedDict):
@@ -61,6 +120,11 @@ class AgentState(TypedDict):
     # 用户确认（可选）
     pending_confirmation_path: Optional[str]    # 待确认的路径
 
+    # 反思节点（可选）
+    reflection_notes: List[str]                 # 反思笔记
+    lessons_learned: List[str]                  # 经验教训
+    improvement_suggestions: List[str]          # 改进建议
+
 
 def create_initial_state(
     user_input: str,
@@ -100,6 +164,9 @@ def create_initial_state(
         errors=[],
         retry_count=0,
         pending_confirmation_path=None,
+        reflection_notes=[],
+        lessons_learned=[],
+        improvement_suggestions=[],
     )
 
 

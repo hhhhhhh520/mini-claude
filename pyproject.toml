@@ -27,6 +27,7 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
     "ruff>=0.4.0",
 ]
 
@@ -47,3 +48,42 @@ target-version = "py310"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "unit: Unit tests (fast, isolated)",
+    "integration: Integration tests (database, API, etc.)",
+    "e2e: End-to-end tests (full system)",
+    "stress: Stress tests for high concurrency scenarios",
+    "chaos: Chaos engineering tests for fault injection scenarios",
+    "slow: Slow running tests (can be skipped with -m 'not slow')",
+]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src/mini_claude"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__init__.py",
+    "*/.venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+fail_under = 0
+show_missing = true
+
+[tool.coverage.html]
+directory = "reports/coverage"

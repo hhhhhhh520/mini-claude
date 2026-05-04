@@ -1,0 +1,311 @@
+{
+  "timestamp": "2026-05-03T13:45:19.115669",
+  "duration": 93.90411925315857,
+  "total_tests": 42,
+  "total_passed": 40,
+  "total_failed": 1,
+  "total_skipped": 0,
+  "groups": [
+    {
+      "group_name": "unit",
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "tests": []
+    },
+    {
+      "group_name": "integration",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "tests": [
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestCompleteUserSessionFlow::test_user_input_to_agent_response",
+          "status": "passed",
+          "duration": 0.125,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestCompleteUserSessionFlow::test_session_save_on_completion",
+          "status": "passed",
+          "duration": 0.132,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestCompleteUserSessionFlow::test_session_list_after_multiple_sessions",
+          "status": "passed",
+          "duration": 0.15,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestMultiTurnDialogue::test_conversation_history_preserved",
+          "status": "passed",
+          "duration": 0.14,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestMultiTurnDialogue::test_context_window_management",
+          "status": "passed",
+          "duration": 0.219,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestMultiTurnDialogue::test_state_accumulation_prevention",
+          "status": "passed",
+          "duration": 0.002,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestToolCallChains::test_sequential_tool_calls",
+          "status": "passed",
+          "duration": 0.124,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestToolCallChains::test_tool_error_recovery",
+          "status": "passed",
+          "duration": 0.001,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestToolCallChains::test_tool_result_formatting",
+          "status": "passed",
+          "duration": 0.0,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestSessionPersistenceAndRecovery::test_session_full_persistence",
+          "status": "passed",
+          "duration": 0.134,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestSessionPersistenceAndRecovery::test_execution_state_persistence",
+          "status": "passed",
+          "duration": 0.133,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestSessionPersistenceAndRecovery::test_interrupted_session_listing",
+          "status": "passed",
+          "duration": 0.134,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestSessionPersistenceAndRecovery::test_session_deletion_with_state",
+          "status": "passed",
+          "duration": 0.136,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestTokenBudgetManagement::test_token_budget_check",
+          "status": "passed",
+          "duration": 0.0,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestTokenBudgetManagement::test_token_budget_exceeded_warning",
+          "status": "passed",
+          "duration": 0.261,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestTokenBudgetManagement::test_token_truncation_strategy",
+          "status": "passed",
+          "duration": 0.001,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestTokenBudgetManagement::test_token_summary_generation",
+          "status": "passed",
+          "duration": 0.001,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestConcurrentSubAgents::test_subagent_spawn_and_wait",
+          "status": "passed",
+          "duration": 0.103,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestConcurrentSubAgents::test_multiple_subagents_parallel",
+          "status": "passed",
+          "duration": 0.156,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestConcurrentSubAgents::test_file_lock_with_subagents",
+          "status": "passed",
+          "duration": 0.127,
+          "message": null
+        }
+      ]
+    },
+    {
+      "group_name": "e2e",
+      "total": 3,
+      "passed": 1,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 1,
+      "tests": [
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_real_llm_simple_query",
+          "status": "passed",
+          "duration": 1.025,
+          "message": null
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_full_graph_execution",
+          "status": "failed",
+          "duration": 0.873,
+          "message": "ValueError: I/O operation on closed file."
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_full_graph_execution",
+          "status": "error",
+          "duration": 0.0,
+          "message": "failed on teardown with \"ValueError: I/O operation on closed file\""
+        }
+      ]
+    },
+    {
+      "group_name": "stress",
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "tests": [
+        {
+          "name": "tests.test_stress.TestConcurrentSessionCreation::test_basic_concurrent_sessions",
+          "status": "passed",
+          "duration": 0.072,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestConcurrentSessionCreation::test_high_concurrency_sessions",
+          "status": "passed",
+          "duration": 0.029,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestConcurrentSessionCreation::test_gradual_pressure_sessions",
+          "status": "passed",
+          "duration": 1.633,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestConcurrentToolCalls::test_concurrent_tool_calls",
+          "status": "passed",
+          "duration": 0.182,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestConcurrentToolCalls::test_mixed_tool_calls",
+          "status": "passed",
+          "duration": 0.188,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestConcurrentToolCalls::test_tool_call_with_resource_limits",
+          "status": "passed",
+          "duration": 0.156,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestConcurrentFileOperations::test_concurrent_file_reads",
+          "status": "passed",
+          "duration": 0.083,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestConcurrentFileOperations::test_concurrent_file_locks",
+          "status": "passed",
+          "duration": 0.004,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestMemoryStability::test_memory_stability_long_running",
+          "status": "passed",
+          "duration": 10.352,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestMemoryStability::test_no_memory_leak_in_subagents",
+          "status": "passed",
+          "duration": 0.826,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestResourceLimits::test_max_sub_agents_limit",
+          "status": "passed",
+          "duration": 0.306,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestResourceLimits::test_task_queue_overflow",
+          "status": "passed",
+          "duration": 0.002,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestErrorRecovery::test_partial_failure_recovery",
+          "status": "passed",
+          "duration": 0.004,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestErrorRecovery::test_cascading_failure_prevention",
+          "status": "passed",
+          "duration": 0.001,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestPerformanceBenchmarks::test_throughput_benchmark",
+          "status": "passed",
+          "duration": 0.329,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestPerformanceBenchmarks::test_latency_benchmark",
+          "status": "passed",
+          "duration": 0.12,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestSubAgentManagerStress::test_rapid_spawn_and_wait",
+          "status": "passed",
+          "duration": 0.085,
+          "message": null
+        },
+        {
+          "name": "tests.test_stress.TestSubAgentManagerStress::test_progress_tracking_under_load",
+          "status": "passed",
+          "duration": 0.503,
+          "message": null
+        }
+      ]
+    },
+    {
+      "group_name": "chaos",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "tests": [
+        {
+          "name": "tests.test_chaos.TestChaosMarker::test_chaos_marker_example",
+          "status": "passed",
+          "duration": 0.001,
+          "message": null
+        }
+      ]
+    }
+  ]
+}

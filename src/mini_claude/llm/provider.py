@@ -1,8 +1,6 @@
 """LiteLLM provider wrapper."""
 
-import os
 from typing import Optional, List, Dict, Any, AsyncIterator
-from enum import Enum
 
 from litellm import acompletion, completion
 
@@ -133,7 +131,6 @@ class LLMProvider:
         # Collect streamed response
         content_parts = []
         tool_calls_data = {}  # index -> {id, name, arguments}
-        current_tool_name = None  # Track current tool for streaming display
 
         async for chunk in response:
             delta = chunk.choices[0].delta
@@ -167,7 +164,6 @@ class LLMProvider:
                     if hasattr(tc, 'function') and tc.function:
                         if hasattr(tc.function, 'name') and tc.function.name:
                             tool_calls_data[tc_index]["name"] = tc.function.name
-                            current_tool_name = tc.function.name
                             # Announce tool call start
                             if tool_stream_callback:
                                 tool_stream_callback("name", tc.function.name)

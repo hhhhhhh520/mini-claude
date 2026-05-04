@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="1" skipped="0" tests="2" time="15.924" timestamp="2026-05-03T13:44:10.524434+08:00" hostname="不知道叫什么"><testcase classname="tests.test_integration.test_e2e_user_flow.TestE2ERealAPI" name="test_real_llm_simple_query" time="1.025" /><testcase classname="tests.test_integration.test_e2e_user_flow.TestE2ERealAPI" name="test_full_graph_execution" time="0.873"><failure message="ValueError: I/O operation on closed file.">tests\test_integration\test_e2e_user_flow.py:633: in test_full_graph_execution
+    assert stop_reason in [StopReason.TASK_COMPLETE, StopReason.CONTINUE, StopReason.MAX_ITERATIONS]
+E   AssertionError: assert &lt;StopReason.IDLE_LOOP: 'idle_loop'&gt; in [&lt;StopReason.TASK_COMPLETE: 'task_complete'&gt;, &lt;StopReason.CONTINUE: 'continue'&gt;, &lt;StopReason.MAX_ITERATIONS: 'max_iterations'&gt;]
+
+During handling of the above exception, another exception occurred:
+tests\test_integration\test_e2e_user_flow.py:637: in test_full_graph_execution
+    pytest.skip(f"Graph execution failed: {e}")
+E   Skipped: Graph execution failed: assert &lt;StopReason.IDLE_LOOP: 'idle_loop'&gt; in [&lt;StopReason.TASK_COMPLETE: 'task_complete'&gt;, &lt;StopReason.CONTINUE: 'continue'&gt;, &lt;StopReason.MAX_ITERATIONS: 'max_iterations'&gt;]
+
+During handling of the above exception, another exception occurred:
+D:\python\3.12.10\Lib\contextlib.py:158: in __exit__
+    self.gen.throw(value)
+E   ValueError: I/O operation on closed file.</failure></testcase><testcase classname="tests.test_integration.test_e2e_user_flow.TestE2ERealAPI" name="test_full_graph_execution" time="0.000"><error message="failed on teardown with &quot;ValueError: I/O operation on closed file&quot;">D:\python\3.12.10\Lib\contextlib.py:137: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+D:\python\3.12.10\Lib\tempfile.py:499: in func_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+E   ValueError: I/O operation on closed file</error></testcase></testsuite></testsuites>

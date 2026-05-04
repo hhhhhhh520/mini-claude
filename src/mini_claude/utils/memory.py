@@ -4,7 +4,12 @@ DEPRECATED: This module is deprecated. Use SessionManager from session.py instea
 The SessionManager provides better SQLite-based persistence with enhanced features.
 """
 
+import json
+import os
 import warnings
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+from dataclasses import dataclass, field, asdict
 
 # Show deprecation warning when this module is imported
 warnings.warn(
@@ -12,12 +17,6 @@ warnings.warn(
     DeprecationWarning,
     stacklevel=2
 )
-
-import json
-import os
-from typing import Dict, Any, List, Optional
-from datetime import datetime
-from dataclasses import dataclass, field, asdict
 
 
 @dataclass
@@ -29,6 +28,9 @@ class SessionMemory:
     messages: List[Dict[str, Any]] = field(default_factory=list)
     context: Dict[str, Any] = field(default_factory=dict)
     summary: Optional[str] = None
+    summary_tokens: int = 0
+    total_tokens: int = 0
+    last_summarized_at: Optional[str] = None
 
     def add_message(self, role: str, content: str, metadata: Dict[str, Any] = None):
         """Add a message to memory."""
@@ -47,6 +49,32 @@ class SessionMemory:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
+
+    def to_system_message(self) -> Optional[Dict[str, str]]:
+        """Convert summary to a system message for context injection.
+
+        Returns:
+            Dict with role and content if summary exists, None otherwise.
+        """
+        if self.summary:
+            return {
+                "role": "system",
+                "content": f"<conversation_summary>\n{self.summary}\n</conversation_summary>"
+            }
+        return None
+
+    def get_context_messages(self) -> List[Dict[str, Any]]:
+        """Get messages with summary injected as context.
+
+        Returns:
+            List of messages with summary at the beginning if available.
+        """
+        messages = []
+        summary_msg = self.to_system_message()
+        if summary_msg:
+            messages.append(summary_msg)
+        messages.extend(self.messages)
+        return messages
 
 
 class MemoryManager:

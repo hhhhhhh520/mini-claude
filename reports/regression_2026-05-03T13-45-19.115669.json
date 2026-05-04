@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-05-03T13:45:19.115669",
+  "duration": 93.90411925315857,
+  "summary": {
+    "total_tests": 42,
+    "passed": 40,
+    "failed": 1,
+    "skipped": 0,
+    "success_rate": 95.23809523809523
+  },
+  "groups": [
+    {
+      "name": "unit",
+      "total": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 7.229815244674683,
+      "success_rate": 100.0,
+      "failed_tests": []
+    },
+    {
+      "name": "integration",
+      "total": 20,
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 17.2598397731781,
+      "success_rate": 100.0,
+      "failed_tests": []
+    },
+    {
+      "name": "e2e",
+      "total": 3,
+      "passed": 1,
+      "failed": 1,
+      "skipped": 0,
+      "errors": 1,
+      "duration": 18.338730812072754,
+      "success_rate": 33.33333333333333,
+      "failed_tests": [
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_full_graph_execution",
+          "message": "ValueError: I/O operation on closed file.",
+          "traceback": "tests\\test_integration\\test_e2e_user_flow.py:633: in test_full_graph_execution\n    assert stop_reason in [StopReason.TASK_COMPLETE, StopReason.CONTINUE, StopReason.MAX_ITERATIONS]\nE   AssertionError: assert <StopReason.IDLE_LOOP: 'idle_loop'> in [<StopReason.TASK_COMPLETE: 'task_complete'>, <StopReason.CONTINUE: 'continue'>, <StopReason.MAX_ITERATIONS: 'max_iterations'>]\n\nDuring handling of the above exception, another exception occurred:\ntests\\test_integration\\test_e2e_user_flow.py:637: in test_full_graph_execution\n    pytest.skip(f\"Graph execution failed: {e}\")\nE   Skipped: Graph execution failed: assert <StopReason.IDLE_LOOP: 'idle_loop'> in [<StopReason.TASK_COMPLETE: 'task_complete'>, <StopReason.CONTINUE: 'continue'>, <StopReason.MAX_ITERATIONS: 'max_iterations'>]\n\nDuring handling of the above exception, another exception occurred:\nD:\\python\\3.12.10\\Lib\\contextlib.py:158: in __exit__\n    self.gen.throw(value)\nE   ValueError: I/O operation on closed file."
+        },
+        {
+          "name": "tests.test_integration.test_e2e_user_flow.TestE2ERealAPI::test_full_graph_execution",
+          "message": "failed on teardown with \"ValueError: I/O operation on closed file\"",
+          "traceback": "D:\\python\\3.12.10\\Lib\\contextlib.py:137: in __enter__\n    return next(self.gen)\n           ^^^^^^^^^^^^^^\nD:\\python\\3.12.10\\Lib\\tempfile.py:499: in func_wrapper\n    return func(*args, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^\nE   ValueError: I/O operation on closed file"
+        }
+      ]
+    },
+    {
+      "name": "stress",
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 35.35371398925781,
+      "success_rate": 100.0,
+      "failed_tests": []
+    },
+    {
+      "name": "chaos",
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 15.720497608184814,
+      "success_rate": 100.0,
+      "failed_tests": []
+    }
+  ],
+  "baseline_comparison": {
+    "regressions": [],
+    "improvements": [
+      {
+        "name": "tests.test_integration.test_e2e_user_flow.TestConcurrentSubAgents::test_multiple_subagents_parallel",
+        "old_status": "failed",
+        "new_status": "passed"
+      }
+    ],
+    "new_failures": [],
+    "new_passes": []
+  }
+}

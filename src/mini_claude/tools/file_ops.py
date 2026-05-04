@@ -2,7 +2,7 @@
 
 import os
 import glob as glob_module
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 
 from .base import BaseTool, register_tool
 from ..utils.safety import SafetyChecker, truncate_content
@@ -55,6 +55,26 @@ class ReadFileTool(BaseTool):
             },
             "required": ["path"],
         }
+
+    @property
+    def examples(self) -> list:
+        return [
+            {
+                "description": "Read entire file content",
+                "input": {"path": "src/main.py"},
+                "expected_output": "def main():\n    print('Hello')\n...",
+            },
+            {
+                "description": "Read specific line range (lines 10-20)",
+                "input": {"path": "README.md", "start_line": 10, "end_line": 20},
+                "expected_output": "## Installation\n\npip install package\n...",
+            },
+            {
+                "description": "Read configuration file",
+                "input": {"path": "config/settings.json"},
+                "expected_output": '{"database": "localhost", "port": 5432}',
+            },
+        ]
 
     async def execute(self, path: str, start_line: int = None, end_line: int = None) -> str:
         from mini_claude.config.settings import settings
@@ -119,6 +139,35 @@ class WriteFileTool(BaseTool):
             },
             "required": ["path", "content"],
         }
+
+    @property
+    def examples(self) -> list:
+        return [
+            {
+                "description": "Create a new Python file",
+                "input": {
+                    "path": "src/utils.py",
+                    "content": "def helper():\n    return 'Hello'",
+                },
+                "expected_output": "Successfully wrote 32 characters to src/utils.py",
+            },
+            {
+                "description": "Write JSON configuration",
+                "input": {
+                    "path": "config.json",
+                    "content": '{"debug": true, "port": 8080}',
+                },
+                "expected_output": "Successfully wrote 28 characters to config.json",
+            },
+            {
+                "description": "Create file in nested directory (auto-creates dirs)",
+                "input": {
+                    "path": "src/api/routes.py",
+                    "content": "# API routes\nfrom flask import Blueprint",
+                },
+                "expected_output": "Successfully wrote 38 characters to src/api/routes.py",
+            },
+        ]
 
     async def execute(self, path: str, content: str) -> str:
         from mini_claude.config.settings import settings
@@ -225,7 +274,7 @@ class EditFileTool(BaseTool):
                 content = f.read()
 
             if old_text not in content:
-                return f"Error: Text not found in file"
+                return "Error: Text not found in file"
 
             new_content = content.replace(old_text, new_text, 1)
 
@@ -379,7 +428,6 @@ class SearchContentTool(BaseTool):
         }
 
     async def execute(self, query: str, pattern: str = "*", path: str = ".") -> str:
-        import re
         from mini_claude.config.settings import settings
 
         # Resolve relative path to workspace
@@ -536,4 +584,3 @@ register_tool(ForceWriteTool())
 
 
 # Import for type checking
-from ..utils.safety import SafetyChecker
