@@ -70,7 +70,7 @@ class LLMSettings(BaseSettings):
     # Token budget settings
     token_budget_ratio: float = Field(default=0.8)
     token_warn_ratio: float = Field(default=0.7)
-    token_strategy: str = Field(default="warn")
+    token_strategy: str = Field(default="summarize")
     token_reserved_output: int = Field(default=4096)
 
     @field_validator("max_iterations")
