@@ -253,11 +253,13 @@ class ExecuteParallelTool(BaseTool):
         """Execute a single task via sub-agent with auto-parameter injection."""
         from ..agent.graph import build_agent_graph_no_checkpoint
         from ..agent.state import create_initial_state
-        from ..tools.file_ops import set_current_agent
+        from ..tools.file_ops import set_current_agent, set_subagent_mode
         from langchain_core.messages import AIMessage
 
         # Set agent ID for file locking
         set_current_agent(agent_id)
+        # Set sub-agent mode - disables path confirmation prompts
+        set_subagent_mode(True)
 
         # Build prompt - VERY EXPLICIT to prevent LLM from making mistakes
         target_file = task.target_files[0] if task.target_files else "output.txt"
@@ -320,36 +322,40 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
             elapsed = time.time() - start
             logger.debug("Graph completed", agent_id=agent_id, elapsed=elapsed)
 
+            # Check if file was created - if not, create it directly
+            import os
+            from ..tools import execute_tool
+            workspace = settings.workspace_root
+            full_path = os.path.join(workspace, target_file) if not os.path.isabs(target_file) else target_file
+
+            if not os.path.exists(full_path):
+                logger.debug("File not created, auto-creating", agent_id=agent_id, target_file=target_file)
+                # Auto-create with basic content based on task description
+                auto_content = self._generate_basic_content(task.description, target_file)
+                try:
+                    create_result = await execute_tool("write_file", {
+                        "path": target_file,
+                        "content": auto_content
+                    })
+                    logger.debug("Auto-created file", agent_id=agent_id, result=create_result)
+                except Exception as e:
+                    logger.error("Failed to auto-create", agent_id=agent_id, error=str(e))
+
+            # Extract result
+            messages = result.get("messages", [])
+            for msg in reversed(messages):
+                if isinstance(msg, AIMessage) and not getattr(msg, 'tool_calls', None):
+                    return msg.content
+
+            return messages[-1].content if messages else "No result"
+
         except asyncio.TimeoutError:
             logger.warning("Graph execution timeout", agent_id=agent_id, timeout=180)
             return "Error: Task execution timed out after 180 seconds"
 
-        # Check if file was created - if not, create it directly
-        import os
-        from ..tools import execute_tool
-        workspace = settings.workspace_root
-        full_path = os.path.join(workspace, target_file) if not os.path.isabs(target_file) else target_file
-
-        if not os.path.exists(full_path):
-            logger.debug("File not created, auto-creating", agent_id=agent_id, target_file=target_file)
-            # Auto-create with basic content based on task description
-            auto_content = self._generate_basic_content(task.description, target_file)
-            try:
-                create_result = await execute_tool("write_file", {
-                    "path": target_file,
-                    "content": auto_content
-                })
-                logger.debug("Auto-created file", agent_id=agent_id, result=create_result)
-            except Exception as e:
-                logger.error("Failed to auto-create", agent_id=agent_id, error=str(e))
-
-        # Extract result
-        messages = result.get("messages", [])
-        for msg in reversed(messages):
-            if isinstance(msg, AIMessage) and not getattr(msg, 'tool_calls', None):
-                return msg.content
-
-        return messages[-1].content if messages else "No result"
+        finally:
+            # Reset sub-agent mode when task completes
+            set_subagent_mode(False)
 
     def _generate_basic_content(self, task_description: str, target_file: str) -> str:
         """Generate basic file content based on task description and file type."""

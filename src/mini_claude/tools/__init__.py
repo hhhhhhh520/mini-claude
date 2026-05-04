@@ -10,6 +10,10 @@ from .file_ops import (
     ListDirTool,
     SearchFilesTool,
     SearchContentTool,
+    set_current_agent,
+    set_subagent_mode,
+    is_subagent_mode,
+    get_current_agent,
 )
 from .bash import RunCommandTool, RunBackgroundTool
 from .agent_spawn import (

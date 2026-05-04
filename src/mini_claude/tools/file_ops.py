@@ -12,6 +12,9 @@ from ..utils.file_lock import file_lock_manager
 # Current agent ID (set by agent context)
 _current_agent_id: str = "main"
 
+# Sub-agent mode flag (set when spawning sub-agents)
+_is_subagent_mode: bool = False
+
 
 def set_current_agent(agent_id: str) -> None:
     """Set the current agent ID for lock ownership."""
@@ -22,6 +25,22 @@ def set_current_agent(agent_id: str) -> None:
 def get_current_agent() -> str:
     """Get the current agent ID."""
     return _current_agent_id
+
+
+def set_subagent_mode(is_subagent: bool) -> None:
+    """Set whether the current agent is a sub-agent.
+
+    Sub-agents cannot request user confirmation for path access.
+    Paths outside workspace will be directly rejected instead of
+    waiting for confirmation.
+    """
+    global _is_subagent_mode
+    _is_subagent_mode = is_subagent
+
+
+def is_subagent_mode() -> bool:
+    """Check if current agent is a sub-agent."""
+    return _is_subagent_mode
 
 
 class ReadFileTool(BaseTool):
@@ -84,7 +103,11 @@ class ReadFileTool(BaseTool):
             path = os.path.join(settings.workspace_root, path)
 
         checker = SafetyChecker()
-        is_valid, reason = checker.check_file_read(path)
+        # Sub-agents cannot request path confirmation - directly reject if outside workspace
+        is_valid, reason = checker.check_file_read(
+            path,
+            require_confirmation=not is_subagent_mode()
+        )
         if not is_valid:
             return f"Error: {reason}"
 
@@ -177,7 +200,11 @@ class WriteFileTool(BaseTool):
             path = os.path.join(settings.workspace_root, path)
 
         checker = SafetyChecker()
-        is_valid, reason = checker.check_file_write(path)
+        # Sub-agents cannot request path confirmation - directly reject if outside workspace
+        is_valid, reason = checker.check_file_write(
+            path,
+            require_confirmation=not is_subagent_mode()
+        )
         if not is_valid:
             return f"Error: {reason}"
 
@@ -253,7 +280,11 @@ class EditFileTool(BaseTool):
             path = os.path.join(settings.workspace_root, path)
 
         checker = SafetyChecker()
-        is_valid, reason = checker.check_file_read(path)
+        # Sub-agents cannot request path confirmation - directly reject if outside workspace
+        is_valid, reason = checker.check_file_read(
+            path,
+            require_confirmation=not is_subagent_mode()
+        )
         if not is_valid:
             return f"Error: {reason}"
 

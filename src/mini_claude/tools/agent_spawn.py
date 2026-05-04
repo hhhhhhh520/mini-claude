@@ -89,11 +89,13 @@ class SpawnAgentTool(BaseTool):
         # Create sub-agent task with full tool loop
         async def subagent_task(progress_callback=None):
             from ..agent.graph import build_agent_graph_no_checkpoint
-            from ..tools.file_ops import set_current_agent
+            from ..tools.file_ops import set_current_agent, set_subagent_mode
             from langchain_core.messages import AIMessage
 
             # Set current agent ID for file locking
             set_current_agent(agent_id)
+            # Set sub-agent mode - disables path confirmation prompts
+            set_subagent_mode(True)
 
             if progress_callback:
                 await progress_callback(0.1, "Starting sub-agent")
@@ -147,6 +149,10 @@ class SpawnAgentTool(BaseTool):
                 if progress_callback:
                     await progress_callback(1.0, f"Error: {e}")
                 return f"Error: {e}"
+
+            finally:
+                # Reset sub-agent mode when task completes
+                set_subagent_mode(False)
 
         # Spawn the agent
         try:
@@ -311,13 +317,15 @@ class SpawnParallelTool(BaseTool):
     async def _run_agent_task(self, agent_id: str, task: str):
         """Run a single agent task with logging."""
         from ..agent.graph import build_agent_graph_no_checkpoint
-        from ..tools.file_ops import set_current_agent
+        from ..tools.file_ops import set_current_agent, set_subagent_mode
         from langchain_core.messages import AIMessage
 
         logger.debug("Agent started", agent_id=agent_id, task_preview=task[:50])
 
         # Set current agent ID for file locking
         set_current_agent(agent_id)
+        # Set sub-agent mode - disables path confirmation prompts
+        set_subagent_mode(True)
 
         try:
             graph = build_agent_graph_no_checkpoint()
@@ -358,6 +366,9 @@ class SpawnParallelTool(BaseTool):
         except Exception as e:
             logger.error("Agent failed", agent_id=agent_id, error=str(e))
             return f"Error: {e}"
+        finally:
+            # Reset sub-agent mode when task completes
+            set_subagent_mode(False)
 
 
 # Register agent tools
