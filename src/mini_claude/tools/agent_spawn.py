@@ -76,6 +76,41 @@ class SpawnAgentTool(BaseTool):
             },
         ]
 
+    def _extract_subagent_result(self, messages: list) -> str:
+        """Extract complete result from sub-agent messages.
+
+        Priority:
+        1. Last non-empty AIMessage content (LLM summary of results)
+        2. All tool results concatenated (if no AI summary)
+        3. Last message content as fallback
+
+        Args:
+            messages: List of messages from sub-agent execution
+
+        Returns:
+            Extracted result string
+        """
+        from langchain_core.messages import AIMessage, HumanMessage
+
+        tool_results = []
+        ai_response = None
+
+        for msg in messages:
+            # Collect tool results (HumanMessage with name = tool name)
+            if isinstance(msg, HumanMessage) and hasattr(msg, 'name') and msg.name:
+                tool_results.append(msg.content)
+            # Record last AI response without tool_calls
+            elif isinstance(msg, AIMessage) and msg.content and not getattr(msg, 'tool_calls', None):
+                ai_response = msg.content
+
+        # Priority: AI summary > tool results > last message
+        if ai_response:
+            return ai_response
+        elif tool_results:
+            return "\n\n".join(tool_results)
+        else:
+            return messages[-1].content if messages else "No result"
+
     async def execute(
         self,
         task: str,
@@ -138,12 +173,9 @@ class SpawnAgentTool(BaseTool):
                     await progress_callback(1.0, "Task complete")
 
                 # Extract final response from messages
+                # Priority: AI summary > tool results > last message
                 messages = result.get("messages", [])
-                for msg in reversed(messages):
-                    if isinstance(msg, AIMessage) and not getattr(msg, 'tool_calls', None):
-                        return msg.content
-
-                return messages[-1].content if messages else "No result"
+                return self._extract_subagent_result(messages)
 
             except Exception as e:
                 if progress_callback:
@@ -352,13 +384,9 @@ class SpawnParallelTool(BaseTool):
 
             logger.debug("Agent completed", agent_id=agent_id, elapsed=task_elapsed)
 
-            # Extract final response
+            # Extract final response using improved logic
             messages = result.get("messages", [])
-            for msg in reversed(messages):
-                if isinstance(msg, AIMessage) and not getattr(msg, 'tool_calls', None):
-                    return msg.content
-
-            return messages[-1].content if messages else "No result"
+            return self._extract_subagent_result(messages)
 
         except asyncio.TimeoutError:
             logger.warning("Agent timeout", agent_id=agent_id)
