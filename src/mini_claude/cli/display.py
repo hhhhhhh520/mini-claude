@@ -136,11 +136,8 @@ class AgentDisplay:
         if self._is_streaming:
             print()  # New line after streaming
             self._is_streaming = False
-            # Optionally re-render as markdown for better display
-            if any(marker in self._streaming_text for marker in ["```", "##", "**", "- "]):
-                self.console.print("\n")  # Add spacing
-                # Clear and re-render as markdown
-                self.console.print(Markdown(self._streaming_text))
+            # Don't re-render - content was already printed during streaming
+            # This avoids duplicate output
 
     def show_tool_call_start(self, tool_name: str):
         """Display tool call start (for streaming)."""
