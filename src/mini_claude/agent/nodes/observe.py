@@ -153,8 +153,21 @@ async def observe_node(state: AgentState) -> dict:
 
             return {"stop_reason": StopReason.CONTINUE}
 
-        # 无工具结果 - 可能是空转
-        logger.debug("observe_node: no tool results, idle loop")
+        # 无工具结果 - 检查是否有 AI 文本回复
+        has_ai_reply = any(
+            isinstance(msg, AIMessage) and msg.content and len(msg.content.strip()) > 10
+            for msg in messages[-3:]
+        )
+
+        if has_ai_reply:
+            # AI 有实质性回复，可能是正在解释或规划，继续执行
+            logger.debug("observe_node: AI has text reply, continuing")
+            if span:
+                span.set_attribute("stop_reason", "continue")
+            return {"stop_reason": StopReason.CONTINUE}
+
+        # 真正的空转 - 无工具结果且无 AI 回复
+        logger.debug("observe_node: no tool results and no AI reply, idle loop")
         if span:
             span.set_attribute("stop_reason", "idle_loop")
         return {"stop_reason": StopReason.IDLE_LOOP}

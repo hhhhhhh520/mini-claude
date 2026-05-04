@@ -44,8 +44,8 @@ MODEL_LIMITS: Dict[str, ModelTokenLimits] = {
     "gpt-4o-mini": ModelTokenLimits(128000, 16384, "cl100k_base"),
 
     # DeepSeek models
-    "deepseek-chat": ModelTokenLimits(64000, 4096, "cl100k_base"),
-    "deepseek-coder": ModelTokenLimits(64000, 4096, "cl100k_base"),
+    "deepseek-chat": ModelTokenLimits(64000, 8192, "cl100k_base"),
+    "deepseek-coder": ModelTokenLimits(64000, 8192, "cl100k_base"),
 
     # Default fallback
     "default": ModelTokenLimits(128000, 4096, "cl100k_base"),
@@ -59,7 +59,7 @@ class TokenCounter:
         self,
         model: str = "deepseek-chat",
         budget_ratio: float = 0.8,  # Use 80% of context window for input
-        warn_ratio: float = 0.7,  # Warn at 70% usage
+        warn_ratio: float = 0.75,  # Warn at 75% usage (reduced noise)
         strategy: TokenLimitStrategy = TokenLimitStrategy.WARN,
     ):
         self.model = model

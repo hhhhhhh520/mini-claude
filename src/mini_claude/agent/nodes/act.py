@@ -237,6 +237,7 @@ async def _streaming_llm_call(
     local_provider,
     litellm_messages: List[Dict],
     litellm_tools: List,
+    max_tokens: int = 8192,
 ) -> Dict:
     """Make streaming LLM call.
 
@@ -258,6 +259,7 @@ async def _streaming_llm_call(
         messages=litellm_messages,
         tools=litellm_tools if litellm_tools else None,
         tool_choice="auto",
+        max_tokens=max_tokens,
         stream_callback=stream_callback,
         tool_stream_callback=tool_stream_callback,
     )
