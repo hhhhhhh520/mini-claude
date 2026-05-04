@@ -90,6 +90,11 @@ __all__ = [
     "ListDirTool",
     "SearchFilesTool",
     "SearchContentTool",
+    # Agent context functions
+    "set_current_agent",
+    "get_current_agent",
+    "set_subagent_mode",
+    "is_subagent_mode",
     # Bash tools
     "RunCommandTool",
     "RunBackgroundTool",
