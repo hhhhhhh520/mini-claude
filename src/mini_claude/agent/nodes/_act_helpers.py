@@ -63,8 +63,8 @@ async def handle_token_budget(
         if token_counter.strategy == TokenLimitStrategy.SUMMARIZE:
             logger.debug("act_node: token budget exceeded, summarizing messages")
             # Summarize messages using LLM
-            async def llm_chat_for_summary(msgs: List[Dict], **kwargs) -> Dict:
-                return await llm_provider.chat(messages=msgs, **kwargs)
+            async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:
+                return await llm_provider.chat(messages=messages, **kwargs)
 
             summarized, summary_text = await token_counter.summarize_messages(
                 litellm_messages,
