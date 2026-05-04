@@ -286,8 +286,9 @@ async def _execute_tools(
         if isinstance(tool_args, str):
             try:
                 tool_args = json.loads(tool_args)
-            except json.JSONDecodeError:
-                tool_args = {}
+            except json.JSONDecodeError as e:
+                logger.warning("Failed to parse tool args in execute loop", tool_name=tool_name, error=str(e))
+                tool_args = {"_parse_error": f"JSON 解析失败: {str(e)}", "_raw_args": tool_args[:500]}
 
         logger.debug("Executing tool", index=i+1, total=len(tool_calls), tool_name=tool_name)
 

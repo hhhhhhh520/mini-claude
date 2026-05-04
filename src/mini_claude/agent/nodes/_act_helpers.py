@@ -134,11 +134,14 @@ def parse_tool_calls(raw_tool_calls) -> List[Dict]:
 
     for tc in raw_tool_calls:
         args = tc.get("arguments", "{}") if isinstance(tc, dict) else tc.function.arguments
+        args_str = args if isinstance(args, str) else "{}"
         if isinstance(args, str):
             try:
                 args = json.loads(args)
-            except json.JSONDecodeError:
-                args = {}
+            except json.JSONDecodeError as e:
+                # JSON 解析失败，记录错误并返回原始字符串让 LLM 修正
+                logger.warning("Failed to parse tool arguments JSON", error=str(e), args_preview=args_str[:200])
+                args = {"_parse_error": f"JSON 解析失败: {str(e)}", "_raw_args": args_str[:500]}
 
         name = tc.get("name", "") if isinstance(tc, dict) else tc.function.name
         if not name:
@@ -192,6 +195,13 @@ async def execute_single_tool(
 
     # Validate required parameters
     if tool_name in ["write_file", "edit_file"]:
+        # Check for parse error first
+        if tool_args.get("_parse_error"):
+            error_msg = f"Error: 工具参数解析失败 - {tool_args['_parse_error']}"
+            logger.warning(error_msg)
+            new_messages.append(HumanMessage(content=error_msg, name=tool_name))
+            return new_messages, None
+
         if not tool_args.get("path"):
             error_msg = f"Error: Tool {tool_name} requires 'path' argument"
             logger.debug(error_msg)
