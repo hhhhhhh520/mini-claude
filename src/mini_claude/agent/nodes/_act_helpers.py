@@ -58,65 +58,94 @@ async def handle_token_budget(
         reserved_output=settings.token_reserved_output,
     )
 
-    if not budget_check["ok"]:
-        # Over budget
+    # Determine if we need to compress (either over budget OR warning)
+    need_compress = not budget_check["ok"] or budget_check.get("action") == "warn"
+
+    if need_compress:
+        stats = budget_check.get("stats", {})
+        usage_percent = stats.get("usage_percent", 0)
+
         if token_counter.strategy == TokenLimitStrategy.SUMMARIZE:
-            logger.debug("act_node: token budget exceeded, summarizing messages")
-            # Summarize messages using LLM
-            async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:
-                return await llm_provider.chat(messages=messages, **kwargs)
+            # Try LLM summarization first
+            logger.debug(f"act_node: token at {usage_percent}%, attempting summarization")
+            try:
+                async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:
+                    return await llm_provider.chat(messages=messages, **kwargs)
 
-            summarized, summary_text = await token_counter.summarize_messages(
-                litellm_messages,
-                llm_chat_func=llm_chat_for_summary,
-            )
-            litellm_messages = summarized
-            # Sync LangChain messages with summarized messages
-            if len(litellm_messages) < len(messages):
-                # Find the summary message position
-                summary_idx = None
-                for i, msg in enumerate(litellm_messages):
-                    if msg.get("role") == "assistant" and "[历史对话摘要]" in msg.get("content", ""):
-                        summary_idx = i
-                        break
+                summarized, summary_text = await token_counter.summarize_messages(
+                    litellm_messages,
+                    llm_chat_func=llm_chat_for_summary,
+                )
 
-                if summary_idx is not None:
-                    # Rebuild messages: system + summary + last few
-                    new_messages = []
-                    # System message
-                    if messages and isinstance(messages[0], SystemMessage):
-                        new_messages.append(messages[0])
-                    # Summary as AI message
-                    new_messages.append(AIMessage(content=litellm_messages[summary_idx]["content"]))
-                    # Last few messages
-                    keep_last = len(litellm_messages) - summary_idx - 1
-                    if keep_last > 0 and len(messages) > keep_last:
-                        new_messages.extend(messages[-keep_last:])
-                    messages = new_messages
+                # Verify summarization actually reduced tokens
+                new_stats = token_counter.get_usage_stats(summarized)
+                new_usage_percent = new_stats.get("usage_percent", 0)
+                if new_usage_percent < usage_percent:
+                    litellm_messages = summarized
+                    logger.info(f"act_node: summarization reduced tokens from {usage_percent}% to {new_usage_percent}%")
+                    # Sync LangChain messages
+                    messages = _sync_messages_after_summary(messages, litellm_messages)
                 else:
-                    # Fallback to truncate
-                    keep_first = 1
-                    keep_last = 4
-                    if len(messages) > keep_first + keep_last:
-                        messages = messages[:keep_first] + messages[-keep_last:]
+                    # Summarization didn't help, fallback to truncate
+                    logger.warning("act_node: summarization didn't reduce tokens, falling back to truncate")
+                    messages, litellm_messages = _truncate_messages(messages, litellm_messages, token_counter)
+
+            except Exception as e:
+                # Summarization failed, fallback to truncate immediately
+                logger.warning(f"act_node: summarization failed ({e}), falling back to truncate")
+                messages, litellm_messages = _truncate_messages(messages, litellm_messages, token_counter)
 
         elif token_counter.strategy == TokenLimitStrategy.TRUNCATE:
-            logger.debug("act_node: token budget exceeded, truncating messages")
-            # Truncate messages
-            truncated = token_counter.truncate_messages(litellm_messages)
-            litellm_messages = truncated
-            # Also truncate LangChain messages
-            keep_first = 1  # System message
-            keep_last = 4   # Recent context
-            if len(messages) > keep_first + keep_last:
-                messages = messages[:keep_first] + messages[-keep_last:]
+            logger.debug(f"act_node: token at {usage_percent}%, truncating messages")
+            messages, litellm_messages = _truncate_messages(messages, litellm_messages, token_counter)
+
         else:
-            # Warn strategy - log warning but continue
+            # Warn strategy - just log warning
             logger.warning(budget_check['reason'])
-    elif budget_check.get("action") == "warn":
-        logger.warning(budget_check['reason'])
 
     return messages, litellm_messages
+
+
+def _sync_messages_after_summary(messages: List, litellm_messages: List[Dict]) -> List:
+    """Sync LangChain messages with summarized LiteLLM messages."""
+    if len(litellm_messages) < len(messages):
+        # Find the summary message position
+        summary_idx = None
+        for i, msg in enumerate(litellm_messages):
+            if msg.get("role") == "assistant" and "[历史对话摘要]" in msg.get("content", ""):
+                summary_idx = i
+                break
+
+        if summary_idx is not None:
+            # Rebuild messages: system + summary + last few
+            new_messages = []
+            # System message
+            if messages and isinstance(messages[0], SystemMessage):
+                new_messages.append(messages[0])
+            # Summary as AI message
+            new_messages.append(AIMessage(content=litellm_messages[summary_idx]["content"]))
+            # Last few messages
+            keep_last = len(litellm_messages) - summary_idx - 1
+            if keep_last > 0 and len(messages) > keep_last:
+                new_messages.extend(messages[-keep_last:])
+            return new_messages
+        else:
+            # Fallback to truncate
+            keep_first = 1
+            keep_last = 4
+            if len(messages) > keep_first + keep_last:
+                return messages[:keep_first] + messages[-keep_last:]
+    return messages
+
+
+def _truncate_messages(messages: List, litellm_messages: List[Dict], token_counter) -> Tuple[List, List[Dict]]:
+    """Truncate messages to fit within budget."""
+    truncated = token_counter.truncate_messages(litellm_messages)
+    keep_first = 1  # System message
+    keep_last = 4   # Recent context
+    if len(messages) > keep_first + keep_last:
+        messages = messages[:keep_first] + messages[-keep_last:]
+    return messages, truncated
 
 
 def parse_tool_calls(raw_tool_calls) -> List[Dict]:

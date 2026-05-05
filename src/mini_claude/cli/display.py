@@ -163,6 +163,10 @@ class AgentDisplay:
         color = "green" if success else "red"
         self.console.print(f"[dim {color}]Result: {result[:200]}{'...' if len(result) > 200 else ''}[/]")
 
+    def show_info(self, message: str):
+        """Display informational message."""
+        self.console.print(f"[dim cyan]{message}[/]")
+
     def show_plan(self, plan: List[str]):
         """Display execution plan."""
         self.console.print("\n[bold][Plan] Execution Plan:[/]")

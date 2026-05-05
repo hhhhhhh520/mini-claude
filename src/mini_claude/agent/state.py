@@ -1,11 +1,14 @@
 """Agent state definition - Refactored version."""
 
-from typing import TypedDict, List, Optional, Dict, Any, Annotated
+from typing import TypedDict, List, Optional, Dict, Any, Annotated, Union
 from langchain_core.messages import BaseMessage
 from enum import Enum
 from operator import add
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
+
+# Forward reference for ExecutionPlan (imported from cli.plan_display)
+ExecutionPlanType = Dict[str, Any]  # Serialized form for TypedDict compatibility
 
 
 class StopReason(Enum):
@@ -79,6 +82,9 @@ class ExecutionState:
 class AgentState(TypedDict):
     """精简后的状态定义 - 从18个字段精简到11个
 
+    重要：TypedDict 没有默认值，必须使用 create_initial_state() 创建状态实例。
+    直接使用 AgentState() 会导致 KeyError，因为必需字段未初始化。
+
     核心字段：
     - messages: 对话历史，使用 Annotated 自动累加
     - current_task: 当前任务描述
@@ -125,6 +131,10 @@ class AgentState(TypedDict):
     lessons_learned: List[str]                  # 经验教训
     improvement_suggestions: List[str]          # 改进建议
 
+    # 执行计划（可选）
+    execution_plan: Optional[ExecutionPlanType] # 当前执行计划（序列化形式）
+    current_step_index: int                     # 当前执行的步骤索引
+
 
 def create_initial_state(
     user_input: str,
@@ -167,6 +177,8 @@ def create_initial_state(
         reflection_notes=[],
         lessons_learned=[],
         improvement_suggestions=[],
+        execution_plan=None,
+        current_step_index=0,
     )
 
 

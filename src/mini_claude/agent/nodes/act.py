@@ -33,6 +33,47 @@ from ._act_helpers import (
 )
 
 
+def _update_plan_step_status(
+    execution_plan: Dict,
+    step_index: int,
+    status: str
+) -> Dict:
+    """Update execution plan step status.
+
+    Args:
+        execution_plan: Serialized execution plan
+        step_index: Step index to update
+        status: New status (pending/running/completed/failed)
+
+    Returns:
+        Updated execution plan
+    """
+    if not execution_plan or step_index >= len(execution_plan.get("steps", [])):
+        return execution_plan
+
+    updated_plan = dict(execution_plan)
+    updated_steps = list(updated_plan.get("steps", []))
+
+    if step_index < len(updated_steps):
+        updated_steps[step_index] = dict(updated_steps[step_index])
+        updated_steps[step_index]["status"] = status
+
+    updated_plan["steps"] = updated_steps
+    return updated_plan
+
+
+def _get_plan_progress_message(execution_plan: Dict, step_index: int) -> str:
+    """Get progress message for current step."""
+    if not execution_plan:
+        return ""
+
+    steps = execution_plan.get("steps", [])
+    if step_index < len(steps):
+        step = steps[step_index]
+        return f"[步骤 {step_index + 1}/{len(steps)}] {step.get('description', '执行中')}"
+    return ""
+
+
 async def act_node(state: AgentState) -> dict:
     """Act 节点：调用 LLM 并执行工具
 
@@ -116,14 +157,44 @@ async def act_node(state: AgentState) -> dict:
             ai_message = AIMessage(content=content or "", tool_calls=tool_calls)
             new_messages = [ai_message]
 
-            # Execute tools
+            # Get execution plan state
+            execution_plan = state.get("execution_plan")
+            current_step_index = state.get("current_step_index", 0)
+
+            # Execute tools with plan progress tracking
             if tool_calls:
-                new_messages, early_return = await _execute_tools(
-                    tool_calls, degr_manager, metrics_collector, new_messages, span
+                # Update plan step to RUNNING if we have a plan
+                updated_plan = None
+                if execution_plan:
+                    updated_plan = _update_plan_step_status(execution_plan, current_step_index, "running")
+                    progress_msg = _get_plan_progress_message(updated_plan, current_step_index)
+                    if progress_msg:
+                        logger.info("act_node: plan progress", progress=progress_msg)
+
+                new_messages, early_return, step_success = await _execute_tools(
+                    tool_calls, degr_manager, metrics_collector, new_messages, span,
+                    execution_plan=updated_plan or execution_plan,
+                    step_index=current_step_index,
                 )
+
+                # Update plan step status based on result
+                if updated_plan:
+                    new_status = "completed" if step_success else "failed"
+                    updated_plan = _update_plan_step_status(updated_plan, current_step_index, new_status)
+                    # Advance to next step
+                    next_step_index = current_step_index + 1
+
+                # Build result with messages and plan updates
+                result = {"messages": new_messages}
+                if updated_plan:
+                    result["execution_plan"] = updated_plan
+                    result["current_step_index"] = next_step_index
+
+                # Merge early_return fields if present
                 if early_return:
-                    early_return["messages"] = new_messages
-                    return early_return
+                    result.update(early_return)
+
+                return result
 
             logger.debug("act_node: returning messages", count=len(new_messages))
 
@@ -275,12 +346,25 @@ async def _execute_tools(
     metrics_collector,
     new_messages: List,
     span,
+    execution_plan: Dict = None,
+    step_index: int = 0,
 ) -> tuple:
     """Execute tool calls.
 
+    Args:
+        tool_calls: List of tool calls to execute
+        degr_manager: Degradation manager
+        metrics_collector: Metrics collector
+        new_messages: List to append result messages to
+        span: Tracing span
+        execution_plan: Current execution plan (for progress display)
+        step_index: Current step index (for progress display)
+
     Returns:
-        Tuple of (updated_messages, early_return_dict or None)
+        Tuple of (updated_messages, early_return_dict or None, step_success)
     """
+    step_success = True  # Assume success unless a tool fails
+
     for i, tool_call in enumerate(tool_calls):
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
@@ -294,12 +378,23 @@ async def _execute_tools(
 
         logger.debug("Executing tool", index=i+1, total=len(tool_calls), tool_name=tool_name)
 
+        # Display plan progress if available
+        if execution_plan and i == 0:
+            progress_msg = _get_plan_progress_message(execution_plan, step_index)
+            if progress_msg:
+                from ...cli.display import display
+                display.show_info(progress_msg)
+
         new_messages, state_update = await execute_single_tool(
             tool_name, tool_args, degr_manager, metrics_collector,
             trace_tool_call, new_messages
         )
 
-        if state_update:
-            return new_messages, state_update
+        # Check if tool execution failed
+        if state_update and state_update.get("stop_reason") == "error":
+            step_success = False
 
-    return new_messages, None
+        if state_update:
+            return new_messages, state_update, step_success
+
+    return new_messages, None, step_success

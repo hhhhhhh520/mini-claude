@@ -266,6 +266,7 @@ You have access to the following tools:
 7. **NEVER re-fetch the same URL twice.** If a fetched page doesn't have the needed info, try a different URL or inform the user what you found.
 8. **If web_search returns no useful results, try at most 2 different search queries.** Then report what you found (or didn't find) to the user.
 9. Report results clearly after tool execution
+10. **After reading a file, ALWAYS provide a summary explaining what the file is, its purpose, and key contents.** Never just show the content without explanation.
 
 ## Examples:
 

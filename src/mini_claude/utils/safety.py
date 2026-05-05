@@ -388,9 +388,18 @@ def get_file_size(path: str) -> int:
 
 
 def truncate_content(content: str, max_length: int = 10000) -> str:
-    """Truncate content if too long."""
+    """Truncate content if too long, with helpful guidance for continuation."""
     if len(content) > max_length:
-        return content[:max_length] + f"\n\n... [truncated, {len(content) - max_length} more chars]"
+        # Count lines for helpful guidance
+        total_lines = content.count('\n') + 1
+        truncated_lines = content[:max_length].count('\n') + 1
+        remaining_lines = total_lines - truncated_lines
+
+        return content[:max_length] + (
+            f"\n\n... [truncated, {len(content) - max_length} more chars, "
+            f"{remaining_lines} more lines]\n"
+            f"To read the rest, use: read_file(path, start_line={truncated_lines + 1})"
+        )
     return content
 
 

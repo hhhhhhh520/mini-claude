@@ -55,6 +55,51 @@
 | P3-12.3 | 故障注入测试（ChaosTest+网络/API/资源故障） | 2026-05-03 |
 | P3-12.4 | 回归测试套件（RegressionRunner+GitHub Actions） | 2026-05-03 |
 
+### 2026-05-05 测试验证
+**测试结果**: 1158测试通过，2失败，9错误，30跳过
+
+**发现问题**:
+1. **依赖缺失**: bs4, psutil, prometheus_client 未安装
+2. **测试失败(2个)**: `test_setup_with_console_exporter` mock了条件导入的TracerProvider
+3. **测试错误(9个)**: FAISS依赖未安装导致TestVectorStoreFAISS类报错
+4. **测试跳过(30个)**: ChromaDB未安装导致TestVectorStoreChroma类跳过
+5. **功能未集成**: EnhancedMemoryManager定义了但未在Agent工作流中调用
+
+**待修复**:
+- [ ] 安装缺失依赖: `pip install faiss-cpu chromadb bs4 psutil prometheus_client`
+- [ ] 修复tracing测试的mock问题
+- [ ] 集成EnhancedMemoryManager到Agent工作流
+
+### 2026-05-05 Token预警机制修复
+**修改文件**: `src/mini_claude/agent/nodes/_act_helpers.py`
+
+**问题描述**: Token预警只是打印WARNING，没有触发实际压缩动作。Agent在token接近上限时继续执行，最终耗尽。
+
+**修复内容**:
+1. 当 `action == "warn"` 时，主动触发压缩（之前只在超限时才压缩）
+2. 增加LLM摘要失败时的fallback机制，立即切换到截断策略
+3. 验证摘要是否真正减少了token，如果没有则fallback到截断
+4. 提取 `_sync_messages_after_summary` 和 `_truncate_messages` 辅助函数
+
+**验收结果**: 模块导入成功，待实际测试
+
+### 2026-05-05 ExecutionPlan 与 AgentState 集成完成
+**修改文件**:
+- src/mini_claude/agent/state.py - 新增 execution_plan 和 current_step_index 字段
+- src/mini_claude/agent/nodes/plan.py - 新增 _serialize_plan 函数，存储计划到状态
+- src/mini_claude/agent/nodes/act.py - 新增 _update_plan_step_status、_get_plan_progress_message 函数，执行时更新步骤状态
+- tests/test_agent/test_execution_plan_integration.py - 新增集成测试
+
+**问题描述**: ExecutionPlan 只是展示用的"装饰"，从未与 Agent 执行流程集成。update_step_status 方法从未被调用，步骤状态始终为 pending。
+
+**修复内容**:
+1. AgentState 新增 execution_plan（序列化形式）和 current_step_index 字段
+2. plan_node 创建计划后存入状态，不只是显示
+3. act_node 执行工具时更新步骤状态（pending → running → completed/failed）
+4. 执行时显示进度信息 "[步骤 1/3] Analyze requirements"
+
+**验收结果**: ✅ 4 个集成测试全部通过
+
 ## 可用工具（18个）
 
 ### 文件操作 (8个)
@@ -224,6 +269,8 @@
 - ISSUE-006: 递归限制问题
 - ISSUE-007: 后端项目检测问题
 - ISSUE-008: 子代理空参数问题
+- ISSUE-009: 测试依赖缺失问题（2026-05-05发现）
+- ISSUE-010: EnhancedMemoryManager未集成问题
 
 ---
 
