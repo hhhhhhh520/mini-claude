@@ -68,8 +68,8 @@ async def plan_node(state: AgentState) -> dict:
             "生成": "write_file",
             "读取": "read_file",
             "查看": "read_file",
-            "看看": "read_file",  # 新增
-            "读": "read_file",    # 新增
+            "看看": "read_file",
+            "读": "read_file",
             "修改": "edit_file",
             "编辑": "edit_file",
             "删除": "run_command",
@@ -79,7 +79,6 @@ async def plan_node(state: AgentState) -> dict:
             "目录": "list_dir",
             "网站": "write_file",
             "网页": "write_file",
-            "html": "write_file",
             "前端": "write_file",
             "后端": "write_file",
             "api": "write_file",
@@ -97,34 +96,34 @@ async def plan_node(state: AgentState) -> dict:
             span.set_attribute("detected_tools", ",".join(detected_tools) if detected_tools else "none")
 
         # 复杂任务可视化（仅首次迭代且启用时）
-        # 放宽条件：只要有工具关键词就显示计划
         if iteration == 1 and detected_tools:
             try:
-                from ..complexity import TaskComplexityAnalyzer
+                from ..complexity import TaskComplexityAnalyzer, ComplexityLevel
                 from ...cli.plan_display import PlanVisualizer, create_plan_from_analysis
 
                 analyzer = TaskComplexityAnalyzer()
                 complexity = analyzer.analyze(current_task, {"file_count": len(detected_tools)})
 
-                # 所有任务都显示可视化（不再限制 score >= 40）
-                visualizer = PlanVisualizer()
-                plan = create_plan_from_analysis(current_task, complexity)
-                visualizer.display_plan(plan, complexity)
-                logger.debug("plan_node: plan visualization displayed", complexity=complexity.level.value, score=complexity.score)
-                if span:
-                    span.set_attribute("complexity_score", complexity.score)
-                    span.set_attribute("complexity_level", complexity.level.value)
+                # Only show execution plan for MEDIUM/COMPLEX tasks
+                if complexity.level in (ComplexityLevel.MEDIUM, ComplexityLevel.COMPLEX):
+                    visualizer = PlanVisualizer()
+                    plan = create_plan_from_analysis(current_task, complexity)
+                    visualizer.display_plan(plan, complexity)
+                    logger.debug("plan_node: plan visualization displayed", complexity=complexity.level.value, score=complexity.score)
+                    if span:
+                        span.set_attribute("complexity_score", complexity.score)
+                        span.set_attribute("complexity_level", complexity.level.value)
 
-                # 将执行计划存入状态（关键修改：不只是显示）
-                serialized_plan = _serialize_plan(plan)
-                logger.debug("plan_node: storing execution plan in state", steps=len(plan.steps))
-
-                plan_msg = f"执行计划：使用 {', '.join(detected_tools)} 工具完成任务"
-                return {
-                    "messages": [AIMessage(content=plan_msg)],
-                    "execution_plan": serialized_plan,
-                    "current_step_index": 0,
-                }
+                    serialized_plan = _serialize_plan(plan)
+                    logger.debug("plan_node: storing execution plan in state", steps=len(plan.steps))
+                    plan_msg = f"执行计划：使用 {', '.join(detected_tools)} 工具完成任务"
+                    return {
+                        "messages": [AIMessage(content=plan_msg)],
+                        "execution_plan": serialized_plan,
+                        "current_step_index": 0,
+                    }
+                else:
+                    logger.debug("plan_node: simple task, skipping plan visualization", score=complexity.score)
             except Exception as e:
                 logger.warning("plan_node: visualization failed", error=str(e), exc_info=True)
 

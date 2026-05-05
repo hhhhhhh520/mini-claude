@@ -49,4 +49,4 @@ workspace/
 issues/
 PROGRESS.md
 *.txt
-test_*.py
+/test_*.py

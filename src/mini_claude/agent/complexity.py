@@ -15,6 +15,7 @@ Analysis Dimensions:
 4. Technical domain: database(+20), security(+25), payment(+40)
 """
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
@@ -345,52 +346,54 @@ class TaskComplexityAnalyzer:
         else:
             return 30, "Long task (>200 chars)"
 
-    def _analyze_keywords(self, task: str) -> tuple[int, List[str]]:
-        """Analyze keywords in task.
+    @staticmethod
+    def _word_match(word: str, text: str) -> bool:
+        """Match word with boundary-aware matching.
 
-        Returns:
-            Tuple of (total_score, list_of_factors)
+        For ASCII-only keywords, uses \\b word boundaries to prevent
+        substring false positives (e.g. 'ml' matching inside 'html').
+
+        For non-ASCII keywords (Chinese, etc.), uses simple substring
+        matching since \\b doesn't work with CJK characters.
         """
+        if word.isascii():
+            return bool(re.search(r'\b' + re.escape(word) + r'\b', text))
+        return word in text
+
+    def _analyze_keywords(self, task: str) -> tuple[int, List[str]]:
+        """Analyze keywords in task."""
         task_lower = task.lower()
         total_score = 0
         factors: List[str] = []
 
         for keyword, score in self.keyword_scores.items():
-            if keyword.lower() in task_lower:
+            if self._word_match(keyword.lower(), task_lower):
                 total_score += score
                 factors.append(f"Keyword '{keyword}' (+{score})")
 
         return total_score, factors
 
     def _analyze_domains(self, task: str) -> tuple[int, List[str]]:
-        """Analyze technical domains in task.
-
-        Returns:
-            Tuple of (total_score, list_of_factors)
-        """
+        """Analyze technical domains in task."""
         task_lower = task.lower()
         total_score = 0
         factors: List[str] = []
 
         for domain, score in self.domain_scores.items():
-            if domain.lower() in task_lower:
+            if self._word_match(domain.lower(), task_lower):
                 total_score += score
                 factors.append(f"Domain '{domain}' (+{score})")
 
         return total_score, factors
 
     def _analyze_risks(self, task: str) -> tuple[int, List[str]]:
-        """Analyze risk indicators in task.
-
-        Returns:
-            Tuple of (total_score, list_of_factors)
-        """
+        """Analyze risk indicators in task."""
         task_lower = task.lower()
         total_score = 0
         factors: List[str] = []
 
         for risk in self.RISK_INDICATORS:
-            if risk.lower() in task_lower:
+            if self._word_match(risk.lower(), task_lower):
                 total_score += 15
                 factors.append(f"Risk indicator '{risk}' (+15)")
 
