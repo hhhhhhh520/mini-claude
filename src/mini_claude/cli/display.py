@@ -86,8 +86,8 @@ class AgentDisplay:
     """Rich-based display for agent interactions."""
 
     def __init__(self):
-        # Force UTF-8 encoding for Windows
-        if sys.platform == "win32":
+        # Force UTF-8 encoding for Windows (skip in test environment)
+        if sys.platform == "win32" and "pytest" not in sys.modules:
             sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
             sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
         self.console = Console()
