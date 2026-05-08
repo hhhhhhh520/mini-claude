@@ -1,0 +1,80 @@
+{
+  "name": "mini-claude-fix-team",
+  "description": "修复 Mini Claude 待修复项的朝廷工作流 Team",
+  "members": [
+    {
+      "name": "工部尚书",
+      "description": "执行省 - 执行代码修复任务",
+      "agent_type": "Senior Developer",
+      "tools": ["Read", "Edit", "Write", "Glob", "Grep", "Bash"],
+      "instructions": "负责执行代码修复。修复时遵循最小改动原则，只修改必要的部分。每次修复后运行相关测试验证。"
+    },
+    {
+      "name": "验收侍郎",
+      "description": "验收省 - 验证修复是否正确完成",
+      "agent_type": "API Tester",
+      "tools": ["Read", "Glob", "Grep", "Bash"],
+      "instructions": "负责验收修复。检查：1) 修复是否正确实现；2) 是否有针对性测试覆盖；3) 是否引入新问题。验收通过后报告结果。"
+    }
+  ],
+  "workflow": {
+    "type": "sequential",
+    "steps": [
+      {
+        "name": "fix_keyerror_risk",
+        "description": "修复 _act_helpers.py:82 KeyError 风险",
+        "assigned_to": "工部尚书",
+        "details": {
+          "file": "src/mini_claude/agent/nodes/_act_helpers.py",
+          "line": 82,
+          "issue": "new_stats['usage_percent'] 直接访问字典键，若 key 不存在会抛出 KeyError",
+          "fix": "改用 new_stats.get('usage_percent', 0) 安全访问"
+        }
+      },
+      {
+        "name": "verify_fix_keyerror",
+        "description": "验证 KeyError 修复",
+        "assigned_to": "验收侍郎",
+        "depends_on": ["fix_keyerror_risk"]
+      },
+      {
+        "name": "fix_duplicate_return",
+        "description": "修复 act.py 重复返回逻辑",
+        "assigned_to": "工部尚书",
+        "depends_on": ["verify_fix_keyerror"],
+        "details": {
+          "file": "src/mini_claude/agent/nodes/act.py",
+          "lines": "195-199",
+          "issue": "tool_calls 存在时有两处返回逻辑（early_return 和 result），逻辑重复",
+          "fix": "合并返回逻辑，确保只有一个出口点"
+        }
+      },
+      {
+        "name": "verify_fix_duplicate_return",
+        "description": "验证重复返回修复",
+        "assigned_to": "验收侍郎",
+        "depends_on": ["fix_duplicate_return"]
+      },
+      {
+        "name": "add_typeddict_docs",
+        "description": "添加 TypedDict 默认值文档",
+        "assigned_to": "工部尚书",
+        "depends_on": ["verify_fix_duplicate_return"],
+        "details": {
+          "file": "src/mini_claude/agent/state.py",
+          "lines": "131-133",
+          "issue": "TypedDict 字段没有默认值，用户可能直接使用 AgentState() 导致 KeyError",
+          "fix": "添加文档说明必须使用 create_initial_state() 创建状态"
+        }
+      },
+      {
+        "name": "verify_all_fixes",
+        "description": "最终验收所有修复",
+        "assigned_to": "验收侍郎",
+        "depends_on": ["add_typeddict_docs"]
+      }
+    ]
+  },
+  "created_at": "2026-05-05",
+  "status": "active"
+}
