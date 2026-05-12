@@ -17,14 +17,14 @@ from mini_claude.utils.vector_store import (
 
 # Check optional dependencies
 try:
-    import sentence_transformers
+    import sentence_transformers  # noqa: F401
 
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 try:
-    import faiss
+    import faiss  # noqa: F401
 
     FAISS_AVAILABLE = True
 except ImportError:
