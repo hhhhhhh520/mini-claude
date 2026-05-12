@@ -480,6 +480,10 @@ def _validate_rm_path(path: str) -> Tuple[bool, str]:
     """
     import os.path
 
+    # Special check for ~ (home directory) - block exact ~ but allow subdirectories
+    if path == "~" or path.rstrip("/") == "~":
+        return False, "rm: Forbidden path detected: home directory"
+
     # Expand user home directory
     expanded_path = os.path.expanduser(path)
     abs_path = os.path.abspath(expanded_path)
