@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-05-10 (P0 安全修复进行中)
+> 最后更新: 2026-05-12 (Windows CI 修复完成)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -61,6 +61,9 @@
 | **P0安全** | ISSUE-002 Prompt注入防护测试（45个测试） | 2026-05-10 |
 | **P0安全** | ISSUE-003 子代理工具白名单审计 | 2026-05-10 |
 | **P0安全** | ISSUE-003 移除子代理run_command | 2026-05-10 |
+| **CI修复** | Windows 8.3短名称路径问题（realpath→abspath） | 2026-05-12 |
+| **CI修复** | 测试mock问题（patch→直接修改settings） | 2026-05-12 |
+| **CI修复** | Windows编码问题（Unicode测试用ASCII替代） | 2026-05-12 |
 
 ### ⏳ 进行中
 
@@ -71,6 +74,31 @@
 | SUB-010 | P0安全修复验证 | 待SUB-003/SUB-009完成 |
 | 验收省 | verifier Agent静态验收 | 待SUB-010完成 |
 | QA验收 | qa_verifier Agent端到端测试 | 待验收省通过 |
+
+### 2026-05-12 Windows CI 修复完成
+
+**问题描述**: GitHub Actions Windows 测试失败，3个问题
+
+**问题1: Windows 8.3 短名称路径问题**
+- 现象: `os.path.realpath()` 在 Windows 上解析 8.3 短名称（如 `RUNNER~1` → `runneradmin`）
+- 影响: 路径比较失败，误判为符号链接指向工作区外
+- 修复: `src/mini_claude/utils/safety.py` - Windows 上使用 `os.path.abspath()` 代替 `os.path.realpath()`
+
+**问题2: 测试 mock 问题**
+- 现象: `patch("mini_claude.config.settings.settings.workspace_root", ...)` 失败
+- 原因: Pydantic Settings 对象的属性无法用 `patch()` mock
+- 修复: 改为直接修改 settings 对象，并在 finally 块恢复原值
+- 影响文件:
+  - `tests/test_tools/test_bash.py` - TestPathConfirmation 类
+  - `tests/test_tools/test_file_ops.py` - mock_workspace fixture
+  - `tests/test_integration/test_edit_file_retry.py` - 3个 mock_workspace fixture
+
+**问题3: Windows 编码问题**
+- 现象: `test_unicode_filename` 测试在 Windows CI 报 `UnicodeEncodeError: 'charmap' codec can't encode characters`
+- 原因: Windows 控制台默认编码不支持中文文件名
+- 修复: `tests/test_utils/test_file_lock.py` - 使用 ASCII 文件名替代中文
+
+**验收结果**: ✅ CI 全部通过（1602 测试通过，Windows/Ubuntu 全平台）
 
 ### 2026-05-10 P0 安全修复（朝廷工作流）
 
