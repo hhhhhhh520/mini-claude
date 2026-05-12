@@ -82,12 +82,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          python -m pytest tests/ -v -m "unit or not integration and not e2e and not stress and not chaos" \
-            --tb=short \
-            --junitxml=reports/junit/unit-tests.xml \
-            --cov=src/mini_claude \
-            --cov-report=xml:reports/coverage/unit-coverage.xml \
-            --cov-report=html:reports/coverage/html
+          python -m pytest tests/ -v -m "unit or not integration and not e2e and not stress and not chaos" --tb=short --junitxml=reports/junit/unit-tests.xml --cov=src/mini_claude --cov-report=xml:reports/coverage/unit-coverage.xml --cov-report=html:reports/coverage/html
 
       - name: Upload test results
         if: always()
@@ -120,11 +115,7 @@ jobs:
 
       - name: Run integration tests
         run: |
-          python -m pytest tests/test_integration -v \
-            --tb=short \
-            --junitxml=reports/junit/integration-tests.xml \
-            --cov=src/mini_claude \
-            --cov-report=xml:reports/coverage/integration-coverage.xml
+          python -m pytest tests/test_integration -v --tb=short --junitxml=reports/junit/integration-tests.xml --cov=src/mini_claude --cov-report=xml:reports/coverage/integration-coverage.xml
 
       - name: Upload test results
         if: always()
@@ -210,10 +201,7 @@ jobs:
 
       - name: Run coverage
         run: |
-          python -m pytest tests/ \
-            --cov=src/mini_claude \
-            --cov-report=xml:coverage.xml \
-            --cov-report=term-missing
+          python -m pytest tests/ --cov=src/mini_claude --cov-report=xml:coverage.xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
