@@ -29,7 +29,6 @@ from mini_claude.config.settings.composite_settings import (
     register_config_callback,
     unregister_config_callback,
     clear_config_callbacks,
-    _config_callbacks,
 )
 
 # Re-export all public items for backward compatibility

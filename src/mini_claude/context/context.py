@@ -22,7 +22,6 @@ Usage:
 
 from contextlib import contextmanager
 from typing import (
-    Any,
     Callable,
     Dict,
     Optional,
@@ -154,7 +153,6 @@ class ApplicationContext:
             create_audit_logger,
             create_execution_log_exporter,
             create_command_registry,
-            create_current_agent_context,
         )
 
         # Core monitoring

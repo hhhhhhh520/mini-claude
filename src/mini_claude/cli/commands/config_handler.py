@@ -69,7 +69,7 @@ class ConfigCommandHandler(CommandHandler):
 
     def _config_watch(self, ctx: CommandContext, args: str) -> CommandResult:
         """Manage config file watching."""
-        from ...config.watcher import get_config_watcher, stop_config_watcher
+        from ...config.watcher import stop_config_watcher
 
         if args == "start":
             return self._start_watcher(ctx)

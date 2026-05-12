@@ -12,7 +12,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict

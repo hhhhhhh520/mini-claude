@@ -9,7 +9,7 @@ Provider functions should:
 3. Handle missing dependencies gracefully
 """
 
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional, TYPE_CHECKING
 import logging
 
 if TYPE_CHECKING:

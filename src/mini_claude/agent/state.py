@@ -1,6 +1,6 @@
 """Agent state definition - Refactored version."""
 
-from typing import TypedDict, List, Optional, Dict, Any, Annotated, Union
+from typing import TypedDict, List, Optional, Dict, Any, Annotated
 from langchain_core.messages import BaseMessage
 from enum import Enum
 from operator import add

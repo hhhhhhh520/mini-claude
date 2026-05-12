@@ -1,7 +1,7 @@
 """Token counting and budget management."""
 
 from typing import List, Dict, Any, Optional, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 import time
 

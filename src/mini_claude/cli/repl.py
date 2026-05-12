@@ -14,7 +14,6 @@ from prompt_toolkit.key_binding import KeyBindings
 
 from .display import display
 from .repl_utils import manage_message_history
-from ..utils.token_manager import count_messages_tokens
 from ..utils.profile import UserProfileManager, UserProfile
 from ..utils.logger import get_logger
 
@@ -156,7 +155,6 @@ class REPLSession:
                 display.show_thinking()
 
                 try:
-                    from langchain_core.messages import HumanMessage, AIMessage
 
                     history_messages = self._build_history_messages()
                     initial_state = create_initial_state(user_input, history_messages)

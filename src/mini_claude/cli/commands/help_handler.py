@@ -11,8 +11,6 @@ Commands:
 from rich.panel import Panel
 
 from .base import CommandHandler, CommandContext, CommandResult
-from . import profile_handler, session_handler, metrics_handler
-from . import cache_handler, config_handler, log_handler, alert_handler
 
 
 class HelpCommandHandler(CommandHandler):

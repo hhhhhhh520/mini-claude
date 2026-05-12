@@ -4,7 +4,7 @@ This module contains utility functions extracted from the REPL module
 to keep the main REPL class focused on core loop logic.
 """
 
-from typing import List, Dict, Any
+from typing import List, Any
 
 
 def manage_message_history(

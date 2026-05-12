@@ -125,7 +125,6 @@ class SpawnAgentTool(BaseTool):
         async def subagent_task(progress_callback=None):
             from ..agent.graph import build_agent_graph_no_checkpoint
             from ..tools.file_ops import set_current_agent, set_subagent_mode
-            from langchain_core.messages import AIMessage
 
             # Set current agent ID for file locking
             set_current_agent(agent_id)
@@ -350,7 +349,6 @@ class SpawnParallelTool(BaseTool):
         """Run a single agent task with logging."""
         from ..agent.graph import build_agent_graph_no_checkpoint
         from ..tools.file_ops import set_current_agent, set_subagent_mode
-        from langchain_core.messages import AIMessage
 
         logger.debug("Agent started", agent_id=agent_id, task_preview=task[:50])
 
