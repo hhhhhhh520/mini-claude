@@ -12,7 +12,6 @@ Created for SUB-004: Testing consecutive file modification retry scenarios.
 import pytest
 import os
 import tempfile
-from unittest.mock import patch
 
 from mini_claude.tools.file_ops import EditFileTool, ReadFileTool, WriteFileTool
 from mini_claude.agent.suggestion import SuggestionEngine, ErrorType
