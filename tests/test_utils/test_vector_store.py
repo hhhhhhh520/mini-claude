@@ -1,18 +1,15 @@
 """Tests for vector_store module."""
 
 import gc
-import os
 import shutil
 import tempfile
 import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+from unittest.mock import patch
 
 from mini_claude.utils.vector_store import (
     VectorStore,
     SearchResult,
     Document,
-    VectorStoreError,
     DependencyNotFoundError,
     check_vector_store_dependencies,
     get_recommended_backend,
@@ -315,7 +312,7 @@ class TestVectorStoreFAISS:
                 pass
             store._backend = None
             gc.collect()
-        except DependencyNotFoundError as e:
+        except DependencyNotFoundError:
             store = VectorStore(
                 db_type="faiss",
                 path=temp_dir,

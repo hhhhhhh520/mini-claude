@@ -24,13 +24,10 @@ from typing import Any, Callable, Dict, List, Optional
 import pytest
 
 from mini_claude.agent.coordinator import (
-    DistributedTask,
     ParallelCoordinator,
-    TaskPriority,
     TaskStatus,
 )
-from mini_claude.agent.state import AgentState, StopReason, create_initial_state
-from mini_claude.agent.subagent import AgentStatus, SubAgentManager, SubAgentResult
+from mini_claude.agent.subagent import AgentStatus, SubAgentManager
 from mini_claude.config.settings import settings
 from mini_claude.utils.file_lock import file_lock_manager
 
@@ -264,7 +261,7 @@ class StressTestRunner:
                 tasks.append(task)
 
             # Wait for all tasks
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
 
             # End metrics collection
             self.metrics.end_time = time.time()
@@ -642,7 +639,7 @@ class TestConcurrentFileOperations:
 
         # Run concurrent lock attempts
         tasks = [acquire_and_release(f"agent_{i}") for i in range(20)]
-        results = await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks)
 
         # At least some should succeed
         assert successful_locks > 0
@@ -777,7 +774,6 @@ class TestErrorRecovery:
     @pytest.mark.asyncio
     async def test_partial_failure_recovery(self, stress_runner):
         """Test recovery from partial failures."""
-        failure_rate = 0.1  # 10% failure rate
         call_count = 0
 
         async def flaky_request(request_id: int) -> Dict[str, Any]:

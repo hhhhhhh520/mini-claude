@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from mini_claude.cli.commands.session_handler import SessionCommandHandler
-from mini_claude.cli.commands.base import CommandContext, CommandResult
+from mini_claude.cli.commands.base import CommandContext
 
 
 class TestSessionCommandHandler:

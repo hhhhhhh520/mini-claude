@@ -1,6 +1,5 @@
 """Tests for subagent mode and result extraction."""
 
-import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from mini_claude.tools.file_ops import (

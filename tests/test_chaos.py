@@ -8,20 +8,14 @@ Tests for fault injection scenarios including:
 """
 
 import asyncio
-import os
 import shutil
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import respx
-from httpx import Response, ConnectError, ReadTimeout
 
 from mini_claude.testing.chaos import (
     ChaosType,
     ChaosScenario,
     ChaosResult,
-    ChaosInjector,
     NetworkChaosInjector,
     APIChaosInjector,
     ResourceChaosInjector,
@@ -31,8 +25,6 @@ from mini_claude.testing.chaos import (
 from mini_claude.agent.degradation import (
     DegradationManager,
     DegradationType,
-    ModelDegradation,
-    ExponentialBackoff,
 )
 
 

@@ -291,8 +291,8 @@ class TestFileLock:
 
     def test_filelock_equality(self):
         """测试文件锁相等性"""
-        lock1 = FileLock(path="/test/file.txt", agent_id="agent1")
-        lock2 = FileLock(path="/test/file.txt", agent_id="agent1")
+        FileLock(path="/test/file.txt", agent_id="agent1")
+        FileLock(path="/test/file.txt", agent_id="agent1")
         # 数据类默认比较所有字段
 
     def test_filelock_different_paths(self):

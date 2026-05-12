@@ -11,19 +11,16 @@ import os
 import shutil
 import tempfile
 from io import StringIO
-from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock
 
 import pytest
 from rich.console import Console
 
-from mini_claude.utils.profile import UserProfile, UserProfileManager
+from mini_claude.utils.profile import UserProfileManager
 from mini_claude.utils.session import SessionManager
 from mini_claude.utils.enhanced_memory import EnhancedMemoryManager
 from mini_claude.cli.plan_display import (
     PlanVisualizer,
-    ExecutionPlan,
-    PlanStep,
     StepStatus,
     create_plan_from_analysis,
 )

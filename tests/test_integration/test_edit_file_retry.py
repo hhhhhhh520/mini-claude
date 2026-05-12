@@ -12,7 +12,6 @@ Created for SUB-004: Testing consecutive file modification retry scenarios.
 import pytest
 import os
 import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 from mini_claude.tools.file_ops import EditFileTool, ReadFileTool, WriteFileTool
@@ -441,7 +440,7 @@ Line 4
         assert "Error" in result2
 
         # Read and use correct content
-        current = await read_tool.execute(path=filepath)
+        await read_tool.execute(path=filepath)
         result3 = await edit_tool.execute(
             path=filepath, old_text="Modified Line 1", new_text="Final content"
         )
@@ -465,7 +464,7 @@ Line 4
             f"Should fail with non-existent text: {result1}"
 
         # Read to see exact content
-        current = await read_tool.execute(path=filepath)
+        await read_tool.execute(path=filepath)
 
         # Use exact text
         result2 = await edit_tool.execute(

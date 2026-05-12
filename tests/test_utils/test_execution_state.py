@@ -3,7 +3,6 @@
 import pytest
 import tempfile
 import os
-from datetime import datetime
 
 from mini_claude.agent.state import ExecutionState
 from mini_claude.utils.session import SessionManager

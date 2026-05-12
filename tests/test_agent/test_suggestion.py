@@ -1,7 +1,5 @@
 """Tests for suggestion engine - User operation suggestions."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 
 from mini_claude.agent.suggestion import (
     SuggestionEngine,
@@ -461,7 +459,7 @@ class TestGetSuggestionEngine:
         import mini_claude.agent.suggestion as sug_module
         sug_module._suggestion_engine = None  # Reset
 
-        engine_zh = get_suggestion_engine("zh")
+        get_suggestion_engine("zh")
         engine_en = get_suggestion_engine("en")
         # Language change should create new instance
         assert engine_en.language == "en"
@@ -496,7 +494,6 @@ class TestSuggestionEngineIntegration:
     def test_full_flow_token_exceeded(self):
         """Test full flow for token exceeded."""
         engine = SuggestionEngine(language="zh")
-        error = "token budget exceeded"
         suggestions = engine.get_suggestions(ErrorType.TOKEN_EXCEEDED)
 
         # Should have both /clear and model switch suggestions

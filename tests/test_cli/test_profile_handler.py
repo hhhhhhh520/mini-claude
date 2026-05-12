@@ -1,10 +1,10 @@
 """Tests for profile command handler."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from mini_claude.cli.commands.profile_handler import ProfileCommandHandler
-from mini_claude.cli.commands.base import CommandContext, CommandResult
+from mini_claude.cli.commands.base import CommandContext
 from mini_claude.utils.profile import UserProfile
 
 

@@ -19,27 +19,20 @@ import gc
 import os
 import shutil
 import tempfile
-from unittest.mock import MagicMock, AsyncMock, patch
-from typing import Dict, Any
 
 import pytest
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from mini_claude.agent.state import (
-    AgentState,
     StopReason,
     create_initial_state,
     ExecutionState,
 )
 from mini_claude.agent.graph import (
-    build_agent_graph,
     build_agent_graph_no_checkpoint,
-    build_agent_graph_simple,
-    DEFAULT_RECURSION_LIMIT,
 )
 from mini_claude.utils.session import SessionManager
 from mini_claude.utils.token_manager import get_token_counter, TokenLimitStrategy
-from mini_claude.config.settings import settings
 
 
 # =============================================================================

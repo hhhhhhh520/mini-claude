@@ -4,7 +4,7 @@ import pytest
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from mini_claude.tools.file_ops import (
     ReadFileTool,
@@ -14,7 +14,6 @@ from mini_claude.tools.file_ops import (
     ListDirTool,
     SearchFilesTool,
     SearchContentTool,
-    ListLocksTool,
 )
 
 
@@ -389,7 +388,7 @@ class TestListDirTool:
         """测试隐藏文件"""
         tool = ListDirTool()
         Path(temp_dir, ".hidden").touch()
-        result = await tool.execute(path=temp_dir)
+        await tool.execute(path=temp_dir)
         # 隐藏文件可能显示也可能不显示
 
     @pytest.mark.asyncio

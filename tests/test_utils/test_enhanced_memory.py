@@ -3,11 +3,9 @@
 import gc
 import os
 import shutil
-import sqlite3
 import tempfile
-from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from datetime import datetime
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -242,7 +240,7 @@ class TestEnhancedMemoryManager:
             ),
         ]
 
-        results = memory_manager.search_history("message", k=5, role_filter="user")
+        memory_manager.search_history("message", k=5, role_filter="user")
 
         mock_vector_store.search_similar.assert_called_once()
         call_kwargs = mock_vector_store.search_similar.call_args[1]

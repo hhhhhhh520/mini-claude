@@ -9,8 +9,7 @@ Tests cover:
 
 import threading
 import time
-from unittest.mock import MagicMock, patch
-import pytest
+from unittest.mock import MagicMock
 
 from mini_claude.context import (
     ApplicationContext,
@@ -225,9 +224,6 @@ class TestProviderIntegration:
         ctx = get_context()
 
         # Access several components
-        metrics = ctx.metrics_collector
-        token_counter = ctx.token_counter
-        rate_limiter = ctx.rate_limiter
 
         # All should be initialized
         status = ctx.is_initialized()
@@ -242,7 +238,6 @@ class TestBackwardCompatibility:
     def test_context_provides_same_types(self):
         """Test that context provides same types as existing functions."""
         from mini_claude.monitoring.metrics import MetricsCollector, get_metrics_collector
-        from mini_claude.utils.token_manager import TokenCounter, get_token_counter
 
         reset_context()
 
@@ -261,7 +256,6 @@ class TestBackwardCompatibility:
     def test_reset_functions_compatible(self):
         """Test that existing reset functions work with context."""
         from mini_claude.monitoring.metrics import (
-            get_metrics_collector,
             reset_metrics_collector,
         )
 

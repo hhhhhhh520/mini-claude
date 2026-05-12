@@ -4,11 +4,9 @@ import pytest
 import asyncio
 import tempfile
 import os
-from pathlib import Path
 
 from mini_claude.agent.coordinator import (
     parallel_coordinator,
-    DistributedTask,
     TaskPriority,
     TaskStatus,
 )
@@ -212,7 +210,7 @@ class TestSubagentManager:
             await asyncio.sleep(0.5)
             return "done"
 
-        agent_id = await subagent_manager.spawn(
+        await subagent_manager.spawn(
             agent_id="long_agent",
             task=long_task,
         )

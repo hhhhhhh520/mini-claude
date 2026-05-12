@@ -1,9 +1,7 @@
 """Unit tests for health check endpoint."""
 
-import asyncio
 import json
 import time
-from pathlib import Path
 from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 

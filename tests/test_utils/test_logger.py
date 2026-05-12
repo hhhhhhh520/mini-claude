@@ -2,7 +2,6 @@
 
 import json
 import logging
-import tempfile
 from pathlib import Path
 from typing import Generator
 
@@ -10,7 +9,6 @@ import pytest
 
 from mini_claude.utils.logger import (
     StructuredFormatter,
-    StructuredLogger,
     AuditLogger,
     get_logger,
     init_logging,

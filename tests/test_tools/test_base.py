@@ -1,6 +1,5 @@
 """Tests for base tool functionality including examples feature."""
 
-import pytest
 from typing import Dict, Any, List
 
 from mini_claude.tools.base import BaseTool, ToolRegistry

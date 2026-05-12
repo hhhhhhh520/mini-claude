@@ -3,8 +3,7 @@
 import asyncio
 import os
 import pytest
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 from mini_claude.tools.health_check import (
     ToolHealthChecker,
@@ -78,7 +77,7 @@ class TestToolHealthResult:
         assert data["status"] == "healthy"
         assert data["message"] == "Shell available"
         assert "last_check_time" in data
-        assert data["details"]["shell_available"] == True
+        assert data["details"]["shell_available"]
         assert data["response_time_ms"] == 10.25
 
 

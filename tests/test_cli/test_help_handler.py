@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from mini_claude.cli.commands.help_handler import HelpCommandHandler
-from mini_claude.cli.commands.base import CommandContext, CommandResult
+from mini_claude.cli.commands.base import CommandContext
 
 
 class TestHelpCommandHandler:

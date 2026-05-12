@@ -11,8 +11,6 @@ import gc
 import os
 import shutil
 import tempfile
-from contextlib import contextmanager
-from pathlib import Path
 from typing import Optional, Dict, Any, List
 from unittest.mock import MagicMock, AsyncMock
 
@@ -214,8 +212,8 @@ def mock_llm_provider():
 
 
 @pytest.fixture
-def mock_session_manager(temp_dir):
-    """Create a SessionManager with temporary database."""
+def real_session_manager(temp_dir):
+    """Create a real SessionManager with temporary database for integration tests."""
     from mini_claude.utils.session import SessionManager
     db_path = os.path.join(temp_dir, "test_sessions.db")
     return SessionManager(db_path)
@@ -224,7 +222,6 @@ def mock_session_manager(temp_dir):
 @pytest.fixture
 def mock_vector_store():
     """Create a mock vector store for testing."""
-    from mini_claude.utils.vector_store import SearchResult
 
     store = MagicMock()
     store.count.return_value = 0

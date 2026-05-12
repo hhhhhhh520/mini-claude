@@ -1,18 +1,14 @@
 """Agent state machine flow integration tests."""
 
 import pytest
-import asyncio
 import tempfile
-import os
-from pathlib import Path
 
 from langchain_core.messages import HumanMessage, AIMessage
 
-from mini_claude.agent.state import AgentState, StopReason, create_initial_state
+from mini_claude.agent.state import StopReason, create_initial_state
 from mini_claude.agent.nodes import (
     think_node,
     plan_node,
-    act_node,
     observe_node,
     check_completion_node,
     handle_error_node,
@@ -210,7 +206,7 @@ class TestExtendedAgentFlow:
         graph = build_agent_graph_no_checkpoint()
 
         # 创建初始状态
-        state = create_initial_state("简单测试任务")
+        create_initial_state("简单测试任务")
 
         # 验证图结构
         assert graph is not None

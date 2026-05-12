@@ -299,7 +299,7 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
         subagent_allowed_tools = [
             "read_file", "write_file", "edit_file",
             "list_dir", "search_files", "search_content",
-            "run_command", "web_search"
+            "web_search"
         ]
 
         state = create_initial_state(

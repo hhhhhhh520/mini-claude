@@ -1,10 +1,6 @@
 """Tests for tool result caching."""
 
-import os
 import time
-import tempfile
-import pytest
-from pathlib import Path
 
 from mini_claude.tools.cache import (
     ToolCache,

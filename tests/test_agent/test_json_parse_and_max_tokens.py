@@ -8,7 +8,7 @@
 
 import pytest
 import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from mini_claude.agent.nodes._act_helpers import parse_tool_calls, execute_single_tool
 from mini_claude.config.settings import settings
@@ -197,7 +197,6 @@ class TestActNodeUsesMaxTokens:
     async def test_streaming_call_uses_config_max_tokens(self):
         """测试流式调用使用配置的 max_tokens"""
         from mini_claude.agent.nodes.act import _streaming_llm_call
-        from unittest.mock import AsyncMock
 
         # Mock provider
         mock_provider = MagicMock()

@@ -4,12 +4,11 @@ import pytest
 import asyncio
 import tempfile
 import os
-from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from langchain_core.messages import HumanMessage, AIMessage
 
-from mini_claude.agent.state import AgentState, StopReason, create_initial_state
+from mini_claude.agent.state import StopReason, create_initial_state
 from mini_claude.agent.nodes import (
     think_node,
     observe_node,
@@ -20,8 +19,6 @@ from mini_claude.agent.nodes import (
 from mini_claude.utils.safety import (
     validate_command,
     validate_path,
-    PathConfirmationRequired,
-    DANGEROUS_PATTERNS,
     PROTECTED_PATHS,
 )
 
@@ -337,7 +334,7 @@ class TestNetworkErrorRecovery:
     @pytest.mark.asyncio
     async def test_llm_connection_error_recovery(self):
         """测试 LLM 连接错误恢复"""
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import patch
 
         state = create_initial_state("测试任务")
 

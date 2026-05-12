@@ -1,10 +1,8 @@
 """Tests for configuration hot reload functionality."""
 
 import os
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 from typing import List
 
 from mini_claude.config.settings import (
@@ -19,8 +17,6 @@ from mini_claude.config.watcher import (
     ConfigFileWatcher,
     WatcherState,
     get_config_watcher,
-    start_config_watcher,
-    stop_config_watcher,
 )
 
 

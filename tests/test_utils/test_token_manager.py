@@ -1,12 +1,11 @@
 """Tests for token_manager module."""
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch
 
 from mini_claude.utils.token_manager import (
     TokenCounter,
     TokenLimitStrategy,
-    ModelTokenLimits,
     MODEL_LIMITS,
     get_token_counter,
     count_tokens,

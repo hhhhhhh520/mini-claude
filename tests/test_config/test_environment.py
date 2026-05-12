@@ -2,16 +2,13 @@
 
 import pytest
 import os
-from pathlib import Path
-from unittest.mock import patch, mock_open
-import tempfile
+from unittest.mock import patch
 
 from mini_claude.config.settings import Settings, Environment
 from mini_claude.config.environment import (
     EnvironmentConfigManager,
     EnvironmentInfo,
     EnvironmentDiff,
-    env_config_manager,
 )
 
 

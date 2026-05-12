@@ -4,9 +4,8 @@ import pytest
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
-from mini_claude.tools.bash import RunCommandTool, RunBackgroundTool
+from mini_claude.tools.bash import RunCommandTool
 from mini_claude.utils.safety import (
     validate_command, SafetyChecker,
     PathConfirmationRequired, approve_path, is_path_approved, clear_approved_paths

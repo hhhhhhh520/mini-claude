@@ -1,6 +1,5 @@
 """Tests for rate limiting functionality."""
 
-import time
 import threading
 import pytest
 

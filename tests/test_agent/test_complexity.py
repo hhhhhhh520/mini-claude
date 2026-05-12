@@ -1,6 +1,5 @@
 """Tests for task complexity analyzer."""
 
-import pytest
 from mini_claude.agent.complexity import (
     ComplexityLevel,
     ComplexityResult,

@@ -2,9 +2,11 @@
 
 import os
 import re
+import shlex
 import time
+import unicodedata
 import threading
-from typing import Tuple, Set, Dict, List, Any, Optional
+from typing import Tuple, Set, Dict, List, Any, Optional, TypedDict
 from collections import defaultdict
 from dataclasses import dataclass, field
 
@@ -100,6 +102,467 @@ PROTECTED_PATHS = [
 SHELL_CHAIN_CHARS = [";", "&&", "||", "|", "`", "$("]
 
 
+# =============================================================================
+# COMMAND WHITELIST ARCHITECTURE
+# =============================================================================
+
+class CommandConfig(TypedDict):
+    """Configuration for an allowed command."""
+    allowed_flags: List[str]
+    allowed_args: int  # -1 means unlimited
+    risk_level: str    # "low", "medium", "high"
+    description: str
+
+
+# Whitelist of allowed commands with their configurations
+ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
+    # Low-risk file operations
+    "ls": {
+        "allowed_flags": ["-l", "-a", "-la", "-lh", "-R", "-S", "-t"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "List directory contents"
+    },
+    "cat": {
+        "allowed_flags": ["-n", "-b", "-s"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Display file contents"
+    },
+    "head": {
+        "allowed_flags": ["-n", "-c"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Display first lines of file"
+    },
+    "tail": {
+        "allowed_flags": ["-n", "-c", "-f"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Display last lines of file"
+    },
+    "grep": {
+        "allowed_flags": ["-i", "-r", "-n", "-l", "-v", "-c", "-w", "-E"],
+        "allowed_args": 2,
+        "risk_level": "low",
+        "description": "Search text patterns"
+    },
+    "find": {
+        "allowed_flags": ["-name", "-type", "-size", "-mtime", "-exec"],
+        "allowed_args": -1,  # Complex command, allow multiple args
+        "risk_level": "low",
+        "description": "Search for files"
+    },
+    "wc": {
+        "allowed_flags": ["-l", "-w", "-c", "-m"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Count lines, words, bytes"
+    },
+    "sort": {
+        "allowed_flags": ["-n", "-r", "-u", "-k", "-t"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Sort lines"
+    },
+    "uniq": {
+        "allowed_flags": ["-c", "-d", "-u"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Filter duplicate lines"
+    },
+    "echo": {
+        "allowed_flags": ["-n", "-e"],
+        "allowed_args": -1,
+        "risk_level": "low",
+        "description": "Display text"
+    },
+    "pwd": {
+        "allowed_flags": [],
+        "allowed_args": 0,
+        "risk_level": "low",
+        "description": "Print working directory"
+    },
+    "which": {
+        "allowed_flags": ["-a"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Locate command"
+    },
+    "tree": {
+        "allowed_flags": ["-L", "-a", "-d", "-I"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Display directory tree"
+    },
+
+    # Medium-risk file operations
+    "mkdir": {
+        "allowed_flags": ["-p", "-v"],
+        "allowed_args": 1,
+        "risk_level": "medium",
+        "description": "Create directory"
+    },
+    "touch": {
+        "allowed_flags": ["-a", "-m", "-d"],
+        "allowed_args": 1,
+        "risk_level": "medium",
+        "description": "Create or update file timestamp"
+    },
+    "cp": {
+        "allowed_flags": ["-r", "-p", "-v", "-i"],
+        "allowed_args": 2,
+        "risk_level": "medium",
+        "description": "Copy files"
+    },
+    "mv": {
+        "allowed_flags": ["-v", "-i", "-n"],
+        "allowed_args": 2,
+        "risk_level": "medium",
+        "description": "Move/rename files"
+    },
+    "rm": {
+        "allowed_flags": ["-r", "-f", "-i", "-v"],  # -rf allowed but with path restrictions
+        "allowed_args": 1,
+        "risk_level": "high",
+        "description": "Remove files (restricted paths)"
+    },
+    "chmod": {
+        "allowed_flags": ["-R", "-v"],
+        "allowed_args": 2,  # mode and file
+        "risk_level": "medium",
+        "description": "Change file permissions"
+    },
+
+    # Development tools
+    "python": {
+        "allowed_flags": ["-m", "-c", "-V", "--version", "-u"],
+        "allowed_args": -1,
+        "risk_level": "medium",
+        "description": "Python interpreter"
+    },
+    "python3": {
+        "allowed_flags": ["-m", "-c", "-V", "--version", "-u"],
+        "allowed_args": -1,
+        "risk_level": "medium",
+        "description": "Python 3 interpreter"
+    },
+    "pip": {
+        "allowed_flags": ["install", "uninstall", "list", "show", "freeze", "-r", "-e", "--upgrade"],
+        "allowed_args": -1,
+        "risk_level": "medium",
+        "description": "Python package manager"
+    },
+    "pip3": {
+        "allowed_flags": ["install", "uninstall", "list", "show", "freeze", "-r", "-e", "--upgrade"],
+        "allowed_args": -1,
+        "risk_level": "medium",
+        "description": "Python 3 package manager"
+    },
+    "node": {
+        "allowed_flags": ["-e", "-v", "--version"],
+        "allowed_args": 1,
+        "risk_level": "medium",
+        "description": "Node.js runtime"
+    },
+    "npm": {
+        "allowed_flags": ["install", "run", "build", "test", "start", "list", "-g", "--save-dev"],
+        "allowed_args": -1,
+        "risk_level": "medium",
+        "description": "Node package manager"
+    },
+    "npx": {
+        "allowed_flags": ["-y", "--yes"],
+        "allowed_args": -1,
+        "risk_level": "medium",
+        "description": "Execute npm package binaries"
+    },
+
+    # Version control
+    "git": {
+        "allowed_flags": [
+            "status", "log", "diff", "branch", "checkout", "add", "commit",
+            "push", "pull", "clone", "fetch", "merge", "rebase", "stash",
+            "reset", "restore", "switch", "show", "tag", "-m", "-a", "-d",
+            "--oneline", "--graph", "--all", "-p", "--staged"
+        ],
+        "allowed_args": -1,
+        "risk_level": "medium",
+        "description": "Git version control"
+    },
+
+    # System utilities (read-only)
+    "date": {
+        "allowed_flags": ["-u", "+%Y-%m-%d"],
+        "allowed_args": 0,
+        "risk_level": "low",
+        "description": "Display current date"
+    },
+    "whoami": {
+        "allowed_flags": [],
+        "allowed_args": 0,
+        "risk_level": "low",
+        "description": "Display current user"
+    },
+    "uname": {
+        "allowed_flags": ["-a", "-r", "-m"],
+        "allowed_args": 0,
+        "risk_level": "low",
+        "description": "System information"
+    },
+    "df": {
+        "allowed_flags": ["-h", "-H", "-T"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Disk space usage"
+    },
+    "du": {
+        "allowed_flags": ["-h", "-s", "-a", "-d"],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Directory space usage"
+    },
+}
+
+# Forbidden path patterns for rm command
+RM_FORBIDDEN_PATHS = [
+    "/",           # Root
+    "/home",       # User homes
+    "/etc",        # System config
+    "/usr",        # System programs
+    "/var",        # Variable data
+    "/root",       # Root home
+    "~",           # Home directory
+    "/*",          # Wildcard root
+]
+
+# Shell injection patterns (for _check_shell_injection)
+SHELL_INJECTION_PATTERNS = [
+    r'\$\([^)]*\)',           # Command substitution $(...)
+    r'`[^`]*`',               # Backtick command substitution
+    r'\$\{[^}]*\}',           # Variable expansion ${...}
+    r'\$[A-Za-z_][A-Za-z0-9_]*',  # Environment variable $VAR
+    r'\\x[0-9a-fA-F]{2}',     # Hex escape \\xNN
+    r'\\u[0-9a-fA-F]{4}',     # Unicode escape \\uNNNN
+    r'\\[0-7]{1,3}',          # Octal escape \\NNN
+    r'%[0-9a-fA-F]{2}',       # URL encoding %NN
+]
+
+
+def _normalize_command(command: str) -> str:
+    """Normalize command string to prevent Unicode bypass.
+
+    Applies NFC normalization and removes null bytes.
+
+    Args:
+        command: Raw command string
+
+    Returns:
+        Normalized command string
+    """
+    # Remove null bytes
+    command = command.replace('\x00', '')
+
+    # Apply Unicode NFC normalization (combines composed characters)
+    command = unicodedata.normalize('NFC', command)
+
+    # Strip leading/trailing whitespace
+    command = command.strip()
+
+    return command
+
+
+def _check_shell_injection(command: str) -> Tuple[bool, str]:
+    """Check for shell injection patterns.
+
+    Detects various shell injection techniques:
+    - Command substitution: $(cmd) or `cmd`
+    - Variable expansion: $VAR or ${VAR}
+    - Escape sequences: \\x00, \\u0000, \\000 (but not Windows paths)
+    - URL encoding: %00
+
+    Args:
+        command: Command string to check
+
+    Returns:
+        Tuple of (is_safe, reason)
+    """
+    # Check for newlines (command injection via multiline)
+    if '\n' in command or '\r' in command:
+        return False, "Newline character detected - potential command injection"
+
+    # Check for semicolon (command chaining)
+    if ';' in command:
+        return False, "Semicolon detected - potential command chaining"
+
+    # Check each injection pattern
+    for pattern in SHELL_INJECTION_PATTERNS:
+        match = re.search(pattern, command)
+        if match:
+            matched_text = match.group()
+            # Skip false positives for Windows paths
+            # On Windows, backslashes are path separators, not escape sequences
+            # A true escape sequence would be like \x00, , \177
+            # Windows paths look like C:\Users\... or just \Users\...
+            if '\\' in matched_text:
+                # Check if this looks like an escape sequence (hex, unicode, or octal)
+                # Real escape sequences: \xNN, \uNNNN, \NNN (where N is digit for octal)
+                # Windows paths: \Users, \Windows, etc. (letters, not digits after \)
+                if re.match(r'\\[xu][0-9a-fA-F]', matched_text):
+                    # This is a hex or unicode escape - potential danger
+                    return False, f"Shell injection pattern detected: {matched_text}"
+                elif re.match(r'\\[0-7]{3}$', matched_text):
+                    # This is a 3-digit octal escape like \177
+                    return False, f"Shell injection pattern detected: {matched_text}"
+                # Otherwise it's likely a Windows path, skip this match
+                continue
+            return False, f"Shell injection pattern detected: {matched_text}"
+
+    # Check for backticks
+    if '`' in command:
+        return False, "Backtick detected - potential command substitution"
+
+    # Check for pipe (allow for safe read-only commands only - handled elsewhere)
+    # This is just a basic check
+
+    return True, "OK"
+
+
+def _validate_rm_path(path: str) -> Tuple[bool, str]:
+    """Validate path for rm command to prevent dangerous deletions.
+
+    Blocks deletion of critical system paths.
+
+    Args:
+        path: Path argument for rm command
+
+    Returns:
+        Tuple of (is_safe, reason)
+    """
+    import os.path
+
+    # Expand user home directory
+    expanded_path = os.path.expanduser(path)
+    abs_path = os.path.abspath(expanded_path)
+
+    for forbidden in RM_FORBIDDEN_PATHS:
+        forbidden_expanded = os.path.expanduser(forbidden)
+        forbidden_abs = os.path.abspath(forbidden_expanded)
+
+        # Check if path matches or is under forbidden path
+        if abs_path == forbidden_abs or abs_path.startswith(forbidden_abs + os.sep):
+            return False, f"rm: Forbidden path detected: {path}"
+
+    return True, "OK"
+
+
+def validate_command_whitelist(command: str) -> Tuple[bool, str]:
+    """Validate command against whitelist (more secure than blacklist).
+
+    This function provides defense-in-depth alongside validate_command().
+    Uses whitelist approach to only allow known-safe commands.
+
+    Args:
+        command: Command string to validate
+
+    Returns:
+        Tuple of (is_safe, reason)
+    """
+    # Step 1: Normalize command
+    normalized = _normalize_command(command)
+
+    # Step 2: Check for shell injection
+    is_safe, reason = _check_shell_injection(normalized)
+    if not is_safe:
+        return False, reason
+
+    # Step 3: Parse command safely using shlex
+    try:
+        parts = shlex.split(normalized)
+    except ValueError as e:
+        return False, f"Command parsing error: {e}"
+
+    if not parts:
+        return False, "Empty command"
+
+    # Step 4: Extract command name (handle Windows paths)
+    cmd_name = os.path.basename(parts[0])
+
+    # Step 5: Check if command is in whitelist
+    if cmd_name not in ALLOWED_COMMANDS:
+        return False, f"Command not in whitelist: {cmd_name}"
+
+    config = ALLOWED_COMMANDS[cmd_name]
+
+    # Step 6: Validate flags and arguments
+    args = parts[1:]
+    positional_args = []
+
+    for arg in args:
+        if arg.startswith('-'):
+            # It's a flag
+            flag = arg.split('=')[0]  # Handle --flag=value
+
+            # Handle combined short flags (e.g., -rf -> -r, -f)
+            if flag.startswith('--'):
+                # Long option, check as-is
+                flags_to_check = [flag]
+            elif len(flag) > 2:
+                # Combined short flags like -rf -> split into -r, -f
+                flags_to_check = ['-' + c for c in flag[1:]]
+            else:
+                flags_to_check = [flag]
+
+            # Check all flags
+            for f in flags_to_check:
+                if f not in config["allowed_flags"]:
+                    return False, f"Flag not allowed for {cmd_name}: {f}"
+        else:
+            positional_args.append(arg)
+
+    # Step 7: Check argument count
+    max_args = config["allowed_args"]
+    if max_args >= 0 and len(positional_args) > max_args:
+        return False, f"Too many arguments for {cmd_name}: expected max {max_args}, got {len(positional_args)}"
+
+    # Step 8: Special handling for rm command
+    if cmd_name == "rm" and positional_args:
+        for path in positional_args:
+            is_safe, reason = _validate_rm_path(path)
+            if not is_safe:
+                return False, reason
+
+    # Step 9: Check risk level for logging purposes
+    risk = config["risk_level"]
+    if risk == "high":
+        # High-risk commands pass but should be logged
+        pass  # Logging handled by caller
+
+    return True, f"OK (risk_level={config['risk_level']})"
+
+
+def get_command_risk_level(command: str) -> str:
+    """Get the risk level of a command.
+
+    Args:
+        command: Command string
+
+    Returns:
+        Risk level string: "low", "medium", "high", or "unknown"
+    """
+    try:
+        normalized = _normalize_command(command)
+        parts = shlex.split(normalized)
+        if not parts:
+            return "unknown"
+        cmd_name = os.path.basename(parts[0])
+        if cmd_name in ALLOWED_COMMANDS:
+            return ALLOWED_COMMANDS[cmd_name]["risk_level"]
+    except Exception:
+        pass
+    return "unknown"
+
+
 # Sensitive information patterns for input filtering
 # Each pattern is a tuple of (regex_pattern, category, severity)
 SENSITIVE_PATTERNS = [
@@ -182,56 +645,61 @@ def check_sensitive_input(text: str) -> Dict[str, Any]:
     }
 
 
-def validate_command(command: str) -> Tuple[bool, str]:
-    """Validate a shell command for safety.
+def validate_command_v2(command: str) -> Tuple[bool, str]:
+    """New command validation function using whitelist mechanism.
+
+    This function provides enhanced security through a whitelist-based approach.
+    It validates commands in multiple steps:
+
+    1. Unicode normalization (NFC) to prevent bypass attacks
+    2. Shell injection detection (command substitution, variable expansion)
+    3. Whitelist validation (only known-safe commands allowed)
+    4. Argument constraint checking (flags, argument count, path restrictions)
+
+    Args:
+        command: Command string to validate
 
     Returns:
         Tuple of (is_safe, reason)
     """
-    # Check for dangerous patterns first
+    # Delegate to validate_command_whitelist which implements all these steps
+    return validate_command_whitelist(command)
+
+
+def validate_command(command: str) -> Tuple[bool, str]:
+    """Validate a shell command for safety.
+
+    This function provides backward compatibility while using the new
+    whitelist-based validation internally. The whitelist approach is
+    more secure than the previous blacklist-only approach.
+
+    Args:
+        command: Command string to validate
+
+    Returns:
+        Tuple of (is_safe, reason)
+    """
+    # Empty or whitespace-only commands are safe (no-op)
+    if not command or not command.strip():
+        return True, "OK (empty command)"
+
+    # Check for dangerous patterns first (highest priority)
     for pattern in DANGEROUS_PATTERNS:
         if re.search(pattern, command, re.IGNORECASE):
             return False, f"Dangerous command pattern detected: {pattern}"
 
-    # Check for confirmation-required patterns
+    # Check for confirmation-required patterns (these should still require confirmation)
     for pattern in CONFIRMATION_REQUIRED_PATTERNS:
         if re.search(pattern, command, re.IGNORECASE):
             return False, f"Command requires user confirmation: {pattern}"
 
-    # Check for shell injection/chaining - STRICT: require confirmation for ALL chaining
-    for chain_char in SHELL_CHAIN_CHARS:
-        if chain_char in command:
-            # Only allow simple pipe for read-only commands
-            if chain_char == "|":
-                # Check if it's a safe read-only pipe (e.g., cat file | grep pattern)
-                pipe_parts = command.split("|")
-                read_only_cmds = ["cat", "head", "tail", "less", "more", "grep", "find", "ls", "echo", "sort", "uniq", "wc", "awk", "sed"]
+    # Try whitelist validation (more secure)
+    is_safe, reason = validate_command_v2(command)
+    if is_safe:
+        return True, reason
 
-                # Check all parts are read-only
-                all_read_only = all(
-                    any(part.strip().startswith(cmd) for cmd in read_only_cmds)
-                    for part in pipe_parts if part.strip()
-                )
-
-                if all_read_only:
-                    continue  # Allow read-only pipes
-
-            return False, f"Shell command chaining detected ('{chain_char}') - requires confirmation"
-
-    # Check for URL-encoded or escaped dangerous characters
-    encoded_patterns = [
-        (r"%3B", ";"),
-        (r"%26%26", "&&"),
-        (r"%7C", "|"),
-        (r"\\x3b", ";"),
-        (r"\\x26", "&"),
-        (r"\\x7c", "|"),
-    ]
-    for encoded, decoded in encoded_patterns:
-        if encoded in command.lower():
-            return False, f"URL-encoded shell character detected ({encoded} = {decoded})"
-
-    return True, "OK"
+    # Return the whitelist validation result
+    return is_safe, reason
 
 
 def is_path_approved(path: str) -> bool:

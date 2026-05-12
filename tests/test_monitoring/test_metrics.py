@@ -9,7 +9,6 @@ Tests cover:
 
 import pytest
 import time
-from unittest.mock import patch, MagicMock
 
 from mini_claude.monitoring.metrics import (
     MetricsCollector,
@@ -229,9 +228,9 @@ class TestMetricsCollector:
         collector = MetricsCollector()
 
         # Start 3 requests
-        s1 = collector.record_request_start()
-        s2 = collector.record_request_start()
-        s3 = collector.record_request_start()
+        collector.record_request_start()
+        collector.record_request_start()
+        collector.record_request_start()
 
         assert collector._snapshot.active_requests == 3
 

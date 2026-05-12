@@ -2,8 +2,6 @@
 
 import pytest
 from pathlib import Path
-from unittest.mock import patch
-import os
 
 from mini_claude.config.settings import Settings, VectorDBType
 

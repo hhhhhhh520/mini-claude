@@ -1,9 +1,7 @@
 """Tests for degradation strategies."""
 
 import pytest
-import asyncio
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
 
 from mini_claude.agent.degradation import (
     DegradationType,

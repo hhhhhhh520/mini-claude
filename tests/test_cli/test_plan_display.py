@@ -2,7 +2,6 @@
 
 import pytest
 from io import StringIO
-from unittest.mock import patch, MagicMock
 
 from rich.console import Console
 

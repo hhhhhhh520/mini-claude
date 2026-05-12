@@ -1,12 +1,11 @@
 """Tests for reflect_node."""
 
 import pytest
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from langchain_core.messages import AIMessage, HumanMessage
 
 from mini_claude.agent.nodes import reflect_node
-from mini_claude.agent.state import AgentState, StopReason, create_initial_state
+from mini_claude.agent.state import create_initial_state
 from mini_claude.agent.complexity import ComplexityLevel, TaskComplexityAnalyzer
 
 

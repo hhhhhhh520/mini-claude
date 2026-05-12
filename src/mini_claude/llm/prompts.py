@@ -1,9 +1,144 @@
 """System prompts for different model providers."""
 
+import re
+import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
 from mini_claude.config.settings import ModelProvider
+
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Prompt Injection Protection - Security Architecture
+# =============================================================================
+
+# Dangerous patterns that may indicate prompt injection attempts
+# These patterns are designed to be conservative to avoid false positives
+# while catching common injection techniques
+PROMPT_INJECTION_PATTERNS: List[str] = [
+    # Instruction override attempts
+    r"ignore\s+(all\s+)?(previous|prior)\s+(instructions?|prompts?)",
+    r"forget\s+(everything|all)\s*(above|before)?",
+    r"disregard\s+(all\s+)?(previous|prior)\s+(instructions?|rules?)",
+
+    # Role/identity manipulation
+    r"you\s+are\s+now\s+",
+    r"act\s+as\s+(if\s+you\s+are|a)",
+    r"pretend\s+(to\s+be|you\s+are)",
+    r"simulate\s+(being|a)",
+
+    # System/assistant role injection
+    r"system\s*:",
+    r"assistant\s*:",
+    r"<\s*system\s*>",
+    r"<\s*assistant\s*>",
+
+    # Instruction tag manipulation
+    r"<\s*instructions?\s*>",
+    r"<\s*\/\s*instructions?\s*>",
+    r"\[instructions?\]",
+    r"\[\/instructions?\]",
+
+    # Output manipulation
+    r"output\s+only\s*:",
+    r"respond\s+with\s*:",
+    r"your\s+response\s+must\s+be",
+
+    # Common jailbreak phrases
+    r"DAN\s+mode",
+    r"do\s+anything\s+now",
+    r"ignore\s+all\s+restrictions",
+    r"bypass\s+(all\s+)?(restrictions|filters)",
+]
+
+# Compiled regex for performance (compiled at module load)
+_COMPILED_INJECTION_PATTERNS: List[re.Pattern] = [
+    re.compile(pattern, re.IGNORECASE) for pattern in PROMPT_INJECTION_PATTERNS
+]
+
+# Delimiter markers for user input isolation
+USER_INPUT_START_MARKER = "[USER_TASK_START]"
+USER_INPUT_END_MARKER = "[USER_TASK_END]"
+
+
+def sanitize_user_input(text: str, max_length: int = 10000) -> str:
+    """
+    Sanitize user input to prevent prompt injection attacks.
+
+    This function wraps user input in delimiter markers and performs
+    basic validation to detect and log potential injection attempts.
+
+    SECURITY DESIGN:
+    1. Length limiting prevents resource exhaustion
+    2. Pattern detection logs suspicious inputs for monitoring
+    3. Delimiter wrapping helps LLM distinguish user content from instructions
+    4. The function does NOT modify content - it wraps and monitors only
+
+    Args:
+        text: User input text to sanitize
+        max_length: Maximum allowed length in characters (default: 10000)
+
+    Returns:
+        Sanitized text wrapped in delimiter markers
+
+    Raises:
+        ValueError: If text is empty or exceeds max_length
+
+    Note:
+        Detection of injection patterns does NOT raise an exception.
+        Instead, it logs a warning for security monitoring. The input
+        is still processed but wrapped in delimiters for isolation.
+    """
+    # 1. Validate input is not empty
+    if not text or not text.strip():
+        raise ValueError("Input text cannot be empty")
+
+    # 2. Length validation
+    if len(text) > max_length:
+        raise ValueError(f"Input text exceeds maximum length of {max_length} characters")
+
+    # 3. Detect potential injection attempts
+    detected_patterns = _detect_injection_attempt(text)
+    if detected_patterns:
+        logger.warning(
+            "Potential prompt injection detected. Patterns: %s",
+            ", ".join(detected_patterns),
+        )
+        # Log the suspicious input (truncated for security)
+        logger.debug("Suspicious input (first 100 chars): %s", text[:100])
+
+    # 4. Wrap in delimiter markers for isolation
+    # The markers help LLM distinguish user content from instructions
+    sanitized = f"{USER_INPUT_START_MARKER}\n{text}\n{USER_INPUT_END_MARKER}"
+
+    return sanitized
+
+
+def _detect_injection_attempt(text: str) -> List[str]:
+    """
+    Check if text matches known injection patterns.
+
+    This is an internal function used by sanitize_user_input.
+
+    Args:
+        text: Text to analyze
+
+    Returns:
+        List of pattern descriptions that matched (empty if no matches)
+    """
+    detected: List[str] = []
+
+    for i, pattern in enumerate(_COMPILED_INJECTION_PATTERNS):
+        match = pattern.search(text)
+        if match:
+            # Use the original pattern string as identifier
+            # Extract a readable part of the matched text
+            matched_text = match.group(0)
+            detected.append(f"Pattern {i+1}: '{matched_text}'")
+
+    return detected
 
 
 # Feature version tracking - centralized record of all capabilities
@@ -390,12 +525,28 @@ Critical Rules:
 
 
 def get_subagent_prompt(task: str, context: str = "") -> str:
-    """Get prompt for sub-agent."""
+    """Get prompt for sub-agent.
+
+    User inputs are sanitized to prevent prompt injection attacks.
+    The sanitizer wraps inputs in delimiter markers and logs
+    suspicious patterns for security monitoring.
+
+    Args:
+        task: The task description (user-provided, will be sanitized)
+        context: Optional context information (user-provided, will be sanitized)
+
+    Returns:
+        Sanitized prompt for sub-agent execution
+    """
+    # Sanitize user-provided inputs
+    sanitized_task = sanitize_user_input(task)
+    sanitized_context = sanitize_user_input(context) if context else ""
+
     return f"""You are a file writer. Your ONLY job is to create files using write_file tool.
 
-Task: {task}
+Task: {sanitized_task}
 
-{f"Context: {context}" if context else ""}
+{f"Context: {sanitized_context}" if sanitized_context else ""}
 
 CRITICAL RULES:
 1. You MUST call write_file tool IMMEDIATELY
@@ -412,10 +563,24 @@ Call write_file NOW with complete arguments."""
 
 
 def get_planning_prompt(task: str) -> str:
-    """Get prompt for planning phase."""
+    """Get prompt for planning phase.
+
+    User inputs are sanitized to prevent prompt injection attacks.
+    The sanitizer wraps inputs in delimiter markers and logs
+    suspicious patterns for security monitoring.
+
+    Args:
+        task: The task to plan (user-provided, will be sanitized)
+
+    Returns:
+        Sanitized prompt for planning
+    """
+    # Sanitize user-provided input
+    sanitized_task = sanitize_user_input(task)
+
     return f"""Given the following task, create a step-by-step execution plan.
 
-Task: {task}
+Task: {sanitized_task}
 
 Available tools:
 - read_file, write_file, edit_file: File operations

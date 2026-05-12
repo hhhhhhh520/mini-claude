@@ -5,7 +5,6 @@ import os
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 from mini_claude.utils.profile import UserProfile, UserProfileManager
 

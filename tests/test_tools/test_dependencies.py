@@ -1,7 +1,6 @@
 """Tests for tool dependency management."""
 
 import pytest
-from typing import Dict, Any
 
 from mini_claude.tools.dependencies import (
     ToolDependency,

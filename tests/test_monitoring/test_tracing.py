@@ -8,10 +8,7 @@ Tests cover:
 - Exporter functionality
 """
 
-import pytest
-import time
-import json
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from pathlib import Path
 
 from mini_claude.monitoring.tracing import (
@@ -351,7 +348,7 @@ class TestTracingManager:
                 with patch('mini_claude.monitoring.tracing.Resource'):
                     with patch('mini_claude.monitoring.tracing.trace'):
                         with patch('mini_claude.monitoring.tracing.SimpleSpanProcessor'):
-                            result = manager.setup(
+                            manager.setup(
                                 service_name="test-service",
                                 exporter_type="console",
                             )
@@ -420,13 +417,13 @@ class TestConvenienceFunctions:
 
     def test_start_span_function(self):
         """Test start_span convenience function."""
-        with start_span("test") as span:
+        with start_span("test"):
             # Returns context manager, may be None if tracing disabled
             pass
 
     def test_trace_tool_call(self):
         """Test trace_tool_call function."""
-        with trace_tool_call("write_file", {"path": "/test.txt"}) as span:
+        with trace_tool_call("write_file", {"path": "/test.txt"}):
             pass
 
     def test_trace_tool_call_sanitizes_params(self):
@@ -435,22 +432,22 @@ class TestConvenienceFunctions:
             "path": "/test.txt",
             "content": "secret data",
             "password": "secret123",
-        }) as span:
+        }):
             pass
 
     def test_trace_llm_call(self):
         """Test trace_llm_call function."""
-        with trace_llm_call("deepseek-chat", 10) as span:
+        with trace_llm_call("deepseek-chat", 10):
             pass
 
     def test_trace_agent_node(self):
         """Test trace_agent_node function."""
-        with trace_agent_node("think", iteration=1) as span:
+        with trace_agent_node("think", iteration=1):
             pass
 
     def test_trace_subagent(self):
         """Test trace_subagent function."""
-        with trace_subagent("Create a file", agent_id="agent-123") as span:
+        with trace_subagent("Create a file", agent_id="agent-123"):
             pass
 
     def test_traced_decorator_async(self):
@@ -569,12 +566,12 @@ class TestIntegration:
 
     def test_error_recording(self):
         """Test that errors are recorded in spans."""
-        storage = get_trace_storage()
+        get_trace_storage()
 
         # This test verifies the error handling path works
         # Actual error recording depends on OpenTelemetry availability
         try:
-            with trace_agent_node("error_test", 1) as span:
+            with trace_agent_node("error_test", 1):
                 raise ValueError("Test error")
         except ValueError:
             pass

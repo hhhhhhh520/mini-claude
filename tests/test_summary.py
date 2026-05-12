@@ -3,9 +3,8 @@
 import pytest
 import tempfile
 import os
-from datetime import datetime
 
-from mini_claude.utils.token_manager import TokenCounter, TokenLimitStrategy
+from mini_claude.utils.token_manager import TokenCounter
 from mini_claude.utils.memory import SessionMemory
 from mini_claude.utils.session import SessionManager
 

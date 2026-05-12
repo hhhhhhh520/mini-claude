@@ -1,8 +1,6 @@
 """Tests for alert system."""
 
 import pytest
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
 
 from mini_claude.monitoring.alerts import (
     AlertLevel,

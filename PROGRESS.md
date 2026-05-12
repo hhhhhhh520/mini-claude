@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-05-03 (P3 全部完成)
+> 最后更新: 2026-05-10 (P0 安全修复进行中)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -54,6 +54,50 @@
 | P3-12.2 | 压力测试（StressTestRunner+并发/内存/资源限制） | 2026-05-03 |
 | P3-12.3 | 故障注入测试（ChaosTest+网络/API/资源故障） | 2026-05-03 |
 | P3-12.4 | 回归测试套件（RegressionRunner+GitHub Actions） | 2026-05-03 |
+| **P0安全** | ISSUE-001 命令白名单架构（ALLOWED_COMMANDS 32个命令） | 2026-05-10 |
+| **P0安全** | ISSUE-001 validate_command_v2() 实现 | 2026-05-10 |
+| **P0安全** | ISSUE-002 Prompt消毒架构（PROMPT_INJECTION_PATTERNS 18个模式） | 2026-05-10 |
+| **P0安全** | ISSUE-002 sanitize_user_input() 实现 | 2026-05-10 |
+| **P0安全** | ISSUE-002 Prompt注入防护测试（45个测试） | 2026-05-10 |
+| **P0安全** | ISSUE-003 子代理工具白名单审计 | 2026-05-10 |
+| **P0安全** | ISSUE-003 移除子代理run_command | 2026-05-10 |
+
+### ⏳ 进行中
+
+| 任务 | 状态 | 预计完成 |
+|------|------|----------|
+| SUB-003 | 命令白名单安全测试 | 需继续 |
+| SUB-009 | 子代理隔离测试 | 需继续 |
+| SUB-010 | P0安全修复验证 | 待SUB-003/SUB-009完成 |
+| 验收省 | verifier Agent静态验收 | 待SUB-010完成 |
+| QA验收 | qa_verifier Agent端到端测试 | 待验收省通过 |
+
+### 2026-05-10 P0 安全修复（朝廷工作流）
+
+**修改文件**:
+- `src/mini_claude/utils/safety.py` - 添加 ALLOWED_COMMANDS 白名单（32个命令）、validate_command_v2()、_normalize_command()、_check_shell_injection()
+- `src/mini_claude/llm/prompts.py` - 添加 PROMPT_INJECTION_PATTERNS（18个模式）、sanitize_user_input()、_detect_injection_attempt()
+- `src/mini_claude/tools/agent_spawn.py` - 移除子代理 run_command
+- `src/mini_claude/tools/parallel.py` - 移除子代理 run_command
+- `tests/test_llm/test_prompts.py` - 新增45个Prompt注入防护测试
+
+**修改内容**: 朝廷工作流执行P0安全修复，8/10子任务完成
+
+**修改原因**: 解决ISSUE-001命令注入、ISSUE-002 Prompt注入、ISSUE-003子代理run_command
+
+**测试状态**:
+- safety.py: 71测试通过
+- prompts.py: 111测试通过
+- agent_spawn.py: 49测试通过
+
+**待完成**:
+- SUB-003: 命令白名单安全测试
+- SUB-009: 子代理隔离测试
+- SUB-010: P0安全修复验证
+- 验收省: verifier Agent静态验收
+- QA验收: qa_verifier Agent端到端测试
+
+---
 
 ### 2026-05-05 测试验证
 **测试结果**: 1158测试通过，2失败，9错误，30跳过

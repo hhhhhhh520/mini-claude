@@ -1,9 +1,7 @@
 """Tests for ExecutionPlan integration with AgentState."""
 
-import pytest
-from unittest.mock import MagicMock, patch
 
-from mini_claude.agent.state import AgentState, create_initial_state, StopReason
+from mini_claude.agent.state import AgentState, create_initial_state
 from mini_claude.cli.plan_display import (
     StepStatus,
     PlanStep,
