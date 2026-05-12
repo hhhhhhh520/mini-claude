@@ -226,7 +226,10 @@ class TestProviderIntegration:
         reset_context()
         ctx = get_context()
 
-        # Access several components
+        # Access several components (lazy initialization)
+        _ = ctx.metrics_collector
+        _ = ctx.token_counter
+        _ = ctx.rate_limiter
 
         # All should be initialized
         status = ctx.is_initialized()

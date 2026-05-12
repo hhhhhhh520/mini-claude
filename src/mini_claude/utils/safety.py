@@ -112,6 +112,7 @@ class CommandConfig(TypedDict):
 
     allowed_flags: List[str]
     allowed_args: int  # -1 means unlimited
+    flag_args: Dict[str, int]  # Maps flag to number of arguments it takes (default 0)
     risk_level: str  # "low", "medium", "high"
     description: str
 
@@ -134,12 +135,14 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
     "head": {
         "allowed_flags": ["-n", "-c"],
         "allowed_args": 1,
+        "flag_args": {"-n": 1, "-c": 1},  # -n and -c take 1 argument
         "risk_level": "low",
         "description": "Display first lines of file",
     },
     "tail": {
         "allowed_flags": ["-n", "-c", "-f"],
         "allowed_args": 1,
+        "flag_args": {"-n": 1, "-c": 1},  # -n and -c take 1 argument, -f takes 0
         "risk_level": "low",
         "description": "Display last lines of file",
     },
@@ -536,8 +539,11 @@ def validate_command_whitelist(command: str) -> Tuple[bool, str]:
     # Step 6: Validate flags and arguments
     args = parts[1:]
     positional_args = []
+    flag_args_config = config.get("flag_args", {})  # Default empty dict
+    i = 0
 
-    for arg in args:
+    while i < len(args):
+        arg = args[i]
         if arg.startswith("-"):
             # It's a flag
             flag = arg.split("=")[0]  # Handle --flag=value
@@ -556,8 +562,15 @@ def validate_command_whitelist(command: str) -> Tuple[bool, str]:
             for f in flags_to_check:
                 if f not in config["allowed_flags"]:
                     return False, f"Flag not allowed for {cmd_name}: {f}"
+
+                # Skip flag arguments if this flag takes arguments
+                num_flag_args = flag_args_config.get(f, 0)
+                if num_flag_args > 0:
+                    # Skip the next num_flag_args arguments (they belong to this flag)
+                    i += num_flag_args
         else:
             positional_args.append(arg)
+        i += 1
 
     # Step 7: Check argument count
     max_args = config["allowed_args"]
