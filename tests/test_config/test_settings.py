@@ -114,7 +114,8 @@ class TestSettingsBackwardCompatibility:
         """Test existing settings remain unchanged."""
         settings = Settings()
         # Check existing settings still have default values
-        assert settings.default_model == "deepseek-chat"
+        # Note: default_model changed from "deepseek-chat" to "deepseek-v4-flash"
+        assert settings.default_model == "deepseek-v4-flash"
         assert settings.max_sub_agents == 3
         assert settings.max_iterations == 10
         assert settings.streaming_enabled is True

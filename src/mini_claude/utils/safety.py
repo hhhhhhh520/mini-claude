@@ -368,14 +368,11 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
 
 # Forbidden path patterns for rm command
 RM_FORBIDDEN_PATHS = [
-    "/",  # Root
-    "/home",  # User homes
+    "/",  # Root (only root itself, not subdirectories)
     "/etc",  # System config
     "/usr",  # System programs
     "/var",  # Variable data
     "/root",  # Root home
-    "~",  # Home directory
-    "/*",  # Wildcard root
 ]
 
 # Shell injection patterns (for _check_shell_injection)

@@ -15,6 +15,33 @@ from mini_claude.utils.vector_store import (
     get_recommended_backend,
 )
 
+# Check optional dependencies
+try:
+    import sentence_transformers
+
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+
+try:
+    import faiss
+
+    FAISS_AVAILABLE = True
+except ImportError:
+    FAISS_AVAILABLE = False
+
+
+# Skip marker for tests requiring sentence-transformers
+requires_sentence_transformers = pytest.mark.skipif(
+    not SENTENCE_TRANSFORMERS_AVAILABLE,
+    reason="sentence-transformers not installed (optional dependency)",
+)
+
+requires_faiss = pytest.mark.skipif(
+    not FAISS_AVAILABLE,
+    reason="faiss not installed (optional dependency)",
+)
+
 
 class TestSearchResult:
     """Test SearchResult dataclass."""
@@ -97,6 +124,7 @@ class TestDependencyCheck:
             pytest.skip("No vector store backend available")
 
 
+@requires_sentence_transformers
 class TestVectorStoreChroma:
     """Test VectorStore with ChromaDB backend."""
 
@@ -280,6 +308,8 @@ class TestVectorStoreChroma:
         assert "chroma" in repr_str
 
 
+@requires_sentence_transformers
+@requires_faiss
 class TestVectorStoreFAISS:
     """Test VectorStore with FAISS backend."""
 
@@ -441,6 +471,7 @@ class TestVectorStoreFAISS:
         assert "index_size" in stats
 
 
+@requires_sentence_transformers
 class TestVectorStoreErrors:
     """Test error handling in VectorStore."""
 
@@ -459,6 +490,7 @@ class TestVectorStoreErrors:
                         VectorStore(db_type="chroma", path=tmpdir)
 
 
+@requires_sentence_transformers
 class TestVectorStoreEdgeCases:
     """Test edge cases in VectorStore."""
 
@@ -537,6 +569,7 @@ class TestVectorStoreEdgeCases:
         assert len(results) == 1
 
 
+@requires_sentence_transformers
 class TestVectorStoreIntegration:
     """Integration tests for VectorStore."""
 

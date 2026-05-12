@@ -397,10 +397,12 @@ class TestConfigFileWatcher:
             env_file = Path(tmpdir) / ".env"
             env_file.write_text("LOG_LEVEL=INFO\n")
 
+            # Create settings with the env file path
             settings = Settings()
+            settings.model_config["env_file"] = str(env_file)
             watcher = ConfigFileWatcher(settings)
-            watcher._config_path = env_file  # Override path
 
+            # The watcher should detect the file exists
             assert watcher.check_now() is True
 
     def test_watcher_config_path(self):
