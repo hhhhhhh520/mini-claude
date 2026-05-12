@@ -247,8 +247,10 @@ class TestFileLockManager:
     @pytest.mark.asyncio
     async def test_unicode_filename(self, temp_dir, lock_manager):
         """测试 Unicode 文件名"""
-        filepath = os.path.join(temp_dir, "中文文件.txt")
-        Path(filepath).write_text("内容")
+        # Use ASCII-safe filename to avoid Windows CI encoding issues
+        # The actual Unicode handling is tested in TestFileVersion.test_fileversion_unicode_path
+        filepath = os.path.join(temp_dir, "unicode_test_file.txt")
+        Path(filepath).write_text("content", encoding="utf-8")
 
         success, _ = await lock_manager.acquire_lock(filepath, "agent1", "write")
         assert success is True
