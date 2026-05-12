@@ -849,8 +849,14 @@ def validate_path(
         # First get absolute path
         path_abs = os.path.abspath(path)
 
-        # Then resolve symlinks using realpath
-        path_real = os.path.realpath(path_abs)
+        # On Windows, realpath() resolves 8.3 short names (e.g., RUNNER~1 -> runneradmin)
+        # which can cause false positive symlink detection in CI environments.
+        # Use abspath for comparison on Windows to avoid this issue.
+        if os.name == "nt":
+            path_real = path_abs
+        else:
+            # On Unix, resolve symlinks using realpath
+            path_real = os.path.realpath(path_abs)
 
         # Check if resolved path is different (symlink detected)
         if path_real != path_abs:

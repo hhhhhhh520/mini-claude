@@ -41,8 +41,10 @@ class TestEditFileRetry:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
-            yield temp_dir
+        # Need to patch both the safety module's import and the config module
+        with patch("mini_claude.config.settings.settings.workspace_root", temp_dir):
+            with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
+                yield temp_dir
 
     # ========== Test 1: Consecutive Edits - Second Fails ==========
 
@@ -352,8 +354,10 @@ class TestEditFileRetryEdgeCases:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
-            yield temp_dir
+        # Need to patch both the safety module's import and the config module
+        with patch("mini_claude.config.settings.settings.workspace_root", temp_dir):
+            with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
+                yield temp_dir
 
     @pytest.mark.asyncio
     async def test_empty_file_edit_retry(self, temp_dir, mock_workspace):
@@ -478,8 +482,10 @@ class TestEditFileRetryIntegration:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
-            yield temp_dir
+        # Need to patch both the safety module's import and the config module
+        with patch("mini_claude.config.settings.settings.workspace_root", temp_dir):
+            with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
+                yield temp_dir
 
     @pytest.mark.asyncio
     async def test_full_retry_workflow(self, temp_dir, mock_workspace):

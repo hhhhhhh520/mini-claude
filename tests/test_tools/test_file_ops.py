@@ -27,8 +27,10 @@ def temp_dir():
 @pytest.fixture
 def mock_workspace(temp_dir):
     """Mock the workspace root to the temp directory."""
-    with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
-        yield temp_dir
+    # Need to patch both the safety module's import and the config module
+    with patch("mini_claude.config.settings.settings.workspace_root", temp_dir):
+        with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
+            yield temp_dir
 
 
 # ========== WriteFileTool Tests (10个) ==========
