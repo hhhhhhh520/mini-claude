@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 from mini_claude.tools.file_ops import EditFileTool, ReadFileTool, WriteFileTool
 from mini_claude.agent.suggestion import SuggestionEngine, ErrorType
+from mini_claude.config.settings import settings as config_settings
 
 
 class TestEditFileRetry:
@@ -41,10 +42,13 @@ class TestEditFileRetry:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        # Need to patch both the safety module's import and the config module
-        with patch("mini_claude.config.settings.settings.workspace_root", temp_dir):
-            with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
-                yield temp_dir
+        # Directly modify the settings object's workspace_root
+        original_workspace = config_settings.workspace_root
+        config_settings.workspace_root = temp_dir
+        try:
+            yield temp_dir
+        finally:
+            config_settings.workspace_root = original_workspace
 
     # ========== Test 1: Consecutive Edits - Second Fails ==========
 
@@ -354,10 +358,13 @@ class TestEditFileRetryEdgeCases:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        # Need to patch both the safety module's import and the config module
-        with patch("mini_claude.config.settings.settings.workspace_root", temp_dir):
-            with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
-                yield temp_dir
+        # Directly modify the settings object's workspace_root
+        original_workspace = config_settings.workspace_root
+        config_settings.workspace_root = temp_dir
+        try:
+            yield temp_dir
+        finally:
+            config_settings.workspace_root = original_workspace
 
     @pytest.mark.asyncio
     async def test_empty_file_edit_retry(self, temp_dir, mock_workspace):
@@ -482,10 +489,13 @@ class TestEditFileRetryIntegration:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        # Need to patch both the safety module's import and the config module
-        with patch("mini_claude.config.settings.settings.workspace_root", temp_dir):
-            with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
-                yield temp_dir
+        # Directly modify the settings object's workspace_root
+        original_workspace = config_settings.workspace_root
+        config_settings.workspace_root = temp_dir
+        try:
+            yield temp_dir
+        finally:
+            config_settings.workspace_root = original_workspace
 
     @pytest.mark.asyncio
     async def test_full_retry_workflow(self, temp_dir, mock_workspace):

@@ -4,7 +4,6 @@ import pytest
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 from mini_claude.tools.file_ops import (
     ReadFileTool,
@@ -15,6 +14,7 @@ from mini_claude.tools.file_ops import (
     SearchFilesTool,
     SearchContentTool,
 )
+from mini_claude.config.settings import settings as config_settings
 
 
 @pytest.fixture
@@ -27,10 +27,13 @@ def temp_dir():
 @pytest.fixture
 def mock_workspace(temp_dir):
     """Mock the workspace root to the temp directory."""
-    # Need to patch both the safety module's import and the config module
-    with patch("mini_claude.config.settings.settings.workspace_root", temp_dir):
-        with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
-            yield temp_dir
+    # Directly modify the settings object's workspace_root
+    original_workspace = config_settings.workspace_root
+    config_settings.workspace_root = temp_dir
+    try:
+        yield temp_dir
+    finally:
+        config_settings.workspace_root = original_workspace
 
 
 # ========== WriteFileTool Tests (10个) ==========

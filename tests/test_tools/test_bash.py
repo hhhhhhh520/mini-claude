@@ -4,7 +4,7 @@ import pytest
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from mini_claude.tools.bash import RunCommandTool
 from mini_claude.utils.safety import (
@@ -15,6 +15,7 @@ from mini_claude.utils.safety import (
     is_path_approved,
     clear_approved_paths,
 )
+from mini_claude.config.settings import settings as config_settings
 
 
 @pytest.fixture
@@ -327,24 +328,30 @@ class TestPathConfirmation:
     def test_path_confirmation_required(self, temp_dir):
         """测试路径确认异常抛出"""
         # Mock workspace_root to a different path so temp_dir is outside workspace
-        with patch("mini_claude.config.settings.settings.workspace_root", "/different/workspace"):
-            with patch("mini_claude.utils.safety.settings.workspace_root", "/different/workspace"):
-                checker = SafetyChecker()
-                path = os.path.join(temp_dir, "test.txt")
-                with pytest.raises(PathConfirmationRequired) as exc_info:
-                    checker.check_path(path, require_confirmation=True)
-                assert exc_info.value.path == os.path.abspath(path)
+        original_workspace = config_settings.workspace_root
+        config_settings.workspace_root = "/different/workspace"
+        try:
+            checker = SafetyChecker()
+            path = os.path.join(temp_dir, "test.txt")
+            with pytest.raises(PathConfirmationRequired) as exc_info:
+                checker.check_path(path, require_confirmation=True)
+            assert exc_info.value.path == os.path.abspath(path)
+        finally:
+            config_settings.workspace_root = original_workspace
 
     def test_path_confirmation_disabled(self, temp_dir):
         """测试禁用确认时返回 False"""
         # Mock workspace_root to a different path so temp_dir is outside workspace
-        with patch("mini_claude.config.settings.settings.workspace_root", "/different/workspace"):
-            with patch("mini_claude.utils.safety.settings.workspace_root", "/different/workspace"):
-                checker = SafetyChecker()
-                path = os.path.join(temp_dir, "test.txt")
-                is_safe, reason = checker.check_path(path, require_confirmation=False)
-                assert is_safe is False
-                assert "outside workspace" in reason.lower()
+        original_workspace = config_settings.workspace_root
+        config_settings.workspace_root = "/different/workspace"
+        try:
+            checker = SafetyChecker()
+            path = os.path.join(temp_dir, "test.txt")
+            is_safe, reason = checker.check_path(path, require_confirmation=False)
+            assert is_safe is False
+            assert "outside workspace" in reason.lower()
+        finally:
+            config_settings.workspace_root = original_workspace
 
     def test_approve_path(self, temp_dir):
         """测试批准路径"""
@@ -355,26 +362,32 @@ class TestPathConfirmation:
     def test_approved_path_bypasses_confirmation(self, temp_dir):
         """测试已批准路径跳过确认"""
         # Mock workspace_root to a different path so temp_dir is outside workspace
-        with patch("mini_claude.config.settings.settings.workspace_root", "/different/workspace"):
-            with patch("mini_claude.utils.safety.settings.workspace_root", "/different/workspace"):
-                checker = SafetyChecker()
-                path = os.path.join(temp_dir, "test.txt")
-                approve_path(path)
-                # 批准后应该返回 True，不抛异常
-                is_safe, reason = checker.check_path(path, require_confirmation=True)
-                assert is_safe is True
+        original_workspace = config_settings.workspace_root
+        config_settings.workspace_root = "/different/workspace"
+        try:
+            checker = SafetyChecker()
+            path = os.path.join(temp_dir, "test.txt")
+            approve_path(path)
+            # 批准后应该返回 True，不抛异常
+            is_safe, reason = checker.check_path(path, require_confirmation=True)
+            assert is_safe is True
+        finally:
+            config_settings.workspace_root = original_workspace
 
     def test_subdirectory_approved(self, temp_dir):
         """测试子目录继承批准"""
         # Mock workspace_root to a different path so temp_dir is outside workspace
-        with patch("mini_claude.config.settings.settings.workspace_root", "/different/workspace"):
-            with patch("mini_claude.utils.safety.settings.workspace_root", "/different/workspace"):
-                checker = SafetyChecker()
-                parent_dir = temp_dir
-                child_path = os.path.join(temp_dir, "subdir", "file.txt")
-                # 批准父目录
-                approve_path(parent_dir)
-                # 子路径也应该被批准
-                assert is_path_approved(child_path) is True
-                is_safe, reason = checker.check_path(child_path, require_confirmation=True)
-                assert is_safe is True
+        original_workspace = config_settings.workspace_root
+        config_settings.workspace_root = "/different/workspace"
+        try:
+            checker = SafetyChecker()
+            parent_dir = temp_dir
+            child_path = os.path.join(temp_dir, "subdir", "file.txt")
+            # 批准父目录
+            approve_path(parent_dir)
+            # 子路径也应该被批准
+            assert is_path_approved(child_path) is True
+            is_safe, reason = checker.check_path(child_path, require_confirmation=True)
+            assert is_safe is True
+        finally:
+            config_settings.workspace_root = original_workspace
