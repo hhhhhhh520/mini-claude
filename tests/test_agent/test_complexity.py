@@ -51,10 +51,12 @@ class TestTaskComplexityAnalyzer:
 
     def test_custom_thresholds(self):
         """Test custom thresholds."""
-        analyzer = TaskComplexityAnalyzer({
-            "simple_threshold": 20,
-            "medium_threshold": 50,
-        })
+        analyzer = TaskComplexityAnalyzer(
+            {
+                "simple_threshold": 20,
+                "medium_threshold": 50,
+            }
+        )
 
         assert analyzer.simple_threshold == 20
         assert analyzer.medium_threshold == 50
@@ -71,9 +73,7 @@ class TestTaskComplexityAnalyzer:
     def test_analyze_medium_task(self):
         """Test analyzing a medium complexity task."""
         analyzer = TaskComplexityAnalyzer()
-        result = analyzer.analyze(
-            "Optimize the database query performance for the user dashboard"
-        )
+        result = analyzer.analyze("Optimize the database query performance for the user dashboard")
 
         assert result.level in [ComplexityLevel.MEDIUM, ComplexityLevel.COMPLEX]
         assert "optimize" in str(result.factors).lower() or "优化" in str(result.factors)
@@ -162,8 +162,7 @@ class TestTaskComplexityAnalyzer:
         analyzer = TaskComplexityAnalyzer()
 
         result = analyzer.analyze(
-            "Update imports",
-            context={"file_paths": ["a.py", "b.py", "c.py"]}
+            "Update imports", context={"file_paths": ["a.py", "b.py", "c.py"]}
         )
         assert result.details["context_score"] == 15
 
@@ -171,20 +170,14 @@ class TestTaskComplexityAnalyzer:
         """Test production environment context."""
         analyzer = TaskComplexityAnalyzer()
 
-        result = analyzer.analyze(
-            "Deploy to production",
-            context={"is_production": True}
-        )
+        result = analyzer.analyze("Deploy to production", context={"is_production": True})
         assert result.details["context_score"] == 20
 
     def test_context_no_tests(self):
         """Test no tests context."""
         analyzer = TaskComplexityAnalyzer()
 
-        result = analyzer.analyze(
-            "Add new feature",
-            context={"has_tests": False}
-        )
+        result = analyzer.analyze("Add new feature", context={"has_tests": False})
         assert result.details["context_score"] == 10
 
     def test_context_dependencies(self):
@@ -192,8 +185,7 @@ class TestTaskComplexityAnalyzer:
         analyzer = TaskComplexityAnalyzer()
 
         result = analyzer.analyze(
-            "Update API",
-            context={"dependencies": ["auth", "db", "cache", "queue"]}
+            "Update API", context={"dependencies": ["auth", "db", "cache", "queue"]}
         )
         assert result.details["context_score"] == 15
 
@@ -215,22 +207,26 @@ class TestTaskComplexityAnalyzer:
 
     def test_custom_keywords(self):
         """Test custom keyword configuration."""
-        analyzer = TaskComplexityAnalyzer({
-            "custom_keywords": {
-                "super_complex": 100,
+        analyzer = TaskComplexityAnalyzer(
+            {
+                "custom_keywords": {
+                    "super_complex": 100,
+                }
             }
-        })
+        )
 
         result = analyzer.analyze("This is super_complex task")
         assert result.details["keyword_score"] == 100
 
     def test_custom_domains(self):
         """Test custom domain configuration."""
-        analyzer = TaskComplexityAnalyzer({
-            "custom_domains": {
-                "blockchain": 50,
+        analyzer = TaskComplexityAnalyzer(
+            {
+                "custom_domains": {
+                    "blockchain": 50,
+                }
             }
-        })
+        )
 
         result = analyzer.analyze("Build blockchain system")
         # Only blockchain should match as domain, "build" is a keyword
@@ -256,8 +252,7 @@ class TestTaskComplexityAnalyzer:
         analyzer = TaskComplexityAnalyzer()
 
         result = analyzer.analyze(
-            "重构数据库架构以提高性能",
-            context={"file_count": 5, "is_production": True}
+            "重构数据库架构以提高性能", context={"file_count": 5, "is_production": True}
         )
 
         # Should have keyword score (重构=30), domain score (数据库=20, 性能=20)
@@ -282,7 +277,7 @@ class TestTaskComplexityAnalyzer:
         # Task that should be COMPLEX
         result = analyzer.analyze(
             "Develop new payment system with security features",
-            context={"file_count": 8, "is_production": True}
+            context={"file_count": 8, "is_production": True},
         )
         assert result.level == ComplexityLevel.COMPLEX
 
@@ -299,10 +294,7 @@ class TestAnalyzeTaskComplexity:
 
     def test_with_context(self):
         """Test convenience function with context."""
-        result = analyze_task_complexity(
-            "Update module",
-            context={"file_count": 3}
-        )
+        result = analyze_task_complexity("Update module", context={"file_count": 3})
 
         assert isinstance(result, ComplexityResult)
         assert result.details["context_score"] == 15

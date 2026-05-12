@@ -34,6 +34,7 @@ def route_after_observe(state: AgentState) -> str:
     else:
         # 对于复杂任务，先进行反思
         from .complexity import TaskComplexityAnalyzer, ComplexityLevel
+
         current_task = state.get("current_task", "")
         analyzer = TaskComplexityAnalyzer()
         complexity = analyzer.analyze(current_task)

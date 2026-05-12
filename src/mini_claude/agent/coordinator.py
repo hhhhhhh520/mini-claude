@@ -11,6 +11,7 @@ from mini_claude.config.settings import settings
 
 class TaskPriority(Enum):
     """Priority levels for tasks."""
+
     HIGH = 1
     MEDIUM = 2
     LOW = 3
@@ -18,6 +19,7 @@ class TaskPriority(Enum):
 
 class TaskStatus(Enum):
     """Status of a distributed task."""
+
     PENDING = "pending"
     ASSIGNED = "assigned"
     RUNNING = "running"
@@ -28,6 +30,7 @@ class TaskStatus(Enum):
 @dataclass
 class DistributedTask:
     """A task for parallel execution."""
+
     id: str
     description: str
     target_files: List[str] = field(default_factory=list)
@@ -45,6 +48,7 @@ class DistributedTask:
 @dataclass
 class AgentInfo:
     """Information about a sub-agent."""
+
     id: str
     status: str = "idle"
     current_task: Optional[str] = None
@@ -147,7 +151,8 @@ class ParallelCoordinator:
 
             # Check if all dependencies are completed
             deps_satisfied = all(
-                self.tasks.get(dep, DistributedTask(id="", description="")).status == TaskStatus.COMPLETED
+                self.tasks.get(dep, DistributedTask(id="", description="")).status
+                == TaskStatus.COMPLETED
                 for dep in task.dependencies
             )
 
@@ -254,10 +259,7 @@ class ParallelCoordinator:
 
     def aggregate_results(self) -> str:
         """Aggregate all completed task results into a summary."""
-        completed_tasks = [
-            t for t in self.tasks.values()
-            if t.status == TaskStatus.COMPLETED
-        ]
+        completed_tasks = [t for t in self.tasks.values() if t.status == TaskStatus.COMPLETED]
 
         if not completed_tasks:
             return "No completed tasks to aggregate."
@@ -267,7 +269,9 @@ class ParallelCoordinator:
         # Group by status
         lines.append(f"Total: {len(self.tasks)} tasks")
         lines.append(f"Completed: {len(completed_tasks)}")
-        lines.append(f"Failed: {sum(1 for t in self.tasks.values() if t.status == TaskStatus.FAILED)}")
+        lines.append(
+            f"Failed: {sum(1 for t in self.tasks.values() if t.status == TaskStatus.FAILED)}"
+        )
         lines.append("")
 
         # Individual results

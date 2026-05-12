@@ -196,9 +196,14 @@ class ToolHealthChecker:
         """
         # File operation tools
         file_tools = [
-            "read_file", "write_file", "edit_file",
-            "list_dir", "search_files", "search_content",
-            "list_locks", "force_write",
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_dir",
+            "search_files",
+            "search_content",
+            "list_locks",
+            "force_write",
         ]
 
         # Bash/command tools
@@ -212,8 +217,10 @@ class ToolHealthChecker:
 
         # Parallel execution tools
         parallel_tools = [
-            "plan_parallel", "execute_parallel",
-            "parallel_status", "aggregate_results",
+            "plan_parallel",
+            "execute_parallel",
+            "parallel_status",
+            "aggregate_results",
         ]
 
         if tool_name in file_tools:
@@ -362,6 +369,7 @@ class ToolHealthChecker:
         if tool_name in ["web_fetch", "weather"]:
             try:
                 import requests
+
                 # Quick connectivity test to a reliable endpoint
                 test_url = "https://www.baidu.com"
                 resp = await asyncio.to_thread(
@@ -391,6 +399,7 @@ class ToolHealthChecker:
             # Check ddgs library availability
             try:
                 from ddgs import DDGS  # noqa: F401
+
                 details["ddgs_available"] = True
 
                 if network_ok:
@@ -433,10 +442,12 @@ class ToolHealthChecker:
 
         try:
             from mini_claude.agent.subagent import subagent_manager  # noqa: F401
+
             details["subagent_manager"] = True
 
             # Check LLM provider (needed for sub-agents)
             from mini_claude.llm.provider import LLMProvider  # noqa: F401
+
             details["llm_provider"] = True
 
             status = ToolHealthStatus.HEALTHY
@@ -470,6 +481,7 @@ class ToolHealthChecker:
 
         try:
             from mini_claude.utils.file_lock import file_lock_manager  # noqa: F401
+
             details["file_lock_manager"] = True
             status = ToolHealthStatus.HEALTHY
             message = "Parallel execution capability available"
@@ -504,6 +516,7 @@ class ToolHealthChecker:
         # Get tool list
         if tool_names is None:
             from mini_claude.tools import tool_registry
+
             tool_names = tool_registry.list_tools()
 
         if not tool_names:
@@ -596,6 +609,7 @@ def get_tool_health_checker() -> ToolHealthChecker:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._tool_health_checker.is_initialized():
                 _tool_health_checker = ctx.tool_health_checker
@@ -614,6 +628,7 @@ def reset_tool_health_checker() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._tool_health_checker.reset()
     except ImportError:

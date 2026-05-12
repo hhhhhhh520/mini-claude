@@ -165,7 +165,9 @@ class ApplicationContext:
         # Session and state
         self._session_manager: Lazy["SessionManager"] = Lazy(create_session_manager)
         self._token_counter: Lazy["TokenCounter"] = Lazy(create_token_counter)
-        self._enhanced_memory_manager: Lazy["EnhancedMemoryManager"] = Lazy(create_enhanced_memory_manager)
+        self._enhanced_memory_manager: Lazy["EnhancedMemoryManager"] = Lazy(
+            create_enhanced_memory_manager
+        )
 
         # Tools
         self._tool_cache: Lazy["ToolCache"] = Lazy(create_tool_cache)
@@ -183,7 +185,9 @@ class ApplicationContext:
         # Logging
         self._output_sanitizer: Lazy["OutputSanitizer"] = Lazy(create_output_sanitizer)
         self._audit_logger: Lazy["AuditLogger"] = Lazy(create_audit_logger)
-        self._execution_log_exporter: Lazy["ExecutionLogExporter"] = Lazy(create_execution_log_exporter)
+        self._execution_log_exporter: Lazy["ExecutionLogExporter"] = Lazy(
+            create_execution_log_exporter
+        )
 
         # CLI
         self._command_registry: Lazy["CommandRegistry"] = Lazy(create_command_registry)

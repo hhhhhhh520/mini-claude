@@ -34,6 +34,7 @@ logger = get_logger(__name__)
 
 class ChaosType(str, Enum):
     """Types of chaos that can be injected."""
+
     NETWORK_TIMEOUT = "network_timeout"
     NETWORK_DISCONNECT = "network_disconnect"
     NETWORK_SLOW = "network_slow"
@@ -48,6 +49,7 @@ class ChaosType(str, Enum):
 @dataclass
 class ChaosScenario:
     """A single chaos scenario configuration."""
+
     name: str
     chaos_type: ChaosType
     duration: float = 1.0  # seconds
@@ -59,6 +61,7 @@ class ChaosScenario:
 @dataclass
 class ChaosResult:
     """Result of a chaos test execution."""
+
     scenario: ChaosScenario
     success: bool
     error_handled: bool
@@ -146,22 +149,19 @@ class NetworkChaosInjector(ChaosInjector):
 
         # Mock all HTTP requests to timeout
         self._respx_mock = respx.mock()
-        self._respx_mock.route(
-            url__regex=r".*"
-        ).mock(side_effect=timeout_callback)
+        self._respx_mock.route(url__regex=r".*").mock(side_effect=timeout_callback)
         self._respx_mock.start()
 
         logger.info("Network timeout chaos injected", timeout=timeout_seconds)
 
     def _inject_disconnect(self) -> None:
         """Inject network disconnection."""
+
         def disconnect_callback(request):
             raise ConnectError("Connection refused", request=request)
 
         self._respx_mock = respx.mock()
-        self._respx_mock.route(
-            url__regex=r".*"
-        ).mock(side_effect=disconnect_callback)
+        self._respx_mock.route(url__regex=r".*").mock(side_effect=disconnect_callback)
         self._respx_mock.start()
 
         logger.info("Network disconnect chaos injected")
@@ -175,9 +175,7 @@ class NetworkChaosInjector(ChaosInjector):
             return Response(200, json={"message": "delayed response"})
 
         self._respx_mock = respx.mock()
-        self._respx_mock.route(
-            url__regex=r".*"
-        ).mock(side_effect=slow_callback)
+        self._respx_mock.route(url__regex=r".*").mock(side_effect=slow_callback)
         self._respx_mock.start()
 
         logger.info("Network slow chaos injected", delay=delay_seconds)
@@ -239,16 +237,14 @@ class APIChaosInjector(ChaosInjector):
                         "error": "rate_limit_exceeded",
                         "message": "Too many requests",
                         "retry_after": retry_after,
-                    }
+                    },
                 )
             else:
                 # After failures, allow success
                 return Response(200, json={"choices": [{"message": {"content": "success"}}]})
 
         self._respx_mock = respx.mock()
-        self._respx_mock.route(
-            url__regex=r".*"
-        ).mock(side_effect=rate_limit_callback)
+        self._respx_mock.route(url__regex=r".*").mock(side_effect=rate_limit_callback)
         self._respx_mock.start()
 
         logger.info("API rate limit chaos injected", retry_after=retry_after)
@@ -270,21 +266,20 @@ class APIChaosInjector(ChaosInjector):
                             "type": "server_error",
                             "code": error_code,
                         }
-                    }
+                    },
                 )
             else:
                 return Response(200, json={"choices": [{"message": {"content": "success"}}]})
 
         self._respx_mock = respx.mock()
-        self._respx_mock.route(
-            url__regex=r".*"
-        ).mock(side_effect=error_callback)
+        self._respx_mock.route(url__regex=r".*").mock(side_effect=error_callback)
         self._respx_mock.start()
 
         logger.info("API error chaos injected", error_code=error_code)
 
     def _inject_unavailable(self) -> None:
         """Inject service unavailability (503)."""
+
         def unavailable_callback(request):
             return Response(
                 503,
@@ -293,13 +288,11 @@ class APIChaosInjector(ChaosInjector):
                         "message": "Service temporarily unavailable",
                         "type": "service_unavailable",
                     }
-                }
+                },
             )
 
         self._respx_mock = respx.mock()
-        self._respx_mock.route(
-            url__regex=r".*"
-        ).mock(side_effect=unavailable_callback)
+        self._respx_mock.route(url__regex=r".*").mock(side_effect=unavailable_callback)
         self._respx_mock.start()
 
         logger.info("API unavailable chaos injected")
@@ -374,13 +367,15 @@ class ResourceChaosInjector(ChaosInjector):
         def mock_disk_usage(path):
             # Return a named tuple with very little free space
             total = 1000000000  # 1GB
-            used = 999900000    # Almost full
-            free = 100000       # 100KB free
+            used = 999900000  # Almost full
+            free = 100000  # 100KB free
             return shutil._ntuple_diskusage(total, used, free)
 
         shutil.disk_usage = mock_disk_usage
 
-        self.add_cleanup(lambda: setattr(shutil, "disk_usage", self._original_functions["shutil_disk_usage"]))
+        self.add_cleanup(
+            lambda: setattr(shutil, "disk_usage", self._original_functions["shutil_disk_usage"])
+        )
 
         logger.info("Disk chaos injected")
 
@@ -669,7 +664,10 @@ class ChaosTest:
         """Check if system recovered after degradation."""
         # Check if model reset to primary
         self.degradation_manager.model.reset()
-        return self.degradation_manager.model.get_current_model() == self.degradation_manager.model.primary
+        return (
+            self.degradation_manager.model.get_current_model()
+            == self.degradation_manager.model.primary
+        )
 
 
 @contextmanager

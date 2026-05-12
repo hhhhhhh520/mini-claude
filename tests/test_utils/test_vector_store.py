@@ -453,12 +453,8 @@ class TestVectorStoreErrors:
     def test_unsupported_db_type_missing_dependency(self):
         """Test that missing dependency raises friendly error."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch(
-                "mini_claude.utils.vector_store.CHROMA_AVAILABLE", False
-            ):
-                with patch(
-                    "mini_claude.utils.vector_store.FAISS_AVAILABLE", False
-                ):
+            with patch("mini_claude.utils.vector_store.CHROMA_AVAILABLE", False):
+                with patch("mini_claude.utils.vector_store.FAISS_AVAILABLE", False):
                     with pytest.raises(DependencyNotFoundError):
                         VectorStore(db_type="chroma", path=tmpdir)
 

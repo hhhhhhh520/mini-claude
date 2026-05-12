@@ -14,19 +14,23 @@ from mini_claude.agent.state import create_initial_state
 
 # Expected subagent allowed tools (from agent_spawn.py and parallel.py)
 EXPECTED_SUBAGENT_ALLOWED_TOOLS = [
-    "read_file", "write_file", "edit_file",
-    "list_dir", "search_files", "search_content",
-    "web_search"
+    "read_file",
+    "write_file",
+    "edit_file",
+    "list_dir",
+    "search_files",
+    "search_content",
+    "web_search",
 ]
 
 # Tools that must NOT be available to subagents
 FORBIDDEN_TOOLS = [
-    "run_command",      # Command execution - security risk
-    "run_background",   # Background command execution
-    "spawn_agent",      # Prevent recursive agent spawning
-    "spawn_parallel",   # Prevent parallel spawning
-    "plan_parallel",    # Prevent planning parallel execution
-    "execute_parallel", # Prevent executing parallel tasks
+    "run_command",  # Command execution - security risk
+    "run_background",  # Background command execution
+    "spawn_agent",  # Prevent recursive agent spawning
+    "spawn_parallel",  # Prevent parallel spawning
+    "plan_parallel",  # Prevent planning parallel execution
+    "execute_parallel",  # Prevent executing parallel tasks
 ]
 
 
@@ -37,32 +41,36 @@ class TestSubagentWhitelistConfiguration:
         """Verify that run_command is NOT in the subagent whitelist."""
         # The whitelist is hardcoded in SpawnAgentTool.execute()
         # We check the expected list defined at module level
-        assert "run_command" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+        assert "run_command" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
             "CRITICAL: run_command must NOT be in subagent whitelist"
+        )
 
     def test_spawn_agent_tool_whitelist_excludes_spawn_agent(self):
         """Verify that spawn_agent is NOT in the subagent whitelist to prevent recursion."""
-        assert "spawn_agent" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+        assert "spawn_agent" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
             "CRITICAL: spawn_agent must NOT be in subagent whitelist to prevent recursion"
+        )
 
     def test_spawn_agent_tool_whitelist_excludes_spawn_parallel(self):
         """Verify that spawn_parallel is NOT in the subagent whitelist."""
-        assert "spawn_parallel" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+        assert "spawn_parallel" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
             "CRITICAL: spawn_parallel must NOT be in subagent whitelist"
+        )
 
     def test_spawn_agent_tool_whitelist_has_required_tools(self):
         """Verify that essential safe tools ARE in the whitelist."""
         required_tools = ["read_file", "write_file", "edit_file", "web_search"]
         for tool in required_tools:
-            assert tool in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+            assert tool in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
                 f"Required tool {tool} must be in subagent whitelist"
+            )
 
     def test_whitelist_is_explicit_not_wildcard(self):
         """Verify whitelist is explicit (not '*' or 'all')."""
-        assert EXPECTED_SUBAGENT_ALLOWED_TOOLS != ["*"], \
-            "Whitelist must be explicit, not wildcard"
-        assert EXPECTED_SUBAGENT_ALLOWED_TOOLS != "all", \
+        assert EXPECTED_SUBAGENT_ALLOWED_TOOLS != ["*"], "Whitelist must be explicit, not wildcard"
+        assert EXPECTED_SUBAGENT_ALLOWED_TOOLS != "all", (
             "Whitelist must be explicit list of tool names"
+        )
 
 
 class TestSubagentStateCreation:
@@ -71,9 +79,7 @@ class TestSubagentStateCreation:
     def test_create_initial_state_with_allowed_tools(self):
         """Test creating state with explicit allowed_tools list."""
         state = create_initial_state(
-            user_input="Test task",
-            is_subagent=True,
-            allowed_tools=EXPECTED_SUBAGENT_ALLOWED_TOOLS
+            user_input="Test task", is_subagent=True, allowed_tools=EXPECTED_SUBAGENT_ALLOWED_TOOLS
         )
 
         assert state["is_subagent"] is True
@@ -81,24 +87,18 @@ class TestSubagentStateCreation:
 
     def test_create_initial_state_default_allowed_tools_is_none(self):
         """Test that default state has allowed_tools=None (all tools)."""
-        state = create_initial_state(
-            user_input="Test task",
-            is_subagent=False
-        )
+        state = create_initial_state(user_input="Test task", is_subagent=False)
 
         assert state["is_subagent"] is False
         assert state["allowed_tools"] is None
 
     def test_subagent_state_has_limited_tools(self):
         """Test that subagent state has limited tools vs main agent."""
-        main_state = create_initial_state(
-            user_input="Main task",
-            is_subagent=False
-        )
+        main_state = create_initial_state(user_input="Main task", is_subagent=False)
         subagent_state = create_initial_state(
             user_input="Subagent task",
             is_subagent=True,
-            allowed_tools=EXPECTED_SUBAGENT_ALLOWED_TOOLS
+            allowed_tools=EXPECTED_SUBAGENT_ALLOWED_TOOLS,
         )
 
         # Main agent has no restrictions (None = all tools)
@@ -177,7 +177,10 @@ class TestSpawnAgentToolIsolation:
     def test_spawn_agent_tool_properties(self):
         """Test SpawnAgentTool has correct properties."""
         assert self.tool.name == "spawn_agent"
-        assert "sub-agent" in self.tool.description.lower() or "parallel" in self.tool.description.lower()
+        assert (
+            "sub-agent" in self.tool.description.lower()
+            or "parallel" in self.tool.description.lower()
+        )
 
     def test_extract_subagent_result_exists(self):
         """Test that _extract_subagent_result method exists."""
@@ -198,9 +201,13 @@ class TestSpawnParallelToolIsolation:
         """Verify SpawnParallelTool also excludes run_command from whitelist."""
         # The whitelist in parallel.py should match agent_spawn.py
         parallel_allowed_tools = [
-            "read_file", "write_file", "edit_file",
-            "list_dir", "search_files", "search_content",
-            "web_search"
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_dir",
+            "search_files",
+            "search_content",
+            "web_search",
         ]
 
         assert "run_command" not in parallel_allowed_tools
@@ -213,21 +220,24 @@ class TestRecursionPrevention:
     def test_subagent_cannot_spawn_agent(self):
         """Verify spawn_agent is not in subagent whitelist."""
         # This prevents infinite recursion of subagent spawning
-        assert "spawn_agent" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+        assert "spawn_agent" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
             "Subagents must not be able to spawn more subagents"
+        )
 
     def test_subagent_cannot_spawn_parallel(self):
         """Verify spawn_parallel is not in subagent whitelist."""
-        assert "spawn_parallel" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+        assert "spawn_parallel" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
             "Subagents must not be able to spawn parallel agents"
+        )
 
     def test_all_spawning_tools_blocked(self):
         """Verify all agent-spawning tools are blocked."""
         spawning_tools = ["spawn_agent", "spawn_parallel", "plan_parallel", "execute_parallel"]
 
         for tool in spawning_tools:
-            assert tool not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+            assert tool not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
                 f"{tool} must be blocked to prevent subagent recursion"
+            )
 
 
 class TestSubagentModeFunctions:
@@ -272,24 +282,27 @@ class TestSecurityBoundary:
         dangerous_tools = ["run_command", "run_background"]
 
         for tool in dangerous_tools:
-            assert tool not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+            assert tool not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
                 f"SECURITY RISK: {tool} is available to subagents"
+            )
 
     def test_file_operations_allowed_in_subagent(self):
         """Test that file operations are allowed for subagents."""
         safe_tools = ["read_file", "write_file", "edit_file", "list_dir"]
 
         for tool in safe_tools:
-            assert tool in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+            assert tool in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
                 f"{tool} should be available to subagents"
+            )
 
     def test_web_tools_allowed_in_subagent(self):
         """Test that web tools are allowed for subagents."""
         web_tools = ["web_search"]
 
         for tool in web_tools:
-            assert tool in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+            assert tool in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
                 f"{tool} should be available to subagents"
+            )
 
     def test_subagent_has_limited_but_sufficient_tools(self):
         """Test that subagent has enough tools to do useful work."""
@@ -302,8 +315,7 @@ class TestSecurityBoundary:
 
         for category, tools in required_categories.items():
             has_tool = any(t in EXPECTED_SUBAGENT_ALLOWED_TOOLS for t in tools)
-            assert has_tool, \
-                f"Subagent lacks tools for {category} operations"
+            assert has_tool, f"Subagent lacks tools for {category} operations"
 
 
 class TestMockedSubagentExecution:
@@ -319,7 +331,7 @@ class TestMockedSubagentExecution:
             user_input="Test subagent task",
             thread_id="test_subagent_001",
             is_subagent=True,
-            allowed_tools=EXPECTED_SUBAGENT_ALLOWED_TOOLS
+            allowed_tools=EXPECTED_SUBAGENT_ALLOWED_TOOLS,
         )
 
         # Verify state is correctly configured
@@ -370,25 +382,35 @@ class TestWhitelistConsistency:
         # This test documents the expected whitelist
         # If agent_spawn.py changes, this test will fail
         agent_spawn_whitelist = [
-            "read_file", "write_file", "edit_file",
-            "list_dir", "search_files", "search_content",
-            "web_search"
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_dir",
+            "search_files",
+            "search_content",
+            "web_search",
         ]
 
-        assert agent_spawn_whitelist == EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+        assert agent_spawn_whitelist == EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
             "agent_spawn.py whitelist must match expected tools"
+        )
 
     def test_parallel_whitelist_matches_agent_spawn(self):
         """Verify parallel.py whitelist matches agent_spawn.py."""
         # Both files should have identical whitelists
         parallel_whitelist = [
-            "read_file", "write_file", "edit_file",
-            "list_dir", "search_files", "search_content",
-            "web_search"
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_dir",
+            "search_files",
+            "search_content",
+            "web_search",
         ]
 
-        assert parallel_whitelist == EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+        assert parallel_whitelist == EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
             "parallel.py whitelist must match agent_spawn.py whitelist"
+        )
 
 
 class TestSecurityAssertions:
@@ -404,17 +426,19 @@ class TestSecurityAssertions:
     def test_run_command_absolutely_excluded(self):
         """CRITICAL: run_command must NEVER be available to subagents."""
         # This is the most important security test
-        assert "run_command" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+        assert "run_command" not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
             "SECURITY VIOLATION: run_command is available to subagents!"
+        )
 
     def test_no_privilege_escalation_tools(self):
         """CRITICAL: No tools that could allow privilege escalation."""
         escalation_tools = [
-            "run_command",      # Shell command execution
-            "run_background",   # Background command execution
-            "spawn_agent",      # Could spawn agent with more privileges
+            "run_command",  # Shell command execution
+            "run_background",  # Background command execution
+            "spawn_agent",  # Could spawn agent with more privileges
         ]
 
         for tool in escalation_tools:
-            assert tool not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, \
+            assert tool not in EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
                 f"PRIVILEGE ESCALATION RISK: {tool} available to subagents"
+            )

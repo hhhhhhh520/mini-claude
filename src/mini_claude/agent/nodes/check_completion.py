@@ -24,8 +24,7 @@ async def check_completion_node(state: AgentState) -> dict:
     # 这避免了 LLM 在还没告诉用户结果时就判断完成
     recent_messages = messages[-5:]
     has_tool_result = any(
-        isinstance(m, HumanMessage) and hasattr(m, 'name') and m.name
-        for m in recent_messages
+        isinstance(m, HumanMessage) and hasattr(m, "name") and m.name for m in recent_messages
     )
     has_ai_text_reply = any(
         isinstance(m, AIMessage) and m.content and len(m.content.strip()) > 5  # 有实质性回复
@@ -38,10 +37,13 @@ async def check_completion_node(state: AgentState) -> dict:
 
     # 构建检查提示 - 更明确的判断标准
     recent_messages = messages[-10:]
-    messages_text = "\n".join([
-        f"{'用户' if isinstance(m, HumanMessage) else '助手'}: {m.content[:300]}..."
-        for m in recent_messages if m.content
-    ])
+    messages_text = "\n".join(
+        [
+            f"{'用户' if isinstance(m, HumanMessage) else '助手'}: {m.content[:300]}..."
+            for m in recent_messages
+            if m.content
+        ]
+    )
 
     completion_prompt = f"""判断以下任务是否已完成。
 
@@ -69,6 +71,7 @@ async def check_completion_node(state: AgentState) -> dict:
 
     try:
         from ._shared import llm_provider
+
         response = await llm_provider.chat(
             messages=[{"role": "user", "content": completion_prompt}],
             temperature=0,

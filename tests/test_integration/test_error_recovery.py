@@ -136,7 +136,11 @@ class TestSafetyErrorHandling:
             is_valid, reason = validate_path(path, allow_outside=False, require_confirmation=False)
             assert not is_valid
             # 原因可能是 protected 或 outside workspace
-            assert "protected" in reason.lower() or "outside" in reason.lower() or "workspace" in reason.lower()
+            assert (
+                "protected" in reason.lower()
+                or "outside" in reason.lower()
+                or "workspace" in reason.lower()
+            )
 
     def test_new_dangerous_patterns(self):
         """测试新增的危险命令模式"""
@@ -233,6 +237,7 @@ class TestEdgeCases:
 # =============================================================================
 # Extended Error Recovery Tests (SUB-008)
 # =============================================================================
+
 
 class TestExtendedErrorRecovery:
     """扩展的错误恢复测试 - 完整恢复路径"""
@@ -430,7 +435,9 @@ class TestInputValidationErrorRecovery:
 
         # 模拟缺少 path 参数的错误
         state["messages"].append(
-            HumanMessage(content="Error: Tool write_file requires 'path' argument", name="write_file")
+            HumanMessage(
+                content="Error: Tool write_file requires 'path' argument", name="write_file"
+            )
         )
 
         # observe 应该检测到错误

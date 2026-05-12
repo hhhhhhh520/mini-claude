@@ -259,10 +259,7 @@ class HighLatencyRule(AlertRule):
         performance = metrics.get("performance", {})
         avg_duration = performance.get("avg_duration_seconds", 0)
 
-        return (
-            f"High average latency detected: {avg_duration:.2f}s. "
-            f"Threshold: {self.threshold}s"
-        )
+        return f"High average latency detected: {avg_duration:.2f}s. Threshold: {self.threshold}s"
 
 
 class TokenBudgetRule(AlertRule):
@@ -393,8 +390,7 @@ class ToolFailureRule(AlertRule):
 
         tools_str = ", ".join(failing_tools) if failing_tools else "unknown"
         return (
-            f"High tool failure rate detected: {tools_str}. "
-            f"Threshold: {self.threshold * 100:.0f}%"
+            f"High tool failure rate detected: {tools_str}. Threshold: {self.threshold * 100:.0f}%"
         )
 
 
@@ -463,14 +459,16 @@ class ConsoleHandler(AlertHandler):
                 }
                 color = level_colors.get(alert.level, "yellow")
 
-                console.print(Panel(
-                    f"[{color}]{alert.message}[/]\n\n"
-                    f"[dim]Rule: {alert.rule_name} | "
-                    f"ID: {alert.alert_id} | "
-                    f"Time: {alert.timestamp.strftime('%H:%M:%S')}[/]",
-                    title=f"{alert.level.emoji} {alert.level.value.upper()} ALERT",
-                    border_style=color,
-                ))
+                console.print(
+                    Panel(
+                        f"[{color}]{alert.message}[/]\n\n"
+                        f"[dim]Rule: {alert.rule_name} | "
+                        f"ID: {alert.alert_id} | "
+                        f"Time: {alert.timestamp.strftime('%H:%M:%S')}[/]",
+                        title=f"{alert.level.emoji} {alert.level.value.upper()} ALERT",
+                        border_style=color,
+                    )
+                )
             else:
                 print(f"[{alert.level.value.upper()}] {alert.message}")
         except Exception as e:
@@ -512,10 +510,12 @@ class WebhookHandler(AlertHandler):
             import urllib.request
             import urllib.error
 
-            payload = json.dumps({
-                "alert": alert.to_dict(),
-                "timestamp": datetime.now().isoformat(),
-            }).encode("utf-8")
+            payload = json.dumps(
+                {
+                    "alert": alert.to_dict(),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ).encode("utf-8")
 
             req = urllib.request.Request(
                 self.webhook_url,
@@ -747,14 +747,14 @@ class EmailHandler(AlertHandler):
             </div>
             <div style="border: 1px solid #ddd; border-top: none; padding: 20px;">
                 <p><strong>Rule:</strong> {alert.rule_name}</p>
-                <p><strong>Time:</strong> {alert.timestamp.strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p><strong>Time:</strong> {alert.timestamp.strftime("%Y-%m-%d %H:%M:%S")}</p>
                 <p><strong>Alert ID:</strong> <code>{alert.alert_id}</code></p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 15px 0;">
                 <p style="font-size: 16px;">{alert.message}</p>
         """
 
         if alert.threshold is not None:
-            html += f'<p><strong>Threshold:</strong> {alert.threshold}</p>'
+            html += f"<p><strong>Threshold:</strong> {alert.threshold}</p>"
 
         html += """
             </div>
@@ -950,9 +950,7 @@ class NotificationManager:
 
         # Add webhook channel if configured
         if "webhook" in settings.notification_channels and settings.alert_webhook_url:
-            manager.add_channel(
-                WebhookHandler(webhook_url=settings.alert_webhook_url)
-            )
+            manager.add_channel(WebhookHandler(webhook_url=settings.alert_webhook_url))
 
         # Add email channel if configured
         if "email" in settings.notification_channels and settings.smtp_host:
@@ -1250,6 +1248,7 @@ def get_alert_manager() -> AlertManager:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._alert_manager.is_initialized():
                 _alert_manager = ctx.alert_manager
@@ -1267,15 +1266,9 @@ def _create_alert_manager() -> AlertManager:
 
     # Add built-in rules based on settings
     if settings.alert_enabled:
-        manager.add_rule(
-            HighFailureRateRule(threshold=settings.alert_failure_rate_threshold)
-        )
-        manager.add_rule(
-            HighLatencyRule(threshold=settings.alert_latency_threshold_seconds)
-        )
-        manager.add_rule(
-            TokenBudgetRule(threshold=settings.alert_token_budget_threshold)
-        )
+        manager.add_rule(HighFailureRateRule(threshold=settings.alert_failure_rate_threshold))
+        manager.add_rule(HighLatencyRule(threshold=settings.alert_latency_threshold_seconds))
+        manager.add_rule(TokenBudgetRule(threshold=settings.alert_token_budget_threshold))
         manager.add_rule(ToolFailureRule())
 
         # Add default handlers
@@ -1283,9 +1276,7 @@ def _create_alert_manager() -> AlertManager:
 
         # Add webhook handler if configured
         if settings.alert_webhook_url:
-            manager.add_handler(
-                WebhookHandler(webhook_url=settings.alert_webhook_url)
-            )
+            manager.add_handler(WebhookHandler(webhook_url=settings.alert_webhook_url))
 
     logger.debug("alert_manager_initialized", enabled=settings.alert_enabled)
     return manager
@@ -1301,6 +1292,7 @@ def reset_alert_manager() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._alert_manager.reset()
     except ImportError:

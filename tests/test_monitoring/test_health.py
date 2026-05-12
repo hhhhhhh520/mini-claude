@@ -38,8 +38,11 @@ def mock_tool_registry():
     """Create mock tool registry."""
     registry = MagicMock()
     registry.list_tools.return_value = [
-        "read_file", "write_file", "edit_file",
-        "run_command", "web_search"
+        "read_file",
+        "write_file",
+        "edit_file",
+        "run_command",
+        "web_search",
     ]
     return registry
 
@@ -403,9 +406,7 @@ class TestHealthChecker:
         checker = HealthChecker()
 
         # Mock the LLMProvider import inside the method
-        with patch(
-            "mini_claude.llm.provider.LLMProvider", return_value=mock_llm_provider
-        ):
+        with patch("mini_claude.llm.provider.LLMProvider", return_value=mock_llm_provider):
             health = await checker.check_model_health()
 
         assert health.status == HealthStatus.HEALTHY
@@ -419,9 +420,7 @@ class TestHealthChecker:
         mock_provider = MagicMock()
         mock_provider.chat = AsyncMock(side_effect=Exception("Connection refused"))
 
-        with patch(
-            "mini_claude.llm.provider.LLMProvider", return_value=mock_provider
-        ):
+        with patch("mini_claude.llm.provider.LLMProvider", return_value=mock_provider):
             health = await checker.check_model_health()
 
         assert health.status == HealthStatus.UNHEALTHY
@@ -459,9 +458,7 @@ class TestHealthChecker:
         """Test full health check."""
         checker = HealthChecker()
 
-        with patch(
-            "mini_claude.llm.provider.LLMProvider", return_value=mock_llm_provider
-        ):
+        with patch("mini_claude.llm.provider.LLMProvider", return_value=mock_llm_provider):
             with patch("mini_claude.monitoring.health.tool_registry", mock_tool_registry):
                 report = await checker.check_health()
 
@@ -479,11 +476,10 @@ class TestCheckHealthFunction:
         """Test that check_health returns a health report."""
         # Reset the global checker
         from mini_claude.monitoring import health
+
         health._health_checker = None
 
-        with patch(
-            "mini_claude.llm.provider.LLMProvider", return_value=mock_llm_provider
-        ):
+        with patch("mini_claude.llm.provider.LLMProvider", return_value=mock_llm_provider):
             with patch("mini_claude.monitoring.health.tool_registry", mock_tool_registry):
                 report = await check_health()
 

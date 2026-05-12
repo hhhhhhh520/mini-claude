@@ -39,6 +39,7 @@ from mini_claude.utils.token_manager import get_token_counter, TokenLimitStrateg
 # Shared Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for testing."""
@@ -62,6 +63,7 @@ def session_manager(temp_dir):
 # =============================================================================
 # Complete User Session Flow Tests
 # =============================================================================
+
 
 class TestCompleteUserSessionFlow:
     """Tests for complete user session from input to output."""
@@ -119,6 +121,7 @@ class TestCompleteUserSessionFlow:
 # Multi-turn Dialogue Tests
 # =============================================================================
 
+
 class TestMultiTurnDialogue:
     """Tests for multi-turn conversations."""
 
@@ -134,10 +137,12 @@ class TestMultiTurnDialogue:
 
         # Second turn - add to existing conversation
         loaded, _ = session_manager.load_session("conv-1")
-        loaded.extend([
-            {"role": "user", "content": "How do I install it?"},
-            {"role": "assistant", "content": "Use pip install fastapi."},
-        ])
+        loaded.extend(
+            [
+                {"role": "user", "content": "How do I install it?"},
+                {"role": "assistant", "content": "Use pip install fastapi."},
+            ]
+        )
         session_manager.save_session("conv-1", loaded)
 
         # Verify history preserved
@@ -165,10 +170,7 @@ class TestMultiTurnDialogue:
         token_counter.strategy = TokenLimitStrategy.TRUNCATE
 
         # Convert to LiteLLM format
-        litellm_messages = [
-            {"role": m["role"], "content": m["content"]}
-            for m in loaded
-        ]
+        litellm_messages = [{"role": m["role"], "content": m["content"]} for m in loaded]
 
         # Truncate with small budget
         truncated = token_counter.truncate_messages(
@@ -205,6 +207,7 @@ class TestMultiTurnDialogue:
 # Tool Call Chain Tests
 # =============================================================================
 
+
 class TestToolCallChains:
     """Tests for tool execution chains."""
 
@@ -218,18 +221,24 @@ class TestToolCallChains:
 
         # Create state with tool results
         state = create_initial_state("Read and analyze files")
-        state["messages"].extend([
-            AIMessage(content="", tool_calls=[
-                {"id": "tc1", "name": "read_file", "args": {"path": file1}},
-                {"id": "tc2", "name": "read_file", "args": {"path": file2}},
-            ]),
-            HumanMessage(content="Tool read_file result: content1", name="read_file"),
-            HumanMessage(content="Tool read_file result: content2", name="read_file"),
-        ])
+        state["messages"].extend(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {"id": "tc1", "name": "read_file", "args": {"path": file1}},
+                        {"id": "tc2", "name": "read_file", "args": {"path": file2}},
+                    ],
+                ),
+                HumanMessage(content="Tool read_file result: content1", name="read_file"),
+                HumanMessage(content="Tool read_file result: content2", name="read_file"),
+            ]
+        )
 
         # Verify tool results are recorded
         tool_results = [
-            m for m in state["messages"]
+            m
+            for m in state["messages"]
             if isinstance(m, HumanMessage) and hasattr(m, "name") and m.name
         ]
         assert len(tool_results) == 2
@@ -274,6 +283,7 @@ class TestToolCallChains:
 # =============================================================================
 # Session Persistence and Recovery Tests
 # =============================================================================
+
 
 class TestSessionPersistenceAndRecovery:
     """Tests for session save/load and recovery."""
@@ -367,6 +377,7 @@ class TestSessionPersistenceAndRecovery:
 # Token Budget Management Tests
 # =============================================================================
 
+
 class TestTokenBudgetManagement:
     """Tests for token budget tracking and management."""
 
@@ -440,11 +451,13 @@ class TestTokenBudgetManagement:
         # Mock LLM for summary
         async def mock_llm(messages, **kwargs):
             return {
-                "choices": [{
-                    "message": {
-                        "content": "[Summary] User asked two questions.",
+                "choices": [
+                    {
+                        "message": {
+                            "content": "[Summary] User asked two questions.",
+                        }
                     }
-                }]
+                ]
             }
 
         # Summarize
@@ -465,6 +478,7 @@ class TestTokenBudgetManagement:
 # =============================================================================
 # Concurrent Sub-Agent Tests
 # =============================================================================
+
 
 class TestConcurrentSubAgents:
     """Tests for concurrent sub-agent execution."""
@@ -540,15 +554,11 @@ class TestConcurrentSubAgents:
         test_file = os.path.join(temp_dir, "shared.txt")
 
         # Acquire lock from agent 1
-        success1, msg1 = await file_lock_manager.acquire_lock(
-            test_file, "agent_1", "write"
-        )
+        success1, msg1 = await file_lock_manager.acquire_lock(test_file, "agent_1", "write")
         assert success1
 
         # Agent 2 should fail to acquire write lock
-        success2, msg2 = await file_lock_manager.acquire_lock(
-            test_file, "agent_2", "write"
-        )
+        success2, msg2 = await file_lock_manager.acquire_lock(test_file, "agent_2", "write")
         assert not success2
         assert "locked" in msg2.lower()
 
@@ -556,9 +566,7 @@ class TestConcurrentSubAgents:
         await file_lock_manager.release_lock(test_file, "agent_1")
 
         # Now agent 2 can acquire
-        success3, msg3 = await file_lock_manager.acquire_lock(
-            test_file, "agent_2", "write"
-        )
+        success3, msg3 = await file_lock_manager.acquire_lock(test_file, "agent_2", "write")
         assert success3
 
         # Cleanup
@@ -568,6 +576,7 @@ class TestConcurrentSubAgents:
 # =============================================================================
 # E2E Tests (Real API)
 # =============================================================================
+
 
 class TestE2ERealAPI:
     """End-to-end tests with real API calls."""
@@ -623,7 +632,11 @@ class TestE2ERealAPI:
 
             # Check stop reason
             stop_reason = result.get("stop_reason")
-            assert stop_reason in [StopReason.TASK_COMPLETE, StopReason.CONTINUE, StopReason.MAX_ITERATIONS]
+            assert stop_reason in [
+                StopReason.TASK_COMPLETE,
+                StopReason.CONTINUE,
+                StopReason.MAX_ITERATIONS,
+            ]
 
         except Exception as e:
             # Real API calls may fail for various reasons

@@ -26,16 +26,14 @@ class TestTokenCounterSummary:
         """Test message token counting."""
         messages = [
             {"role": "user", "content": "你好"},
-            {"role": "assistant", "content": "你好！有什么可以帮助你的吗？"}
+            {"role": "assistant", "content": "你好！有什么可以帮助你的吗？"},
         ]
         total = token_counter.count_messages_tokens(messages)
         assert total > 0
 
     def test_get_usage_stats(self, token_counter):
         """Test usage stats."""
-        messages = [
-            {"role": "user", "content": "测试消息" * 100}
-        ]
+        messages = [{"role": "user", "content": "测试消息" * 100}]
         stats = token_counter.get_usage_stats(messages)
         assert "current_tokens" in stats
         assert "token_budget" in stats
@@ -50,11 +48,8 @@ class TestTokenCounterSummary:
 
     def test_truncate_messages(self, token_counter):
         """Test message truncation."""
-        messages = [
-            {"role": "system", "content": "系统提示"}
-        ] + [
-            {"role": "user", "content": f"消息 {i}"}
-            for i in range(30)
+        messages = [{"role": "system", "content": "系统提示"}] + [
+            {"role": "user", "content": f"消息 {i}"} for i in range(30)
         ]
 
         truncated = token_counter.truncate_messages(messages, keep_first=1, keep_last=4)
@@ -91,19 +86,19 @@ class TestTokenCounterSummary:
     @pytest.mark.asyncio
     async def test_summarize_messages_with_enough_messages(self, token_counter):
         """Test summarization with enough messages."""
-        messages = [
-            {"role": "system", "content": "系统提示"},
-        ] + [
-            {"role": "user", "content": f"问题 {i} " * 50}
-            for i in range(10)
-        ] + [
-            {"role": "assistant", "content": f"回答 {i} " * 50}
-            for i in range(10)
-        ]
+        messages = (
+            [
+                {"role": "system", "content": "系统提示"},
+            ]
+            + [{"role": "user", "content": f"问题 {i} " * 50} for i in range(10)]
+            + [{"role": "assistant", "content": f"回答 {i} " * 50} for i in range(10)]
+        )
 
         # Mock LLM chat function
         async def mock_llm_chat(messages, **kwargs):
-            return {"choices": [{"message": {"content": "用户询问了多个问题，助手提供了相应回答。"}}]}
+            return {
+                "choices": [{"message": {"content": "用户询问了多个问题，助手提供了相应回答。"}}]
+            }
 
         compressed, summary = await token_counter.summarize_messages(
             messages,
@@ -130,10 +125,7 @@ class TestSessionMemory:
 
     def test_session_memory_with_summary(self):
         """Test SessionMemory with summary."""
-        memory = SessionMemory(
-            thread_id="test-123",
-            summary="这是一个测试摘要"
-        )
+        memory = SessionMemory(thread_id="test-123", summary="这是一个测试摘要")
         assert memory.summary == "这是一个测试摘要"
 
     def test_add_message(self):
@@ -156,10 +148,7 @@ class TestSessionMemory:
 
     def test_to_system_message(self):
         """Test converting summary to system message."""
-        memory = SessionMemory(
-            thread_id="test-123",
-            summary="这是历史对话摘要"
-        )
+        memory = SessionMemory(thread_id="test-123", summary="这是历史对话摘要")
 
         sys_msg = memory.to_system_message()
         assert sys_msg is not None
@@ -175,10 +164,7 @@ class TestSessionMemory:
 
     def test_get_context_messages(self):
         """Test getting context messages with summary."""
-        memory = SessionMemory(
-            thread_id="test-123",
-            summary="历史摘要"
-        )
+        memory = SessionMemory(thread_id="test-123", summary="历史摘要")
         memory.add_message("user", "新问题")
 
         context = memory.get_context_messages()
@@ -197,11 +183,7 @@ class TestSessionMemory:
 
     def test_to_dict(self):
         """Test converting to dictionary."""
-        memory = SessionMemory(
-            thread_id="test-123",
-            summary="摘要",
-            total_tokens=100
-        )
+        memory = SessionMemory(thread_id="test-123", summary="摘要", total_tokens=100)
         data = memory.to_dict()
         assert data["thread_id"] == "test-123"
         assert data["summary"] == "摘要"
@@ -226,10 +208,7 @@ class TestSessionManager:
 
     def test_save_and_load_session(self, session_manager):
         """Test saving and loading a session."""
-        messages = [
-            {"role": "user", "content": "你好"},
-            {"role": "assistant", "content": "你好！"}
-        ]
+        messages = [{"role": "user", "content": "你好"}, {"role": "assistant", "content": "你好！"}]
 
         session_manager.save_session("test-1", messages)
         loaded, summary = session_manager.load_session("test-1")
@@ -301,12 +280,7 @@ class TestSessionManager:
         messages = [{"role": "user", "content": "测试"}]
         summary = "摘要"
 
-        session_manager.save_session(
-            "full-test",
-            messages,
-            summary=summary,
-            token_count=50
-        )
+        session_manager.save_session("full-test", messages, summary=summary, token_count=50)
 
         full = session_manager.load_session_full("full-test")
         assert full["id"] == "full-test"
@@ -335,10 +309,7 @@ class TestIntegration:
     def test_full_summary_workflow(self, session_manager):
         """Test the full summary workflow."""
         # 1. Create messages
-        messages = [
-            {"role": "user", "content": f"问题 {i}"}
-            for i in range(25)
-        ]
+        messages = [{"role": "user", "content": f"问题 {i}"} for i in range(25)]
 
         # 2. Save with summary
         summary = "用户提出了多个问题"

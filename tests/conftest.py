@@ -21,22 +21,18 @@ import pytest
 # Pytest Markers
 # =============================================================================
 
+
 def pytest_configure(config):
     """Register custom pytest markers."""
-    config.addinivalue_line(
-        "markers", "unit: Unit tests (fast, no external dependencies)"
-    )
-    config.addinivalue_line(
-        "markers", "integration: Integration tests (mocked external services)"
-    )
-    config.addinivalue_line(
-        "markers", "e2e: End-to-end tests (real API calls, requires API key)"
-    )
+    config.addinivalue_line("markers", "unit: Unit tests (fast, no external dependencies)")
+    config.addinivalue_line("markers", "integration: Integration tests (mocked external services)")
+    config.addinivalue_line("markers", "e2e: End-to-end tests (real API calls, requires API key)")
 
 
 # =============================================================================
 # E2ETestRunner
 # =============================================================================
+
 
 class E2ETestRunner:
     """Runner for end-to-end tests with real API support.
@@ -167,6 +163,7 @@ def get_e2e_runner(use_real_api: bool = False) -> E2ETestRunner:
 # Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for testing.
@@ -215,6 +212,7 @@ def mock_llm_provider():
 def real_session_manager(temp_dir):
     """Create a real SessionManager with temporary database for integration tests."""
     from mini_claude.utils.session import SessionManager
+
     db_path = os.path.join(temp_dir, "test_sessions.db")
     return SessionManager(db_path)
 
@@ -266,6 +264,7 @@ def sample_user_input():
 # ApplicationContext Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def app_context():
     """Create a fresh ApplicationContext for testing.
@@ -296,6 +295,7 @@ def isolated_app_context():
 def mock_metrics_collector():
     """Create a mock MetricsCollector for testing."""
     from mini_claude.monitoring.metrics import MetricsCollector
+
     mock = MagicMock(spec=MetricsCollector)
     mock.record_request_start.return_value = 0.0
     mock.record_request_end.return_value = None
@@ -310,6 +310,7 @@ def mock_metrics_collector():
 def mock_alert_manager():
     """Create a mock AlertManager for testing."""
     from mini_claude.monitoring.alerts import AlertManager
+
     mock = MagicMock(spec=AlertManager)
     mock.add_rule.return_value = None
     mock.add_handler.return_value = None
@@ -321,6 +322,7 @@ def mock_alert_manager():
 def mock_token_counter():
     """Create a mock TokenCounter for testing."""
     from mini_claude.utils.token_manager import TokenCounter
+
     mock = MagicMock(spec=TokenCounter)
     mock.count_tokens.return_value = 100
     mock.count_messages_tokens.return_value = 200
@@ -332,6 +334,7 @@ def mock_token_counter():
 def mock_session_manager():
     """Create a mock SessionManager for testing."""
     from mini_claude.utils.session import SessionManager
+
     mock = MagicMock(spec=SessionManager)
     mock.create_session.return_value = "test-session-id"
     mock.get_session.return_value = None
@@ -344,6 +347,7 @@ def mock_session_manager():
 def mock_rate_limiter():
     """Create a mock RateLimiter for testing."""
     from mini_claude.utils.safety import RateLimiter
+
     mock = MagicMock(spec=RateLimiter)
     mock.acquire.return_value = True
     mock.release.return_value = None
@@ -359,6 +363,7 @@ def context_with_mocked_metrics(mock_metrics_collector):
     yield ctx
 
     from mini_claude.context import reset_context
+
     reset_context()
 
 
@@ -366,20 +371,25 @@ def context_with_mocked_metrics(mock_metrics_collector):
 # Skip decorators
 # =============================================================================
 
+
 def skip_if_no_api(func):
     """Decorator to skip test if no API key available."""
+
     def wrapper(*args, **kwargs):
         runner = get_e2e_runner(use_real_api=True)
         if runner.should_skip():
             pytest.skip(runner.get_skip_reason())
         return func(*args, **kwargs)
+
     return wrapper
 
 
 def skip_if_windows(func):
     """Decorator to skip test on Windows."""
+
     def wrapper(*args, **kwargs):
         if os.name == "nt":
             pytest.skip("Test not supported on Windows")
         return func(*args, **kwargs)
+
     return wrapper

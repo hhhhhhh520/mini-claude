@@ -4,7 +4,14 @@ Provides a centralized container for all singleton instances,
 enabling dependency injection and testability.
 """
 
-from .context import ApplicationContext, get_context, reset_context, init_context, isolated_context, Lazy
+from .context import (
+    ApplicationContext,
+    get_context,
+    reset_context,
+    init_context,
+    isolated_context,
+    Lazy,
+)
 from .providers import (
     ProviderFactory,
     create_metrics_collector,

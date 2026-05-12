@@ -15,12 +15,14 @@ from dataclasses import dataclass, field, asdict
 # File locking support
 try:
     import fcntl
+
     HAS_FCNTL = True
 except ImportError:
     HAS_FCNTL = False
 
 try:
     import portalocker
+
     HAS_PORTALOCKER = True
 except ImportError:
     HAS_PORTALOCKER = False
@@ -39,6 +41,7 @@ class UserProfile:
         created_at: Profile creation timestamp
         updated_at: Last update timestamp
     """
+
     preferred_model: str = "deepseek-chat"
     preferred_language: str = "zh-CN"
     recent_projects: List[str] = field(default_factory=list)
@@ -129,6 +132,7 @@ class UserProfileManager:
         Returns:
             UserProfile instance
         """
+
         async def _async_load():
             async with self._lock:
                 return self._sync_load()
@@ -187,6 +191,7 @@ class UserProfileManager:
         Returns:
             True if saved successfully, False on error
         """
+
         async def _async_save():
             async with self._lock:
                 return self._sync_save(profile)
@@ -234,8 +239,11 @@ class UserProfileManager:
 
         # Validate key is a valid profile field
         valid_keys = {
-            "preferred_model", "preferred_language",
-            "recent_projects", "common_workflows", "custom_prompts"
+            "preferred_model",
+            "preferred_language",
+            "recent_projects",
+            "common_workflows",
+            "custom_prompts",
         }
         if key not in valid_keys:
             return False
@@ -284,7 +292,7 @@ class UserProfileManager:
 
         # Trim to max size
         if len(profile.recent_projects) > self.MAX_RECENT_PROJECTS:
-            profile.recent_projects = profile.recent_projects[:self.MAX_RECENT_PROJECTS]
+            profile.recent_projects = profile.recent_projects[: self.MAX_RECENT_PROJECTS]
 
         return self.save_profile(profile)
 
@@ -308,7 +316,7 @@ class UserProfileManager:
 
         # Trim to max size
         if len(profile.common_workflows) > self.MAX_COMMON_WORKFLOWS:
-            profile.common_workflows = profile.common_workflows[:self.MAX_COMMON_WORKFLOWS]
+            profile.common_workflows = profile.common_workflows[: self.MAX_COMMON_WORKFLOWS]
 
         return self.save_profile(profile)
 

@@ -143,32 +143,28 @@ class LLMProvider:
 
             # Collect tool calls (streamed incrementally)
             # Use 'index' as key since subsequent chunks have id=None
-            if hasattr(delta, 'tool_calls') and delta.tool_calls:
+            if hasattr(delta, "tool_calls") and delta.tool_calls:
                 for tc in delta.tool_calls:
                     # Get index - this is the stable identifier for streaming tool calls
-                    tc_index = tc.index if hasattr(tc, 'index') and tc.index is not None else 0
+                    tc_index = tc.index if hasattr(tc, "index") and tc.index is not None else 0
 
                     # Initialize or update tool call data
                     if tc_index not in tool_calls_data:
-                        tool_calls_data[tc_index] = {
-                            "id": None,
-                            "name": "",
-                            "arguments": ""
-                        }
+                        tool_calls_data[tc_index] = {"id": None, "name": "", "arguments": ""}
 
                     # Update id if present (first chunk)
-                    if hasattr(tc, 'id') and tc.id:
+                    if hasattr(tc, "id") and tc.id:
                         tool_calls_data[tc_index]["id"] = tc.id
 
                     # Update function name and arguments
-                    if hasattr(tc, 'function') and tc.function:
-                        if hasattr(tc.function, 'name') and tc.function.name:
+                    if hasattr(tc, "function") and tc.function:
+                        if hasattr(tc.function, "name") and tc.function.name:
                             tool_calls_data[tc_index]["name"] = tc.function.name
                             # Announce tool call start
                             if tool_stream_callback:
                                 tool_stream_callback("name", tc.function.name)
 
-                        if hasattr(tc.function, 'arguments') and tc.function.arguments:
+                        if hasattr(tc.function, "arguments") and tc.function.arguments:
                             tool_calls_data[tc_index]["arguments"] += tc.function.arguments
                             # Stream each argument chunk
                             if tool_stream_callback:
@@ -184,11 +180,13 @@ class LLMProvider:
             for index in sorted(tool_calls_data.keys()):
                 tc = tool_calls_data[index]
                 if tc["name"]:  # Only include if we have a function name
-                    final_tool_calls.append({
-                        "id": tc["id"] or f"call_{index}",
-                        "name": tc["name"],
-                        "arguments": tc["arguments"]
-                    })
+                    final_tool_calls.append(
+                        {
+                            "id": tc["id"] or f"call_{index}",
+                            "name": tc["name"],
+                            "arguments": tc["arguments"],
+                        }
+                    )
 
         # Return in same format as non-streaming
         return {
@@ -231,7 +229,7 @@ def convert_tools_to_litellm(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]
                 "name": tool.get("name", ""),
                 "description": tool.get("description", ""),
                 "parameters": tool.get("parameters", {}),
-            }
+            },
         }
         litellm_tools.append(litellm_tool)
 

@@ -33,6 +33,7 @@ class SessionSearchResult:
         timestamp: When the session was created/updated
         session_type: Optional session type metadata
     """
+
     session_id: str
     message_idx: int
     role: str
@@ -290,7 +291,9 @@ class EnhancedMemoryManager:
 
             # Apply time range filter
             if time_range:
-                timestamp_str = result.metadata.get("timestamp") or result.metadata.get("session_updated_at")
+                timestamp_str = result.metadata.get("timestamp") or result.metadata.get(
+                    "session_updated_at"
+                )
                 if timestamp_str:
                     try:
                         timestamp = datetime.fromisoformat(timestamp_str)
@@ -306,15 +309,18 @@ class EnhancedMemoryManager:
                 if result_session_type != session_type:
                     continue
 
-            search_results.append(SessionSearchResult(
-                session_id=session_id,
-                message_idx=message_idx,
-                role=result.metadata.get("role", "unknown"),
-                content=result.text,
-                score=result.score,
-                timestamp=result.metadata.get("timestamp") or result.metadata.get("session_updated_at"),
-                session_type=result.metadata.get("session_type"),
-            ))
+            search_results.append(
+                SessionSearchResult(
+                    session_id=session_id,
+                    message_idx=message_idx,
+                    role=result.metadata.get("role", "unknown"),
+                    content=result.text,
+                    score=result.score,
+                    timestamp=result.metadata.get("timestamp")
+                    or result.metadata.get("session_updated_at"),
+                    session_type=result.metadata.get("session_type"),
+                )
+            )
 
             # Stop when we have enough results
             if len(search_results) >= k:

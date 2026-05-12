@@ -85,10 +85,10 @@ class TestTokenCounter:
                     "id": "call_123",
                     "function": {
                         "name": "write_file",
-                        "arguments": '{"path": "test.py", "content": "print(1)"}'
-                    }
+                        "arguments": '{"path": "test.py", "content": "print(1)"}',
+                    },
                 }
-            ]
+            ],
         }
         tokens = counter.count_message_tokens(message)
         assert tokens > 0
@@ -208,6 +208,7 @@ class TestGlobalFunctions:
     def test_get_token_counter_different_models(self):
         """Test that different models create new counter."""
         import mini_claude.utils.token_manager as tm
+
         tm._token_counter = None  # Reset
 
         counter1 = get_token_counter("deepseek-chat")
@@ -268,7 +269,7 @@ class TestEdgeCases:
             "content": [
                 {"type": "text", "text": "What's in this image?"},
                 {"type": "image", "image_url": "http://example.com/image.png"},
-            ]
+            ],
         }
         tokens = counter.count_message_tokens(message)
         assert tokens > 0
@@ -378,9 +379,7 @@ class TestSummarizeMessages:
         # Mock LLM response
         async def mock_llm_chat(messages, **kwargs):
             return {
-                "choices": [
-                    {"message": {"content": "用户请求创建Python文件并添加函数，已完成。"}}
-                ]
+                "choices": [{"message": {"content": "用户请求创建Python文件并添加函数，已完成。"}}]
             }
 
         summarized, summary_text = await counter.summarize_messages(
@@ -426,9 +425,13 @@ class TestSummarizeMessages:
         messages = [
             {"role": "system", "content": "System"},
             {"role": "user", "content": "Create file"},
-            {"role": "assistant", "content": "", "tool_calls": [
-                {"function": {"name": "write_file", "arguments": '{"path": "test.py"}'}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"function": {"name": "write_file", "arguments": '{"path": "test.py"}'}}
+                ],
+            },
             {"role": "tool", "name": "write_file", "content": "File created"},
             {"role": "user", "content": "Now run it"},
             {"role": "assistant", "content": "Running"},
@@ -520,10 +523,14 @@ class TestSummarizeMessages:
         counter = TokenCounter()
 
         messages = [
-            {"role": "assistant", "content": "", "tool_calls": [
-                {"function": {"name": "write_file"}},
-                {"function": {"name": "read_file"}},
-            ]},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"function": {"name": "write_file"}},
+                    {"function": {"name": "read_file"}},
+                ],
+            },
         ]
 
         formatted = counter._format_messages_for_summary(messages)

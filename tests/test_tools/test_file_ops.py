@@ -27,11 +27,12 @@ def temp_dir():
 @pytest.fixture
 def mock_workspace(temp_dir):
     """Mock the workspace root to the temp directory."""
-    with patch('mini_claude.utils.safety.settings.workspace_root', temp_dir):
+    with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
         yield temp_dir
 
 
 # ========== WriteFileTool Tests (10个) ==========
+
 
 class TestWriteFileTool:
     """测试写入文件工具 - 10个测试用例"""
@@ -121,6 +122,7 @@ class TestWriteFileTool:
 
 
 # ========== ReadFileTool Tests (10个) ==========
+
 
 class TestReadFileTool:
     """测试读取文件工具 - 10个测试用例"""
@@ -227,6 +229,7 @@ class TestReadFileTool:
 
 # ========== EditFileTool Tests (10个) ==========
 
+
 class TestEditFileTool:
     """测试编辑文件工具 - 10个测试用例"""
 
@@ -328,6 +331,7 @@ class TestEditFileTool:
 
 # ========== ListDirTool Tests (10个) ==========
 
+
 class TestListDirTool:
     """测试列出目录工具 - 10个测试用例"""
 
@@ -416,6 +420,7 @@ class TestListDirTool:
 
 
 # ========== SearchFilesTool Tests (10个) ==========
+
 
 class TestSearchFilesTool:
     """测试搜索文件工具 - 10个测试用例"""
@@ -509,6 +514,7 @@ class TestSearchFilesTool:
 
 
 # ========== SearchContentTool Tests (10个) ==========
+
 
 class TestSearchContentTool:
     """测试搜索内容工具 - 10个测试用例"""
@@ -609,6 +615,7 @@ class TestSearchContentTool:
 
 # ========== ForceWriteTool Tests (5个) ==========
 
+
 class TestForceWriteTool:
     """测试强制写入工具 - 5个测试用例"""
 
@@ -654,6 +661,7 @@ class TestForceWriteTool:
 
 
 # ========== Tool Properties Tests (10个) ==========
+
 
 class TestToolProperties:
     """测试工具属性 - 10个测试用例"""

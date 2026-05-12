@@ -10,6 +10,7 @@ from mini_claude.utils.session import SessionManager
 
 # ========== ExecutionState Tests (15个) ==========
 
+
 class TestExecutionStateCreation:
     """Test ExecutionState creation and validation."""
 
@@ -29,7 +30,7 @@ class TestExecutionStateCreation:
             iteration_count=5,
             last_error="Test error",
             pending_tools=["read_file", "write_file"],
-            checkpoint_data={"thread_id": "test-123"}
+            checkpoint_data={"thread_id": "test-123"},
         )
         assert state.current_node == "act"
         assert state.iteration_count == 5
@@ -50,7 +51,7 @@ class TestExecutionStateCreation:
             iteration_count=3,
             last_error="Error",
             pending_tools=["tool1"],
-            checkpoint_data={"key": "value"}
+            checkpoint_data={"key": "value"},
         )
         data = state.to_dict()
 
@@ -69,7 +70,7 @@ class TestExecutionStateCreation:
             "pending_tools": ["a", "b"],
             "checkpoint_data": {"x": 1},
             "created_at": "2024-01-01T00:00:00",
-            "updated_at": "2024-01-02T00:00:00"
+            "updated_at": "2024-01-02T00:00:00",
         }
         state = ExecutionState.from_dict(data)
 
@@ -86,7 +87,7 @@ class TestExecutionStateCreation:
             iteration_count=7,
             last_error="Test",
             pending_tools=["x", "y", "z"],
-            checkpoint_data={"nested": {"key": "value"}}
+            checkpoint_data={"nested": {"key": "value"}},
         )
         data = original.to_dict()
         restored = ExecutionState.from_dict(data)
@@ -118,18 +119,12 @@ class TestExecutionStateValidation:
 
     def test_is_invalid_negative_iteration(self):
         """Test validation fails for negative iteration count."""
-        state = ExecutionState(
-            current_node="think",
-            iteration_count=-1
-        )
+        state = ExecutionState(current_node="think", iteration_count=-1)
         assert state.is_valid() is False
 
     def test_is_valid_zero_iteration(self):
         """Test validation passes for zero iteration count."""
-        state = ExecutionState(
-            current_node="think",
-            iteration_count=0
-        )
+        state = ExecutionState(current_node="think", iteration_count=0)
         assert state.is_valid() is True
 
     def test_update_timestamp(self):
@@ -139,6 +134,7 @@ class TestExecutionStateValidation:
 
         # Small delay to ensure timestamp changes
         import time
+
         time.sleep(0.01)
 
         state.update_timestamp()
@@ -146,6 +142,7 @@ class TestExecutionStateValidation:
 
 
 # ========== SessionManager Execution State Tests (15个) ==========
+
 
 class TestSessionManagerExecutionState:
     """Test SessionManager execution state methods."""
@@ -165,11 +162,7 @@ class TestSessionManagerExecutionState:
     def test_save_execution_state_new_session(self, temp_db):
         """Test saving execution state for a new session."""
         manager = SessionManager(temp_db)
-        state = ExecutionState(
-            current_node="act",
-            iteration_count=3,
-            last_error="Test error"
-        )
+        state = ExecutionState(current_node="act", iteration_count=3, last_error="Test error")
 
         result = manager.save_execution_state("test-session", state)
         assert result is True
@@ -182,7 +175,7 @@ class TestSessionManagerExecutionState:
             iteration_count=5,
             last_error="Error",
             pending_tools=["tool1", "tool2"],
-            checkpoint_data={"key": "value"}
+            checkpoint_data={"key": "value"},
         )
 
         manager.save_execution_state("test-id", original)
@@ -242,7 +235,7 @@ class TestSessionManagerExecutionState:
             state = ExecutionState(
                 current_node=f"node_{i}",
                 iteration_count=i * 2,
-                last_error="Error" if i == 1 else None
+                last_error="Error" if i == 1 else None,
             )
             manager.save_execution_state(f"session_{i}", state)
 
@@ -285,7 +278,7 @@ class TestSessionManagerExecutionState:
             cursor.execute(
                 "INSERT INTO sessions (id, created_at, updated_at, messages, execution_state) "
                 "VALUES (?, ?, ?, '[]', ?)",
-                ("corrupted", "2024-01-01", "2024-01-01", "invalid json{")
+                ("corrupted", "2024-01-01", "2024-01-01", "invalid json{"),
             )
 
         loaded = manager.load_execution_state("corrupted")
@@ -295,10 +288,7 @@ class TestSessionManagerExecutionState:
         """Test that Unicode is preserved in execution state."""
         manager = SessionManager(temp_db)
 
-        state = ExecutionState(
-            current_node="observe",
-            last_error="错误信息: 中文测试"
-        )
+        state = ExecutionState(current_node="observe", last_error="错误信息: 中文测试")
         manager.save_execution_state("unicode-test", state)
 
         loaded = manager.load_execution_state("unicode-test")
@@ -309,10 +299,7 @@ class TestSessionManagerExecutionState:
         manager = SessionManager(temp_db)
 
         tools = [f"tool_{i}" for i in range(100)]
-        state = ExecutionState(
-            current_node="act",
-            pending_tools=tools
-        )
+        state = ExecutionState(current_node="act", pending_tools=tools)
         manager.save_execution_state("many-tools", state)
 
         loaded = manager.load_execution_state("many-tools")
@@ -324,20 +311,10 @@ class TestSessionManagerExecutionState:
 
         checkpoint = {
             "thread_id": "test-123",
-            "config": {
-                "recursion_limit": 50,
-                "model": "gpt-4"
-            },
-            "nested": {
-                "deep": {
-                    "value": 42
-                }
-            }
+            "config": {"recursion_limit": 50, "model": "gpt-4"},
+            "nested": {"deep": {"value": 42}},
         }
-        state = ExecutionState(
-            current_node="check_completion",
-            checkpoint_data=checkpoint
-        )
+        state = ExecutionState(current_node="check_completion", checkpoint_data=checkpoint)
         manager.save_execution_state("nested-data", state)
 
         loaded = manager.load_execution_state("nested-data")
@@ -361,6 +338,7 @@ class TestSessionManagerExecutionState:
 
 
 # ========== Integration Tests (10个) ==========
+
 
 class TestCheckpointRecoveryIntegration:
     """Integration tests for checkpoint recovery."""
@@ -386,7 +364,7 @@ class TestCheckpointRecoveryIntegration:
             iteration_count=5,
             last_error="API rate limit",
             pending_tools=["write_file", "run_tests"],
-            checkpoint_data={"thread_id": "recovery-test"}
+            checkpoint_data={"thread_id": "recovery-test"},
         )
         manager.save_execution_state("interrupted-session", state)
 
@@ -432,7 +410,7 @@ class TestCheckpointRecoveryIntegration:
             state = ExecutionState(
                 current_node=f"node_{i}",
                 iteration_count=i,
-                last_error=f"Error {i}" if i % 2 == 0 else None
+                last_error=f"Error {i}" if i % 2 == 0 else None,
             )
             manager.save_execution_state(f"session_{i}", state)
 
@@ -448,9 +426,7 @@ class TestCheckpointRecoveryIntegration:
         """Test that state persists across different manager instances."""
         manager1 = SessionManager(temp_db)
         state = ExecutionState(
-            current_node="observe",
-            iteration_count=10,
-            checkpoint_data={"key": "persistent"}
+            current_node="observe", iteration_count=10, checkpoint_data={"key": "persistent"}
         )
         manager1.save_execution_state("persistent-test", state)
 
@@ -485,11 +461,7 @@ class TestCheckpointRecoveryIntegration:
         """Test recovery when last_error is None."""
         manager = SessionManager(temp_db)
 
-        state = ExecutionState(
-            current_node="check_completion",
-            iteration_count=4,
-            last_error=None
-        )
+        state = ExecutionState(current_node="check_completion", iteration_count=4, last_error=None)
         manager.save_execution_state("no-error-session", state)
 
         loaded = manager.load_execution_state("no-error-session")
@@ -531,10 +503,7 @@ class TestCheckpointRecoveryIntegration:
         """Test handling of empty pending tools list."""
         manager = SessionManager(temp_db)
 
-        state = ExecutionState(
-            current_node="observe",
-            pending_tools=[]
-        )
+        state = ExecutionState(current_node="observe", pending_tools=[])
         manager.save_execution_state("empty-tools", state)
 
         loaded = manager.load_execution_state("empty-tools")
@@ -546,7 +515,7 @@ class TestCheckpointRecoveryIntegration:
 
         state = ExecutionState(
             current_node="handle_error",
-            last_error="Error: 'quotes' and \"double quotes\" and \n newlines"
+            last_error="Error: 'quotes' and \"double quotes\" and \n newlines",
         )
         manager.save_execution_state("special-chars", state)
 

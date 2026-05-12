@@ -22,30 +22,25 @@ PROMPT_INJECTION_PATTERNS: List[str] = [
     r"ignore\s+(all\s+)?(previous|prior)\s+(instructions?|prompts?)",
     r"forget\s+(everything|all)\s*(above|before)?",
     r"disregard\s+(all\s+)?(previous|prior)\s+(instructions?|rules?)",
-
     # Role/identity manipulation
     r"you\s+are\s+now\s+",
     r"act\s+as\s+(if\s+you\s+are|a)",
     r"pretend\s+(to\s+be|you\s+are)",
     r"simulate\s+(being|a)",
-
     # System/assistant role injection
     r"system\s*:",
     r"assistant\s*:",
     r"<\s*system\s*>",
     r"<\s*assistant\s*>",
-
     # Instruction tag manipulation
     r"<\s*instructions?\s*>",
     r"<\s*\/\s*instructions?\s*>",
     r"\[instructions?\]",
     r"\[\/instructions?\]",
-
     # Output manipulation
     r"output\s+only\s*:",
     r"respond\s+with\s*:",
     r"your\s+response\s+must\s+be",
-
     # Common jailbreak phrases
     r"DAN\s+mode",
     r"do\s+anything\s+now",
@@ -136,7 +131,7 @@ def _detect_injection_attempt(text: str) -> List[str]:
             # Use the original pattern string as identifier
             # Extract a readable part of the matched text
             matched_text = match.group(0)
-            detected.append(f"Pattern {i+1}: '{matched_text}'")
+            detected.append(f"Pattern {i + 1}: '{matched_text}'")
 
     return detected
 
@@ -225,8 +220,7 @@ def get_feature_summary(include_version: bool = True, include_features: bool = T
 
         if include_features and info.get("features"):
             features_str = ", ".join(
-                feature_display.get(f, f.replace("_", " ").title())
-                for f in info["features"]
+                feature_display.get(f, f.replace("_", " ").title()) for f in info["features"]
             )
             lines.append(f"- **{display_name}**{version_str}: {features_str}")
         else:
@@ -252,7 +246,11 @@ def get_feature_list_markdown() -> str:
             ("background_tasks", "Background Tasks", "Run long-running tasks asynchronously"),
         ],
         "web_capabilities": [
-            ("web_search", "Web Search", "Search the web using DuckDuckGo for up-to-date information"),
+            (
+                "web_search",
+                "Web Search",
+                "Search the web using DuckDuckGo for up-to-date information",
+            ),
             ("web_fetch", "Web Fetch", "Retrieve and analyze web content"),
         ],
         "agent_collaboration": [
@@ -262,7 +260,11 @@ def get_feature_list_markdown() -> str:
         ],
         "token_management": [
             ("budget", "Budget Control", "Monitor and enforce token usage limits"),
-            ("summarize", "Summary Compression", "Automatically compress conversations when approaching limits"),
+            (
+                "summarize",
+                "Summary Compression",
+                "Automatically compress conversations when approaching limits",
+            ),
         ],
         "session_management": [
             ("save", "Save/Load", "Persist and restore conversation sessions"),

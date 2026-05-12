@@ -64,7 +64,9 @@ class WeatherTool(BaseTool):
 
             # Current conditions
             output += "**Current Conditions:**\n"
-            output += f"- Temperature: {current['temp_C']}°C (feels like {current['FeelsLikeC']}°C)\n"
+            output += (
+                f"- Temperature: {current['temp_C']}°C (feels like {current['FeelsLikeC']}°C)\n"
+            )
             output += f"- Weather: {current['weatherDesc'][0]['value']}\n"
             output += f"- Humidity: {current['humidity']}%\n"
             output += f"- Wind: {current['winddir16Point']} {current['windspeedKmph']} km/h\n"

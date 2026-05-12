@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 
 class StepStatus(str, Enum):
     """Status of an execution step."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -36,6 +37,7 @@ class StepStatus(str, Enum):
 
 class DisplayFormat(str, Enum):
     """Display format options."""
+
     TREE = "tree"
     LIST = "list"
     COMPACT = "compact"
@@ -52,6 +54,7 @@ class PlanStep:
         dependencies: List of step IDs this step depends on
         details: Additional step details
     """
+
     id: str
     description: str
     status: StepStatus = StepStatus.PENDING
@@ -70,6 +73,7 @@ class ExecutionPlan:
         estimated_time: Estimated execution time (seconds)
         complexity_score: Complexity score of the task
     """
+
     steps: List[PlanStep] = field(default_factory=list)
     total_steps: int = 0
     strategy: str = "react"
@@ -145,7 +149,7 @@ class PlanVisualizer:
         self,
         plan: ExecutionPlan,
         complexity: ComplexityResult,
-        format: DisplayFormat = DisplayFormat.TREE
+        format: DisplayFormat = DisplayFormat.TREE,
     ) -> None:
         """Display execution plan.
 
@@ -175,10 +179,7 @@ class PlanVisualizer:
         )
 
     def display_progress(
-        self,
-        step_id: str,
-        status: StepStatus,
-        message: Optional[str] = None
+        self, step_id: str, status: StepStatus, message: Optional[str] = None
     ) -> None:
         """Display execution progress for a step.
 
@@ -304,11 +305,7 @@ class PlanVisualizer:
         )
         self.console.print(panel)
 
-    def _display_tree_plan(
-        self,
-        plan: ExecutionPlan,
-        complexity: ComplexityResult
-    ) -> None:
+    def _display_tree_plan(self, plan: ExecutionPlan, complexity: ComplexityResult) -> None:
         """Display plan in tree format."""
         # Header
         level_color = self.LEVEL_COLORS.get(complexity.level, "white")
@@ -346,7 +343,8 @@ class PlanVisualizer:
 
         # Add orphan steps (those whose dependencies aren't in the plan)
         orphan_steps = [
-            s for s in dep_steps
+            s
+            for s in dep_steps
             if not any(d in [step.id for step in plan.steps] for d in s.dependencies)
         ]
         if orphan_steps:
@@ -357,11 +355,7 @@ class PlanVisualizer:
 
         self.console.print(tree)
 
-    def _display_list_plan(
-        self,
-        plan: ExecutionPlan,
-        complexity: ComplexityResult
-    ) -> None:
+    def _display_list_plan(self, plan: ExecutionPlan, complexity: ComplexityResult) -> None:
         """Display plan in list format."""
         # Header
         level_color = self.LEVEL_COLORS.get(complexity.level, "white")
@@ -386,11 +380,7 @@ class PlanVisualizer:
 
             self.console.print(f"  {icon} [{color}]{i}. {step.description}[/]{deps_str}")
 
-    def _display_compact_plan(
-        self,
-        plan: ExecutionPlan,
-        complexity: ComplexityResult
-    ) -> None:
+    def _display_compact_plan(self, plan: ExecutionPlan, complexity: ComplexityResult) -> None:
         """Display plan in compact format for simple tasks."""
         if not plan.steps:
             self.console.print("[dim]Executing directly (no plan needed)[/]")
@@ -402,9 +392,7 @@ class PlanVisualizer:
             step_descs.append(f"... (+{len(plan.steps) - 3} more)")
 
         steps_str = " -> ".join(step_descs)
-        self.console.print(
-            f"\n[cyan][Plan][/] {steps_str}\n"
-        )
+        self.console.print(f"\n[cyan][Plan][/] {steps_str}\n")
 
     def create_progress_tracker(self, plan: ExecutionPlan) -> Progress:
         """Create a progress tracker for the plan.
@@ -433,9 +421,7 @@ class PlanVisualizer:
 
 
 def create_plan_from_analysis(
-    task: str,
-    complexity: ComplexityResult,
-    steps: Optional[List[str]] = None
+    task: str, complexity: ComplexityResult, steps: Optional[List[str]] = None
 ) -> ExecutionPlan:
     """Create an execution plan from complexity analysis.
 
@@ -477,12 +463,14 @@ def create_plan_from_analysis(
         if complexity.level == ComplexityLevel.COMPLEX and i > 0:
             deps = [f"step_{i}"]
 
-        plan_steps.append(PlanStep(
-            id=step_id,
-            description=desc,
-            status=StepStatus.PENDING,
-            dependencies=deps,
-        ))
+        plan_steps.append(
+            PlanStep(
+                id=step_id,
+                description=desc,
+                status=StepStatus.PENDING,
+                dependencies=deps,
+            )
+        )
 
     return ExecutionPlan(
         steps=plan_steps,

@@ -1,6 +1,5 @@
 """Tests for ExecutionPlan integration with AgentState."""
 
-
 from mini_claude.agent.state import AgentState, create_initial_state
 from mini_claude.cli.plan_display import (
     StepStatus,
@@ -40,7 +39,9 @@ class TestExecutionPlanStateIntegration:
                 {
                     "id": step.id,
                     "description": step.description,
-                    "status": step.status.value if hasattr(step.status, 'value') else str(step.status),
+                    "status": step.status.value
+                    if hasattr(step.status, "value")
+                    else str(step.status),
                     "dependencies": step.dependencies,
                     "details": step.details,
                 }
@@ -66,8 +67,20 @@ class TestExecutionPlanStateIntegration:
         # Create serialized plan
         serialized_plan = {
             "steps": [
-                {"id": "step_1", "description": "First step", "status": "pending", "dependencies": [], "details": {}},
-                {"id": "step_2", "description": "Second step", "status": "pending", "dependencies": ["step_1"], "details": {}},
+                {
+                    "id": "step_1",
+                    "description": "First step",
+                    "status": "pending",
+                    "dependencies": [],
+                    "details": {},
+                },
+                {
+                    "id": "step_2",
+                    "description": "Second step",
+                    "status": "pending",
+                    "dependencies": ["step_1"],
+                    "details": {},
+                },
             ],
             "total_steps": 2,
             "strategy": "react",
@@ -102,7 +115,12 @@ class TestPlanNodeIntegration:
 
         # Create a plan
         step1 = PlanStep(id="step_1", description="First step", status=StepStatus.PENDING)
-        step2 = PlanStep(id="step_2", description="Second step", status=StepStatus.PENDING, dependencies=["step_1"])
+        step2 = PlanStep(
+            id="step_2",
+            description="Second step",
+            status=StepStatus.PENDING,
+            dependencies=["step_1"],
+        )
         plan = ExecutionPlan(
             steps=[step1, step2],
             total_steps=2,
@@ -222,6 +240,7 @@ class TestExecutionPlanFlow:
 
         # 3. Serialize and store
         from mini_claude.agent.nodes.plan import _serialize_plan
+
         serialized = _serialize_plan(plan)
 
         state["execution_plan"] = serialized

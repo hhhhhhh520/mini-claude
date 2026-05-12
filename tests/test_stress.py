@@ -49,6 +49,7 @@ DEFAULT_DURATION_SECONDS = 5
 # Metrics Collection
 # =============================================================================
 
+
 @dataclass
 class PerformanceMetrics:
     """Collected performance metrics from stress tests."""
@@ -97,7 +98,9 @@ class PerformanceMetrics:
                 ),
                 "success_rate_percent": round(
                     self.successful_requests / self.total_requests * 100
-                    if self.total_requests > 0 else 0, 2
+                    if self.total_requests > 0
+                    else 0,
+                    2,
                 ),
             },
             "latency": {
@@ -157,9 +160,9 @@ class PerformanceMetrics:
             f"  Count: {data['errors']['count']}",
         ]
 
-        if data['errors']['samples']:
+        if data["errors"]["samples"]:
             lines.append("  Sample errors:")
-            for err in data['errors']['samples'][:5]:
+            for err in data["errors"]["samples"][:5]:
                 lines.append(f"    - {err[:100]}")
 
         return "\n".join(lines)
@@ -168,6 +171,7 @@ class PerformanceMetrics:
 # =============================================================================
 # Stress Test Runner
 # =============================================================================
+
 
 class StressTestRunner:
     """Runner for stress tests with configurable parameters."""
@@ -196,12 +200,7 @@ class StressTestRunner:
         self._active_tasks = 0
         self._active_tasks_peak = 0
 
-    async def _run_single_request(
-        self,
-        request_func: Callable,
-        request_id: int,
-        **kwargs
-    ) -> Any:
+    async def _run_single_request(self, request_func: Callable, request_id: int, **kwargs) -> Any:
         """Run a single request with metrics collection."""
         async with self._semaphore:
             self._active_tasks += 1
@@ -221,11 +220,7 @@ class StressTestRunner:
                 response_time = time.time() - start_time
                 self.metrics.response_times.append(response_time)
 
-    async def run_concurrent_requests(
-        self,
-        request_func: Callable,
-        **kwargs
-    ) -> PerformanceMetrics:
+    async def run_concurrent_requests(self, request_func: Callable, **kwargs) -> PerformanceMetrics:
         """Run concurrent requests and collect metrics.
 
         Args:
@@ -255,9 +250,7 @@ class StressTestRunner:
                     delay = self.ramp_up_seconds * (i / self.request_count)
                     await asyncio.sleep(delay)
 
-                task = asyncio.create_task(
-                    self._run_single_request(request_func, i, **kwargs)
-                )
+                task = asyncio.create_task(self._run_single_request(request_func, i, **kwargs))
                 tasks.append(task)
 
             # Wait for all tasks
@@ -281,10 +274,7 @@ class StressTestRunner:
         return self.metrics
 
     async def run_gradual_pressure(
-        self,
-        request_func: Callable,
-        steps: int = 5,
-        **kwargs
+        self, request_func: Callable, steps: int = 5, **kwargs
     ) -> Dict[str, PerformanceMetrics]:
         """Run gradual pressure test, increasing concurrency step by step.
 
@@ -315,11 +305,7 @@ class StressTestRunner:
 
         return results
 
-    async def run_duration_test(
-        self,
-        request_func: Callable,
-        **kwargs
-    ) -> PerformanceMetrics:
+    async def run_duration_test(self, request_func: Callable, **kwargs) -> PerformanceMetrics:
         """Run test for a fixed duration.
 
         Args:
@@ -376,6 +362,7 @@ class StressTestRunner:
 # Mock Functions for Testing
 # =============================================================================
 
+
 async def mock_session_create(request_id: int = 0, delay: float = 0.01) -> Dict[str, Any]:
     """Mock session creation with configurable delay."""
     await asyncio.sleep(delay)
@@ -415,9 +402,7 @@ async def mock_file_operation(request_id: int = 0, operation: str = "read") -> D
 
 
 async def mock_agent_task(
-    request_id: int = 0,
-    complexity: str = "simple",
-    progress_callback: Optional[Callable] = None
+    request_id: int = 0, complexity: str = "simple", progress_callback: Optional[Callable] = None
 ) -> Dict[str, Any]:
     """Mock agent task with progress reporting."""
     steps = {"simple": 2, "medium": 5, "complex": 10}.get(complexity, 3)
@@ -438,6 +423,7 @@ async def mock_agent_task(
 # =============================================================================
 # Test Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def stress_runner():
@@ -477,6 +463,7 @@ def clean_coordinator():
 # Stress Tests: Concurrent Session Creation
 # =============================================================================
 
+
 @pytest.mark.stress
 @pytest.mark.skipif(SKIP_STRESS_TESTS, reason="SKIP_STRESS_TESTS is set")
 class TestConcurrentSessionCreation:
@@ -508,10 +495,7 @@ class TestConcurrentSessionCreation:
     @pytest.mark.asyncio
     async def test_gradual_pressure_sessions(self, stress_runner):
         """Test gradual pressure increase on sessions."""
-        results = await stress_runner.run_gradual_pressure(
-            mock_session_create,
-            steps=3
-        )
+        results = await stress_runner.run_gradual_pressure(mock_session_create, steps=3)
 
         assert len(results) == 3
         for step_name, metrics in results.items():
@@ -523,6 +507,7 @@ class TestConcurrentSessionCreation:
 # Stress Tests: Concurrent Tool Calls
 # =============================================================================
 
+
 @pytest.mark.stress
 @pytest.mark.skipif(SKIP_STRESS_TESTS, reason="SKIP_STRESS_TESTS is set")
 class TestConcurrentToolCalls:
@@ -532,8 +517,7 @@ class TestConcurrentToolCalls:
     async def test_concurrent_tool_calls(self, stress_runner):
         """Test concurrent tool calls."""
         metrics = await stress_runner.run_concurrent_requests(
-            mock_tool_call,
-            tool_name="write_file"
+            mock_tool_call, tool_name="write_file"
         )
 
         assert metrics.total_requests == DEFAULT_REQUEST_COUNT
@@ -588,6 +572,7 @@ class TestConcurrentToolCalls:
 # Stress Tests: Concurrent File Operations
 # =============================================================================
 
+
 @pytest.mark.stress
 @pytest.mark.skipif(SKIP_STRESS_TESTS, reason="SKIP_STRESS_TESTS is set")
 class TestConcurrentFileOperations:
@@ -624,9 +609,7 @@ class TestConcurrentFileOperations:
         async def acquire_and_release(agent_id: str):
             nonlocal successful_locks, failed_locks
 
-            success, msg = await file_lock_manager.acquire_lock(
-                str(test_file), agent_id, "write"
-            )
+            success, msg = await file_lock_manager.acquire_lock(str(test_file), agent_id, "write")
 
             if success:
                 successful_locks += 1
@@ -653,6 +636,7 @@ class TestConcurrentFileOperations:
 # =============================================================================
 # Stress Tests: Memory Stability
 # =============================================================================
+
 
 @pytest.mark.stress
 @pytest.mark.slow
@@ -690,10 +674,7 @@ class TestMemoryStability:
             # Run multiple rounds of subagent tasks
             for round_num in range(5):
                 for i in range(settings.max_sub_agents):
-                    await clean_subagent_manager.spawn(
-                        f"agent_{round_num}_{i}",
-                        mock_agent_task
-                    )
+                    await clean_subagent_manager.spawn(f"agent_{round_num}_{i}", mock_agent_task)
                 await clean_subagent_manager.wait_for_all()
                 clean_subagent_manager.clear()
                 gc.collect()
@@ -712,6 +693,7 @@ class TestMemoryStability:
 # =============================================================================
 # Stress Tests: Resource Limits
 # =============================================================================
+
 
 @pytest.mark.stress
 @pytest.mark.skipif(SKIP_STRESS_TESTS, reason="SKIP_STRESS_TESTS is set")
@@ -766,6 +748,7 @@ class TestResourceLimits:
 # Stress Tests: Error Recovery
 # =============================================================================
 
+
 @pytest.mark.stress
 @pytest.mark.skipif(SKIP_STRESS_TESTS, reason="SKIP_STRESS_TESTS is set")
 class TestErrorRecovery:
@@ -817,6 +800,7 @@ class TestErrorRecovery:
 # Stress Tests: Performance Benchmarks
 # =============================================================================
 
+
 @pytest.mark.stress
 @pytest.mark.slow
 @pytest.mark.skipif(SKIP_STRESS_TESTS, reason="SKIP_STRESS_TESTS is set")
@@ -859,6 +843,7 @@ class TestPerformanceBenchmarks:
 # Report Generation
 # =============================================================================
 
+
 def generate_stress_report(results: Dict[str, PerformanceMetrics]) -> str:
     """Generate a JSON-formatted stress test report.
 
@@ -875,10 +860,7 @@ def generate_stress_report(results: Dict[str, PerformanceMetrics]) -> str:
             "tests_passed": sum(1 for m in results.values() if m.failed_requests == 0),
             "tests_with_failures": sum(1 for m in results.values() if m.failed_requests > 0),
         },
-        "tests": {
-            name: metrics.to_dict()
-            for name, metrics in results.items()
-        },
+        "tests": {name: metrics.to_dict() for name, metrics in results.items()},
     }
 
     return json.dumps(report, indent=2)
@@ -888,6 +870,7 @@ def generate_stress_report(results: Dict[str, PerformanceMetrics]) -> str:
 # Integration with SubAgentManager
 # =============================================================================
 
+
 @pytest.mark.stress
 @pytest.mark.skipif(SKIP_STRESS_TESTS, reason="SKIP_STRESS_TESTS is set")
 class TestSubAgentManagerStress:
@@ -896,6 +879,7 @@ class TestSubAgentManagerStress:
     @pytest.mark.asyncio
     async def test_rapid_spawn_and_wait(self, clean_subagent_manager):
         """Test rapid spawning and waiting of agents."""
+
         async def quick_task(progress_callback=None):
             await asyncio.sleep(0.01)
             return "quick"

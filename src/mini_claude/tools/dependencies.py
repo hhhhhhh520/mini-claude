@@ -19,9 +19,10 @@ logger = get_logger("mini_claude.tools.dependencies")
 
 class DependencyType(Enum):
     """Type of dependency relationship."""
-    REQUIRED = "required"      # Must be satisfied for tool to work
-    OPTIONAL = "optional"      # Nice to have, tool can work without it
-    CONFLICT = "conflict"      # Cannot be used together
+
+    REQUIRED = "required"  # Must be satisfied for tool to work
+    OPTIONAL = "optional"  # Nice to have, tool can work without it
+    CONFLICT = "conflict"  # Cannot be used together
 
 
 @dataclass
@@ -35,6 +36,7 @@ class ToolDependency:
         description: Human-readable explanation of why dependency exists
         dependency_type: Type of dependency relationship
     """
+
     tool_name: str
     depends_on: List[str] = field(default_factory=list)
     optional: bool = False
@@ -53,6 +55,7 @@ class ToolDependency:
 
 class CyclicDependencyError(Exception):
     """Raised when a cycle is detected in the dependency graph."""
+
     pass
 
 
@@ -136,8 +139,7 @@ class DependencyGraph:
         # Remove specific dependency
         original_len = len(self._dependencies[tool_name])
         self._dependencies[tool_name] = [
-            d for d in self._dependencies[tool_name]
-            if depends_on not in d.depends_on
+            d for d in self._dependencies[tool_name] if depends_on not in d.depends_on
         ]
         removed = original_len - len(self._dependencies[tool_name])
 
@@ -209,9 +211,7 @@ class DependencyGraph:
         return list(set(dependents))
 
     def check_availability(
-        self,
-        tool_name: str,
-        available_tools: Set[str] = None
+        self, tool_name: str, available_tools: Set[str] = None
     ) -> Tuple[bool, List[str], List[str]]:
         """Check if all required dependencies are available.
 
@@ -302,9 +302,7 @@ class DependencyGraph:
             if not current_level:
                 # This shouldn't happen if we checked for cycles
                 remaining_tools = list(remaining)
-                raise CyclicDependencyError(
-                    f"Unexpected cycle detected among: {remaining_tools}"
-                )
+                raise CyclicDependencyError(f"Unexpected cycle detected among: {remaining_tools}")
 
             levels.append(sorted(current_level))  # Sort for deterministic output
 
@@ -443,6 +441,7 @@ def get_dependency_graph() -> DependencyGraph:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._dependency_graph.is_initialized():
                 _dependency_graph = ctx.dependency_graph
@@ -463,6 +462,7 @@ def reset_dependency_graph() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._dependency_graph.reset()
     except ImportError:
@@ -477,43 +477,53 @@ def _init_builtin_dependencies() -> None:
     graph = get_dependency_graph()
 
     # edit_file depends on read_file (need to read before editing)
-    graph.add_dependency(ToolDependency(
-        tool_name="edit_file",
-        depends_on=["read_file"],
-        optional=False,
-        description="edit_file requires reading file content first to find text to replace",
-    ))
+    graph.add_dependency(
+        ToolDependency(
+            tool_name="edit_file",
+            depends_on=["read_file"],
+            optional=False,
+            description="edit_file requires reading file content first to find text to replace",
+        )
+    )
 
     # force_write optionally depends on read_file (for conflict detection context)
-    graph.add_dependency(ToolDependency(
-        tool_name="force_write",
-        depends_on=["read_file"],
-        optional=True,
-        description="read_file helps detect conflicts but force_write can work without it",
-    ))
+    graph.add_dependency(
+        ToolDependency(
+            tool_name="force_write",
+            depends_on=["read_file"],
+            optional=True,
+            description="read_file helps detect conflicts but force_write can work without it",
+        )
+    )
 
     # spawn_parallel depends on spawn_agent (parallel uses agent spawning)
-    graph.add_dependency(ToolDependency(
-        tool_name="spawn_parallel",
-        depends_on=["spawn_agent"],
-        optional=False,
-        description="spawn_parallel uses spawn_agent internally for parallel task execution",
-    ))
+    graph.add_dependency(
+        ToolDependency(
+            tool_name="spawn_parallel",
+            depends_on=["spawn_agent"],
+            optional=False,
+            description="spawn_parallel uses spawn_agent internally for parallel task execution",
+        )
+    )
 
     # aggregate_results depends on spawn_agent or spawn_parallel (need agents to aggregate)
-    graph.add_dependency(ToolDependency(
-        tool_name="aggregate_results",
-        depends_on=["spawn_agent", "spawn_parallel"],
-        optional=False,
-        description="aggregate_results collects results from spawned agents",
-    ))
+    graph.add_dependency(
+        ToolDependency(
+            tool_name="aggregate_results",
+            depends_on=["spawn_agent", "spawn_parallel"],
+            optional=False,
+            description="aggregate_results collects results from spawned agents",
+        )
+    )
 
     # execute_parallel depends on plan_parallel (must plan before execute)
-    graph.add_dependency(ToolDependency(
-        tool_name="execute_parallel",
-        depends_on=["plan_parallel"],
-        optional=False,
-        description="execute_parallel requires a plan from plan_parallel first",
-    ))
+    graph.add_dependency(
+        ToolDependency(
+            tool_name="execute_parallel",
+            depends_on=["plan_parallel"],
+            optional=False,
+            description="execute_parallel requires a plan from plan_parallel first",
+        )
+    )
 
     logger.debug("Builtin dependencies initialized", count=len(graph._dependencies))

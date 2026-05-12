@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 
 class ComplexityLevel(str, Enum):
     """Task complexity levels."""
+
     SIMPLE = "simple"
     MEDIUM = "medium"
     COMPLEX = "complex"
@@ -43,6 +44,7 @@ class ComplexityResult:
         factors: List of factors that contributed to the score
         details: Detailed breakdown by dimension
     """
+
     level: ComplexityLevel
     score: int
     strategy: str
@@ -84,7 +86,6 @@ class TaskComplexityAnalyzer:
         "更新": 10,
         "change": 10,
         "修改": 10,
-
         # Medium complexity
         "optimize": 20,
         "优化": 20,
@@ -96,7 +97,6 @@ class TaskComplexityAnalyzer:
         "重构": 30,
         "redesign": 30,
         "重新设计": 30,
-
         # Complex operations
         "develop": 50,
         "开发": 50,
@@ -122,7 +122,6 @@ class TaskComplexityAnalyzer:
         "docker": 15,
         "kubernetes": 20,
         "k8s": 20,
-
         # Data
         "database": 20,
         "数据库": 20,
@@ -131,7 +130,6 @@ class TaskComplexityAnalyzer:
         "数据迁移": 20,
         "query": 10,
         "查询": 10,
-
         # Security
         "security": 25,
         "安全": 25,
@@ -144,7 +142,6 @@ class TaskComplexityAnalyzer:
         "加密": 25,
         "vulnerability": 30,
         "漏洞": 30,
-
         # High-risk domains
         "payment": 40,
         "支付": 40,
@@ -152,7 +149,6 @@ class TaskComplexityAnalyzer:
         "交易": 35,
         "financial": 35,
         "金融": 35,
-
         # AI/ML
         "model": 25,
         "模型": 25,
@@ -162,7 +158,6 @@ class TaskComplexityAnalyzer:
         "ai": 25,
         "machine learning": 25,
         "机器学习": 25,
-
         # Performance
         "performance": 20,
         "性能": 20,
@@ -170,7 +165,6 @@ class TaskComplexityAnalyzer:
         "扩展": 20,
         "scalability": 20,
         "可扩展": 20,
-
         # Architecture
         "architecture": 30,
         "架构": 30,
@@ -183,13 +177,20 @@ class TaskComplexityAnalyzer:
 
     # Risk indicators that add complexity
     RISK_INDICATORS: Set[str] = {
-        "critical", "关键",
-        "urgent", "紧急",
-        "production", "生产",
-        "live", "在线",
-        "breaking", "破坏性",
-        "deprecated", "废弃",
-        "legacy", "遗留",
+        "critical",
+        "关键",
+        "urgent",
+        "紧急",
+        "production",
+        "生产",
+        "live",
+        "在线",
+        "breaking",
+        "破坏性",
+        "deprecated",
+        "废弃",
+        "legacy",
+        "遗留",
     }
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -215,11 +216,7 @@ class TaskComplexityAnalyzer:
         if custom_domains := config.get("custom_domains"):
             self.domain_scores.update(custom_domains)
 
-    def analyze(
-        self,
-        task: str,
-        context: Optional[Dict[str, Any]] = None
-    ) -> ComplexityResult:
+    def analyze(self, task: str, context: Optional[Dict[str, Any]] = None) -> ComplexityResult:
         """Analyze task complexity.
 
         Args:
@@ -269,13 +266,7 @@ class TaskComplexityAnalyzer:
         details["context_score"] = context_score
 
         # Calculate total score
-        total_score = (
-            length_score +
-            keyword_score +
-            domain_score +
-            risk_score +
-            context_score
-        )
+        total_score = length_score + keyword_score + domain_score + risk_score + context_score
 
         # Determine level and strategy
         level = self._get_level(total_score)
@@ -357,7 +348,7 @@ class TaskComplexityAnalyzer:
         matching since \\b doesn't work with CJK characters.
         """
         if word.isascii():
-            return bool(re.search(r'\b' + re.escape(word) + r'\b', text))
+            return bool(re.search(r"\b" + re.escape(word) + r"\b", text))
         return word in text
 
     def _analyze_keywords(self, task: str) -> tuple[int, List[str]]:
@@ -468,8 +459,7 @@ class TaskComplexityAnalyzer:
 
 
 def analyze_task_complexity(
-    task: str,
-    context: Optional[Dict[str, Any]] = None
+    task: str, context: Optional[Dict[str, Any]] = None
 ) -> ComplexityResult:
     """Convenience function to analyze task complexity.
 

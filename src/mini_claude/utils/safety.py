@@ -28,11 +28,11 @@ DANGEROUS_PATTERNS = [
     r"rm\s+/",
     r"dd\s+if=",
     r"chmod\s+777",
-    r"chmod\s+-R\s+777",      # 全系统权限开放
-    r"chown\s+-R",            # 批量修改所有权
+    r"chmod\s+-R\s+777",  # 全系统权限开放
+    r"chown\s+-R",  # 批量修改所有权
     r">\s*/dev/sd",
     r">\s*/dev/hd",
-    r">\s*/etc/",             # 系统配置覆盖
+    r">\s*/etc/",  # 系统配置覆盖
     r"mkfs",
     r":\(\)\{\s*:\|:&\s*\};:",  # Fork bomb
     r"curl.*\|\s*bash",
@@ -89,10 +89,10 @@ PROTECTED_PATHS = [
     "~/.netrc",
     "~/.pgpass",
     # 容器与云凭证
-    "~/.docker/config.json",   # Docker 凭证
-    "~/.kube/config",          # Kubernetes 凭证
-    "~/.npmrc",                # npm 凭证
-    "~/.pypirc",               # PyPI 凭证
+    "~/.docker/config.json",  # Docker 凭证
+    "~/.kube/config",  # Kubernetes 凭证
+    "~/.npmrc",  # npm 凭证
+    "~/.pypirc",  # PyPI 凭证
     # Windows 敏感目录
     "~/AppData/Roaming/Microsoft/Credentials",
     "~/AppData/Local/Microsoft/Credentials",
@@ -106,11 +106,13 @@ SHELL_CHAIN_CHARS = [";", "&&", "||", "|", "`", "$("]
 # COMMAND WHITELIST ARCHITECTURE
 # =============================================================================
 
+
 class CommandConfig(TypedDict):
     """Configuration for an allowed command."""
+
     allowed_flags: List[str]
     allowed_args: int  # -1 means unlimited
-    risk_level: str    # "low", "medium", "high"
+    risk_level: str  # "low", "medium", "high"
     description: str
 
 
@@ -121,231 +123,268 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
         "allowed_flags": ["-l", "-a", "-la", "-lh", "-R", "-S", "-t"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "List directory contents"
+        "description": "List directory contents",
     },
     "cat": {
         "allowed_flags": ["-n", "-b", "-s"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Display file contents"
+        "description": "Display file contents",
     },
     "head": {
         "allowed_flags": ["-n", "-c"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Display first lines of file"
+        "description": "Display first lines of file",
     },
     "tail": {
         "allowed_flags": ["-n", "-c", "-f"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Display last lines of file"
+        "description": "Display last lines of file",
     },
     "grep": {
         "allowed_flags": ["-i", "-r", "-n", "-l", "-v", "-c", "-w", "-E"],
         "allowed_args": 2,
         "risk_level": "low",
-        "description": "Search text patterns"
+        "description": "Search text patterns",
     },
     "find": {
         "allowed_flags": ["-name", "-type", "-size", "-mtime", "-exec"],
         "allowed_args": -1,  # Complex command, allow multiple args
         "risk_level": "low",
-        "description": "Search for files"
+        "description": "Search for files",
     },
     "wc": {
         "allowed_flags": ["-l", "-w", "-c", "-m"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Count lines, words, bytes"
+        "description": "Count lines, words, bytes",
     },
     "sort": {
         "allowed_flags": ["-n", "-r", "-u", "-k", "-t"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Sort lines"
+        "description": "Sort lines",
     },
     "uniq": {
         "allowed_flags": ["-c", "-d", "-u"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Filter duplicate lines"
+        "description": "Filter duplicate lines",
     },
     "echo": {
         "allowed_flags": ["-n", "-e"],
         "allowed_args": -1,
         "risk_level": "low",
-        "description": "Display text"
+        "description": "Display text",
     },
     "pwd": {
         "allowed_flags": [],
         "allowed_args": 0,
         "risk_level": "low",
-        "description": "Print working directory"
+        "description": "Print working directory",
     },
     "which": {
         "allowed_flags": ["-a"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Locate command"
+        "description": "Locate command",
     },
     "tree": {
         "allowed_flags": ["-L", "-a", "-d", "-I"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Display directory tree"
+        "description": "Display directory tree",
     },
-
     # Medium-risk file operations
     "mkdir": {
         "allowed_flags": ["-p", "-v"],
         "allowed_args": 1,
         "risk_level": "medium",
-        "description": "Create directory"
+        "description": "Create directory",
     },
     "touch": {
         "allowed_flags": ["-a", "-m", "-d"],
         "allowed_args": 1,
         "risk_level": "medium",
-        "description": "Create or update file timestamp"
+        "description": "Create or update file timestamp",
     },
     "cp": {
         "allowed_flags": ["-r", "-p", "-v", "-i"],
         "allowed_args": 2,
         "risk_level": "medium",
-        "description": "Copy files"
+        "description": "Copy files",
     },
     "mv": {
         "allowed_flags": ["-v", "-i", "-n"],
         "allowed_args": 2,
         "risk_level": "medium",
-        "description": "Move/rename files"
+        "description": "Move/rename files",
     },
     "rm": {
         "allowed_flags": ["-r", "-f", "-i", "-v"],  # -rf allowed but with path restrictions
         "allowed_args": 1,
         "risk_level": "high",
-        "description": "Remove files (restricted paths)"
+        "description": "Remove files (restricted paths)",
     },
     "chmod": {
         "allowed_flags": ["-R", "-v"],
         "allowed_args": 2,  # mode and file
         "risk_level": "medium",
-        "description": "Change file permissions"
+        "description": "Change file permissions",
     },
-
     # Development tools
     "python": {
         "allowed_flags": ["-m", "-c", "-V", "--version", "-u"],
         "allowed_args": -1,
         "risk_level": "medium",
-        "description": "Python interpreter"
+        "description": "Python interpreter",
     },
     "python3": {
         "allowed_flags": ["-m", "-c", "-V", "--version", "-u"],
         "allowed_args": -1,
         "risk_level": "medium",
-        "description": "Python 3 interpreter"
+        "description": "Python 3 interpreter",
     },
     "pip": {
-        "allowed_flags": ["install", "uninstall", "list", "show", "freeze", "-r", "-e", "--upgrade"],
+        "allowed_flags": [
+            "install",
+            "uninstall",
+            "list",
+            "show",
+            "freeze",
+            "-r",
+            "-e",
+            "--upgrade",
+        ],
         "allowed_args": -1,
         "risk_level": "medium",
-        "description": "Python package manager"
+        "description": "Python package manager",
     },
     "pip3": {
-        "allowed_flags": ["install", "uninstall", "list", "show", "freeze", "-r", "-e", "--upgrade"],
+        "allowed_flags": [
+            "install",
+            "uninstall",
+            "list",
+            "show",
+            "freeze",
+            "-r",
+            "-e",
+            "--upgrade",
+        ],
         "allowed_args": -1,
         "risk_level": "medium",
-        "description": "Python 3 package manager"
+        "description": "Python 3 package manager",
     },
     "node": {
         "allowed_flags": ["-e", "-v", "--version"],
         "allowed_args": 1,
         "risk_level": "medium",
-        "description": "Node.js runtime"
+        "description": "Node.js runtime",
     },
     "npm": {
         "allowed_flags": ["install", "run", "build", "test", "start", "list", "-g", "--save-dev"],
         "allowed_args": -1,
         "risk_level": "medium",
-        "description": "Node package manager"
+        "description": "Node package manager",
     },
     "npx": {
         "allowed_flags": ["-y", "--yes"],
         "allowed_args": -1,
         "risk_level": "medium",
-        "description": "Execute npm package binaries"
+        "description": "Execute npm package binaries",
     },
-
     # Version control
     "git": {
         "allowed_flags": [
-            "status", "log", "diff", "branch", "checkout", "add", "commit",
-            "push", "pull", "clone", "fetch", "merge", "rebase", "stash",
-            "reset", "restore", "switch", "show", "tag", "-m", "-a", "-d",
-            "--oneline", "--graph", "--all", "-p", "--staged"
+            "status",
+            "log",
+            "diff",
+            "branch",
+            "checkout",
+            "add",
+            "commit",
+            "push",
+            "pull",
+            "clone",
+            "fetch",
+            "merge",
+            "rebase",
+            "stash",
+            "reset",
+            "restore",
+            "switch",
+            "show",
+            "tag",
+            "-m",
+            "-a",
+            "-d",
+            "--oneline",
+            "--graph",
+            "--all",
+            "-p",
+            "--staged",
         ],
         "allowed_args": -1,
         "risk_level": "medium",
-        "description": "Git version control"
+        "description": "Git version control",
     },
-
     # System utilities (read-only)
     "date": {
         "allowed_flags": ["-u", "+%Y-%m-%d"],
         "allowed_args": 0,
         "risk_level": "low",
-        "description": "Display current date"
+        "description": "Display current date",
     },
     "whoami": {
         "allowed_flags": [],
         "allowed_args": 0,
         "risk_level": "low",
-        "description": "Display current user"
+        "description": "Display current user",
     },
     "uname": {
         "allowed_flags": ["-a", "-r", "-m"],
         "allowed_args": 0,
         "risk_level": "low",
-        "description": "System information"
+        "description": "System information",
     },
     "df": {
         "allowed_flags": ["-h", "-H", "-T"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Disk space usage"
+        "description": "Disk space usage",
     },
     "du": {
         "allowed_flags": ["-h", "-s", "-a", "-d"],
         "allowed_args": 1,
         "risk_level": "low",
-        "description": "Directory space usage"
+        "description": "Directory space usage",
     },
 }
 
 # Forbidden path patterns for rm command
 RM_FORBIDDEN_PATHS = [
-    "/",           # Root
-    "/home",       # User homes
-    "/etc",        # System config
-    "/usr",        # System programs
-    "/var",        # Variable data
-    "/root",       # Root home
-    "~",           # Home directory
-    "/*",          # Wildcard root
+    "/",  # Root
+    "/home",  # User homes
+    "/etc",  # System config
+    "/usr",  # System programs
+    "/var",  # Variable data
+    "/root",  # Root home
+    "~",  # Home directory
+    "/*",  # Wildcard root
 ]
 
 # Shell injection patterns (for _check_shell_injection)
 SHELL_INJECTION_PATTERNS = [
-    r'\$\([^)]*\)',           # Command substitution $(...)
-    r'`[^`]*`',               # Backtick command substitution
-    r'\$\{[^}]*\}',           # Variable expansion ${...}
-    r'\$[A-Za-z_][A-Za-z0-9_]*',  # Environment variable $VAR
-    r'\\x[0-9a-fA-F]{2}',     # Hex escape \\xNN
-    r'\\u[0-9a-fA-F]{4}',     # Unicode escape \\uNNNN
-    r'\\[0-7]{1,3}',          # Octal escape \\NNN
-    r'%[0-9a-fA-F]{2}',       # URL encoding %NN
+    r"\$\([^)]*\)",  # Command substitution $(...)
+    r"`[^`]*`",  # Backtick command substitution
+    r"\$\{[^}]*\}",  # Variable expansion ${...}
+    r"\$[A-Za-z_][A-Za-z0-9_]*",  # Environment variable $VAR
+    r"\\x[0-9a-fA-F]{2}",  # Hex escape \\xNN
+    r"\\u[0-9a-fA-F]{4}",  # Unicode escape \\uNNNN
+    r"\\[0-7]{1,3}",  # Octal escape \\NNN
+    r"%[0-9a-fA-F]{2}",  # URL encoding %NN
 ]
 
 
@@ -361,10 +400,10 @@ def _normalize_command(command: str) -> str:
         Normalized command string
     """
     # Remove null bytes
-    command = command.replace('\x00', '')
+    command = command.replace("\x00", "")
 
     # Apply Unicode NFC normalization (combines composed characters)
-    command = unicodedata.normalize('NFC', command)
+    command = unicodedata.normalize("NFC", command)
 
     # Strip leading/trailing whitespace
     command = command.strip()
@@ -388,11 +427,11 @@ def _check_shell_injection(command: str) -> Tuple[bool, str]:
         Tuple of (is_safe, reason)
     """
     # Check for newlines (command injection via multiline)
-    if '\n' in command or '\r' in command:
+    if "\n" in command or "\r" in command:
         return False, "Newline character detected - potential command injection"
 
     # Check for semicolon (command chaining)
-    if ';' in command:
+    if ";" in command:
         return False, "Semicolon detected - potential command chaining"
 
     # Check each injection pattern
@@ -404,14 +443,14 @@ def _check_shell_injection(command: str) -> Tuple[bool, str]:
             # On Windows, backslashes are path separators, not escape sequences
             # A true escape sequence would be like \x00, , \177
             # Windows paths look like C:\Users\... or just \Users\...
-            if '\\' in matched_text:
+            if "\\" in matched_text:
                 # Check if this looks like an escape sequence (hex, unicode, or octal)
                 # Real escape sequences: \xNN, \uNNNN, \NNN (where N is digit for octal)
                 # Windows paths: \Users, \Windows, etc. (letters, not digits after \)
-                if re.match(r'\\[xu][0-9a-fA-F]', matched_text):
+                if re.match(r"\\[xu][0-9a-fA-F]", matched_text):
                     # This is a hex or unicode escape - potential danger
                     return False, f"Shell injection pattern detected: {matched_text}"
-                elif re.match(r'\\[0-7]{3}$', matched_text):
+                elif re.match(r"\\[0-7]{3}$", matched_text):
                     # This is a 3-digit octal escape like \177
                     return False, f"Shell injection pattern detected: {matched_text}"
                 # Otherwise it's likely a Windows path, skip this match
@@ -419,7 +458,7 @@ def _check_shell_injection(command: str) -> Tuple[bool, str]:
             return False, f"Shell injection pattern detected: {matched_text}"
 
     # Check for backticks
-    if '`' in command:
+    if "`" in command:
         return False, "Backtick detected - potential command substitution"
 
     # Check for pipe (allow for safe read-only commands only - handled elsewhere)
@@ -499,17 +538,17 @@ def validate_command_whitelist(command: str) -> Tuple[bool, str]:
     positional_args = []
 
     for arg in args:
-        if arg.startswith('-'):
+        if arg.startswith("-"):
             # It's a flag
-            flag = arg.split('=')[0]  # Handle --flag=value
+            flag = arg.split("=")[0]  # Handle --flag=value
 
             # Handle combined short flags (e.g., -rf -> -r, -f)
-            if flag.startswith('--'):
+            if flag.startswith("--"):
                 # Long option, check as-is
                 flags_to_check = [flag]
             elif len(flag) > 2:
                 # Combined short flags like -rf -> split into -r, -f
-                flags_to_check = ['-' + c for c in flag[1:]]
+                flags_to_check = ["-" + c for c in flag[1:]]
             else:
                 flags_to_check = [flag]
 
@@ -523,7 +562,10 @@ def validate_command_whitelist(command: str) -> Tuple[bool, str]:
     # Step 7: Check argument count
     max_args = config["allowed_args"]
     if max_args >= 0 and len(positional_args) > max_args:
-        return False, f"Too many arguments for {cmd_name}: expected max {max_args}, got {len(positional_args)}"
+        return (
+            False,
+            f"Too many arguments for {cmd_name}: expected max {max_args}, got {len(positional_args)}",
+        )
 
     # Step 8: Special handling for rm command
     if cmd_name == "rm" and positional_args:
@@ -567,33 +609,42 @@ def get_command_risk_level(command: str) -> str:
 # Each pattern is a tuple of (regex_pattern, category, severity)
 SENSITIVE_PATTERNS = [
     # API Key patterns - High severity
-    (r'\bsk-[a-zA-Z0-9]{10,}', 'api_key', 'high'),  # OpenAI API key (at least 10 chars after sk-)
-    (r'\bsk-proj-[a-zA-Z0-9]{10,}', 'api_key', 'high'),  # OpenAI project key
-    (r'\bapi[_-]?key\s*=\s*["\']?[^\s"\']{4,}["\']?', 'api_key', 'high'),  # api_key=xxx or api-key=xxx
-    (r'\bx-api-key\s*[:=]\s*["\']?[^\s"\']{4,}["\']?', 'api_key', 'high'),  # x-api-key: xxx
-    (r'\bAKIA[A-Z0-9]{16}\b', 'api_key', 'high'),  # AWS access key
-
+    (r"\bsk-[a-zA-Z0-9]{10,}", "api_key", "high"),  # OpenAI API key (at least 10 chars after sk-)
+    (r"\bsk-proj-[a-zA-Z0-9]{10,}", "api_key", "high"),  # OpenAI project key
+    (
+        r'\bapi[_-]?key\s*=\s*["\']?[^\s"\']{4,}["\']?',
+        "api_key",
+        "high",
+    ),  # api_key=xxx or api-key=xxx
+    (r'\bx-api-key\s*[:=]\s*["\']?[^\s"\']{4,}["\']?', "api_key", "high"),  # x-api-key: xxx
+    (r"\bAKIA[A-Z0-9]{16}\b", "api_key", "high"),  # AWS access key
     # Password patterns - Medium/High severity
-    (r'\bpassword\s*=\s*["\']?[^\s"\']{3,}["\']?', 'password', 'medium'),  # password=xxx
-    (r'\bpasswd\s*=\s*["\']?[^\s"\']{3,}["\']?', 'password', 'medium'),  # passwd=xxx
-    (r'\bpwd\s*=\s*["\']?[^\s"\']{3,}["\']?', 'password', 'medium'),  # pwd=xxx
-
+    (r'\bpassword\s*=\s*["\']?[^\s"\']{3,}["\']?', "password", "medium"),  # password=xxx
+    (r'\bpasswd\s*=\s*["\']?[^\s"\']{3,}["\']?', "password", "medium"),  # passwd=xxx
+    (r'\bpwd\s*=\s*["\']?[^\s"\']{3,}["\']?', "password", "medium"),  # pwd=xxx
     # Token patterns - High severity
-    (r'\bbearer\s+[a-zA-Z0-9_\-\.]{4,}', 'token', 'high'),  # Bearer xxx
-    (r'\btoken\s*=\s*["\']?[^\s"\']{4,}["\']?', 'token', 'high'),  # token=xxx
-    (r'\bjwt\s+[a-zA-Z0-9_\-]{20,}', 'token', 'high'),  # jwt xxx (longer, real JWT format)
-    (r'\bghp_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub personal access token
-    (r'\bgho_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub OAuth token
-    (r'\bghr_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub refresh token
-    (r'\bghu_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub user-to-server token
-    (r'\bghs_[a-zA-Z0-9]{36}', 'token', 'high'),  # GitHub server-to-server token
-
+    (r"\bbearer\s+[a-zA-Z0-9_\-\.]{4,}", "token", "high"),  # Bearer xxx
+    (r'\btoken\s*=\s*["\']?[^\s"\']{4,}["\']?', "token", "high"),  # token=xxx
+    (r"\bjwt\s+[a-zA-Z0-9_\-]{20,}", "token", "high"),  # jwt xxx (longer, real JWT format)
+    (r"\bghp_[a-zA-Z0-9]{36}", "token", "high"),  # GitHub personal access token
+    (r"\bgho_[a-zA-Z0-9]{36}", "token", "high"),  # GitHub OAuth token
+    (r"\bghr_[a-zA-Z0-9]{36}", "token", "high"),  # GitHub refresh token
+    (r"\bghu_[a-zA-Z0-9]{36}", "token", "high"),  # GitHub user-to-server token
+    (r"\bghs_[a-zA-Z0-9]{36}", "token", "high"),  # GitHub server-to-server token
     # Connection strings with credentials - High severity
-    (r'\bmysql://[^:]+:[^@]+@[^/\s]+', 'connection_string', 'high'),  # mysql://user:pass@host
-    (r'\bpostgresql://[^:]+:[^@]+@[^/\s]+', 'connection_string', 'high'),  # postgresql://user:pass@host
-    (r'\bmongodb(\+srv)?://[^:]+:[^@]+@[^/\s]+', 'connection_string', 'high'),  # mongodb://user:pass@host
-    (r'\bredis://[^:]*:[^@]+@[^/\s]+', 'connection_string', 'high'),  # redis://:pass@host
-    (r'\bpostgres://[^:]+:[^@]+@[^/\s]+', 'connection_string', 'high'),  # postgres://user:pass@host
+    (r"\bmysql://[^:]+:[^@]+@[^/\s]+", "connection_string", "high"),  # mysql://user:pass@host
+    (
+        r"\bpostgresql://[^:]+:[^@]+@[^/\s]+",
+        "connection_string",
+        "high",
+    ),  # postgresql://user:pass@host
+    (
+        r"\bmongodb(\+srv)?://[^:]+:[^@]+@[^/\s]+",
+        "connection_string",
+        "high",
+    ),  # mongodb://user:pass@host
+    (r"\bredis://[^:]*:[^@]+@[^/\s]+", "connection_string", "high"),  # redis://:pass@host
+    (r"\bpostgres://[^:]+:[^@]+@[^/\s]+", "connection_string", "high"),  # postgres://user:pass@host
 ]
 
 
@@ -611,12 +662,7 @@ def check_sensitive_input(text: str) -> Dict[str, Any]:
         - matches: List[Dict] - Detailed match information (for logging)
     """
     if not text or not text.strip():
-        return {
-            "detected": False,
-            "patterns": [],
-            "severity": "none",
-            "matches": []
-        }
+        return {"detected": False, "patterns": [], "severity": "none", "matches": []}
 
     detected_patterns: Set[str] = set()
     matches: List[Dict[str, Any]] = []
@@ -628,12 +674,14 @@ def check_sensitive_input(text: str) -> Dict[str, Any]:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             detected_patterns.add(category)
-            matches.append({
-                "category": category,
-                "severity": severity,
-                "match_start": match.start(),
-                "match_end": match.end(),
-            })
+            matches.append(
+                {
+                    "category": category,
+                    "severity": severity,
+                    "match_start": match.start(),
+                    "match_end": match.end(),
+                }
+            )
             if severity_order.get(severity, 0) > severity_order.get(max_severity, 0):
                 max_severity = severity
 
@@ -641,7 +689,7 @@ def check_sensitive_input(text: str) -> Dict[str, Any]:
         "detected": bool(detected_patterns),
         "patterns": sorted(list(detected_patterns)),
         "severity": max_severity if detected_patterns else "none",
-        "matches": matches
+        "matches": matches,
     }
 
 
@@ -730,13 +778,16 @@ def get_approved_paths() -> Set[str]:
 
 class PathConfirmationRequired(Exception):
     """Exception raised when path requires user confirmation."""
+
     def __init__(self, path: str, reason: str):
         self.path = path
         self.reason = reason
         super().__init__(f"Path requires confirmation: {path} - {reason}")
 
 
-def validate_path(path: str, workspace: str = None, allow_outside: bool = False, require_confirmation: bool = True) -> Tuple[bool, str]:
+def validate_path(
+    path: str, workspace: str = None, allow_outside: bool = False, require_confirmation: bool = True
+) -> Tuple[bool, str]:
     """Validate a file path is within workspace.
 
     Args:
@@ -765,14 +816,14 @@ def validate_path(path: str, workspace: str = None, allow_outside: bool = False,
 
     # 2. Check for various path traversal patterns
     traversal_patterns = [
-        "..",           # Basic traversal
-        "../",          # Unix traversal
-        "..\\",         # Windows traversal
-        "%2e%2e",       # URL-encoded ..
-        "%2e%2e%2f",    # URL-encoded ../
-        "%2e%2e%5c",    # URL-encoded ..\
-        "..%2f",        # Partial encoding
-        "..%5c",        # Partial encoding Windows
+        "..",  # Basic traversal
+        "../",  # Unix traversal
+        "..\\",  # Windows traversal
+        "%2e%2e",  # URL-encoded ..
+        "%2e%2e%2f",  # URL-encoded ../
+        "%2e%2e%5c",  # URL-encoded ..\
+        "..%2f",  # Partial encoding
+        "..%5c",  # Partial encoding Windows
     ]
     path_lower = path.lower()
     for pattern in traversal_patterns:
@@ -796,11 +847,11 @@ def validate_path(path: str, workspace: str = None, allow_outside: bool = False,
         return False, f"Path resolution error: {e}"
 
     # 4. Check for Windows drive letter bypass (e.g., C:\, D:\)
-    if os.name == 'nt' or '\\' in path:
+    if os.name == "nt" or "\\" in path:
         # Normalize path separators
-        normalized = path.replace('\\', '/')
+        normalized = path.replace("\\", "/")
         # Check for absolute Windows paths
-        if re.match(r'^[a-zA-Z]:', normalized):
+        if re.match(r"^[a-zA-Z]:", normalized):
             drive_path = os.path.abspath(path)
             if not allow_outside and not drive_path.startswith(workspace_abs):
                 # Check if already approved
@@ -809,8 +860,7 @@ def validate_path(path: str, workspace: str = None, allow_outside: bool = False,
                 # Raise confirmation exception if enabled
                 if require_confirmation:
                     raise PathConfirmationRequired(
-                        drive_path,
-                        f"Path is outside workspace ({workspace})"
+                        drive_path, f"Path is outside workspace ({workspace})"
                     )
                 return False, f"Absolute Windows path outside workspace: {path}"
 
@@ -828,10 +878,7 @@ def validate_path(path: str, workspace: str = None, allow_outside: bool = False,
             return True, "OK"
         # Raise confirmation exception if enabled
         if require_confirmation:
-            raise PathConfirmationRequired(
-                path_real,
-                f"Path is outside workspace ({workspace})"
-            )
+            raise PathConfirmationRequired(path_real, f"Path is outside workspace ({workspace})")
         return False, f"Path outside workspace: {path}"
 
     return True, "OK"
@@ -859,8 +906,8 @@ def truncate_content(content: str, max_length: int = 10000) -> str:
     """Truncate content if too long, with helpful guidance for continuation."""
     if len(content) > max_length:
         # Count lines for helpful guidance
-        total_lines = content.count('\n') + 1
-        truncated_lines = content[:max_length].count('\n') + 1
+        total_lines = content.count("\n") + 1
+        truncated_lines = content[:max_length].count("\n") + 1
         remaining_lines = total_lines - truncated_lines
 
         return content[:max_length] + (
@@ -881,14 +928,18 @@ class SafetyChecker:
         """Check if a command is safe to execute."""
         return validate_command(command)
 
-    def check_path(self, path: str, allow_outside: bool = False, require_confirmation: bool = True) -> Tuple[bool, str]:
+    def check_path(
+        self, path: str, allow_outside: bool = False, require_confirmation: bool = True
+    ) -> Tuple[bool, str]:
         """Check if a path is safe to access."""
         return validate_path(path, self.workspace, allow_outside, require_confirmation)
 
     def check_file_read(self, path: str, require_confirmation: bool = True) -> Tuple[bool, str]:
         """Check if a file can be safely read."""
         # Allow reading files outside workspace for read operations
-        is_valid, reason = self.check_path(path, allow_outside=True, require_confirmation=require_confirmation)
+        is_valid, reason = self.check_path(
+            path, allow_outside=True, require_confirmation=require_confirmation
+        )
         if not is_valid:
             return is_valid, reason
 
@@ -930,9 +981,11 @@ class SafetyChecker:
 # RATE LIMITING
 # =============================================================================
 
+
 @dataclass
 class RateLimitEntry:
     """Entry for rate limit tracking."""
+
     count: int = 0
     window_start: float = 0.0
     timestamps: List[float] = field(default_factory=list)  # For sliding window
@@ -1058,10 +1111,7 @@ class RateLimiter:
 
         # Refill tokens based on time elapsed
         elapsed = current_time - entry.last_update
-        entry.tokens = min(
-            self.burst_size,
-            entry.tokens + elapsed * self._refill_rate
-        )
+        entry.tokens = min(self.burst_size, entry.tokens + elapsed * self._refill_rate)
 
         if entry.tokens < 1.0:
             return False
@@ -1105,10 +1155,7 @@ class RateLimiter:
             elif self.strategy == "token_bucket":
                 # Refill and get current tokens
                 elapsed = current_time - entry.last_update
-                tokens = min(
-                    self.burst_size,
-                    entry.tokens + elapsed * self._refill_rate
-                )
+                tokens = min(self.burst_size, entry.tokens + elapsed * self._refill_rate)
                 return int(tokens)
 
             return self.requests_per_minute
@@ -1201,6 +1248,7 @@ def get_rate_limiter() -> RateLimiter:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._rate_limiter.is_initialized():
                 _rate_limiter = ctx.rate_limiter
@@ -1229,6 +1277,7 @@ def reset_rate_limiter() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._rate_limiter.reset()
     except ImportError:

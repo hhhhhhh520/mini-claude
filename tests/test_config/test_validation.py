@@ -177,7 +177,8 @@ class TestPathValidation:
             validator.validate_paths()
             # Should not have warning for existing workspace
             workspace_warnings = [
-                w for w in validator.result.warnings
+                w
+                for w in validator.result.warnings
                 if "workspace_root" in w and "does not exist" in w
             ]
             assert len(workspace_warnings) == 0
@@ -196,10 +197,7 @@ class TestPathValidation:
             settings = Settings(log_file_path=log_path)
             validator = ConfigValidator(settings)
             validator.validate_paths()
-            log_warnings = [
-                w for w in validator.result.warnings
-                if "log_file_path" in w
-            ]
+            log_warnings = [w for w in validator.result.warnings if "log_file_path" in w]
             assert len(log_warnings) == 0
 
     def test_log_path_parent_not_exists_warning(self):
@@ -207,17 +205,16 @@ class TestPathValidation:
         settings = Settings(log_file_path="/non/existing/dir/test.log")
         validator = ConfigValidator(settings)
         validator.validate_paths()
-        assert any("log_file_path parent directory does not exist" in w for w in validator.result.warnings)
+        assert any(
+            "log_file_path parent directory does not exist" in w for w in validator.result.warnings
+        )
 
     def test_valid_session_db_path(self):
         """Test valid session db path."""
         settings = Settings(session_db_path="sessions.db")
         validator = ConfigValidator(settings)
         validator.validate_paths()
-        session_errors = [
-            e for e in validator.result.errors
-            if "session_db_path" in e
-        ]
+        session_errors = [e for e in validator.result.errors if "session_db_path" in e]
         assert len(session_errors) == 0
 
     def test_non_existing_vector_db_path_warning(self):
@@ -296,7 +293,10 @@ class TestNumericRangeValidation:
         settings.token_budget_ratio = 0.8  # warn > budget
         validator = ConfigValidator(settings)
         validator.validate_numeric_ranges()
-        assert any("token_warn_ratio" in w and "should be less than" in w for w in validator.result.warnings)
+        assert any(
+            "token_warn_ratio" in w and "should be less than" in w
+            for w in validator.result.warnings
+        )
 
     def test_valid_health_check_port(self):
         """Test valid health_check_port value."""
@@ -316,10 +316,7 @@ class TestNumericRangeValidation:
 
     def test_valid_alert_thresholds(self):
         """Test valid alert threshold values."""
-        settings = Settings(
-            alert_failure_rate_threshold=0.2,
-            alert_token_budget_threshold=0.8
-        )
+        settings = Settings(alert_failure_rate_threshold=0.2, alert_token_budget_threshold=0.8)
         validator = ConfigValidator(settings)
         validator.validate_numeric_ranges()
         threshold_errors = [e for e in validator.result.errors if "threshold" in e]
@@ -331,7 +328,9 @@ class TestNumericRangeValidation:
         settings.alert_failure_rate_threshold = 1.5  # Bypass Pydantic validation
         validator = ConfigValidator(settings)
         validator.validate_numeric_ranges()
-        assert any("alert_failure_rate_threshold must be between" in e for e in validator.result.errors)
+        assert any(
+            "alert_failure_rate_threshold must be between" in e for e in validator.result.errors
+        )
 
 
 class TestCrossFieldValidation:
@@ -359,7 +358,10 @@ class TestCrossFieldValidation:
         # Note: API key validation happens in ConfigValidator, not Pydantic
         validator = ConfigValidator(settings)
         validator.validate_cross_fields()
-        assert any("Production environment requires at least one API key" in e for e in validator.result.errors)
+        assert any(
+            "Production environment requires at least one API key" in e
+            for e in validator.result.errors
+        )
 
     def test_prod_environment_with_api_key(self):
         """Test production environment with API key configured."""
@@ -367,7 +369,7 @@ class TestCrossFieldValidation:
         settings = Settings(
             environment="prod",
             openai_api_key="sk-validkey1234567890123",
-            log_to_json=True  # Required for prod environment
+            log_to_json=True,  # Required for prod environment
         )
         validator = ConfigValidator(settings)
         validator.validate_cross_fields()
@@ -391,7 +393,7 @@ class TestCrossFieldValidation:
             alert_enabled=True,
             alert_webhook_url="https://hooks.example.com/webhook",
             openai_api_key="sk-validkey1234567890123",
-            log_to_json=True
+            log_to_json=True,
         )
         validator = ConfigValidator(settings)
         validator.validate_cross_fields()
@@ -414,11 +416,7 @@ class TestCrossFieldValidation:
         """Test tracing enabled with OTLP exporter but no endpoint."""
         # This is now enforced by Pydantic model_validator - test that it raises
         with pytest.raises(ValueError) as exc_info:
-            Settings(
-                tracing_enabled=True,
-                tracing_exporter="otlp",
-                tracing_otlp_endpoint=""
-            )
+            Settings(tracing_enabled=True, tracing_exporter="otlp", tracing_otlp_endpoint="")
         assert "tracing_otlp_endpoint must be configured" in str(exc_info.value)
 
     def test_tracing_enabled_with_valid_otlp(self):
@@ -426,7 +424,7 @@ class TestCrossFieldValidation:
         settings = Settings(
             tracing_enabled=True,
             tracing_exporter="otlp",
-            tracing_otlp_endpoint="http://localhost:4317"
+            tracing_otlp_endpoint="http://localhost:4317",
         )
         validator = ConfigValidator(settings)
         validator.validate_cross_fields()
@@ -436,9 +434,7 @@ class TestCrossFieldValidation:
     def test_notification_email_without_smtp_warning(self):
         """Test email notification without SMTP settings produces warning."""
         settings = Settings(
-            notification_enabled=True,
-            notification_channels=["email"],
-            smtp_host=None
+            notification_enabled=True, notification_channels=["email"], smtp_host=None
         )
         validator = ConfigValidator(settings)
         validator.validate_cross_fields()
@@ -451,7 +447,7 @@ class TestCrossFieldValidation:
             notification_channels=["email"],
             smtp_host="smtp.example.com",
             smtp_user="user@example.com",
-            smtp_password="password123"
+            smtp_password="password123",
         )
         validator = ConfigValidator(settings)
         validator.validate_cross_fields()
@@ -463,7 +459,7 @@ class TestCrossFieldValidation:
         settings = Settings(
             rate_limit_strategy="token_bucket",
             rate_limit_burst_size=100,
-            rate_limit_requests_per_minute=60
+            rate_limit_requests_per_minute=60,
         )
         validator = ConfigValidator(settings)
         validator.validate_cross_fields()
@@ -490,7 +486,7 @@ class TestValidateConfiguration:
         """Test validate_configuration runs all validation checks."""
         settings = Settings(
             openai_api_key="invalid-format",  # Should produce warning
-            workspace_root="/non/existing/path"  # Should produce warning
+            workspace_root="/non/existing/path",  # Should produce warning
         )
         result = validate_configuration(settings)
         # Should have warnings from API key and path validation
@@ -581,10 +577,7 @@ class TestFieldValidators:
 
     def test_alert_threshold_validator_accepts_valid(self):
         """Test alert threshold validators accept valid values."""
-        settings = Settings(
-            alert_failure_rate_threshold=0.5,
-            alert_token_budget_threshold=0.7
-        )
+        settings = Settings(alert_failure_rate_threshold=0.5, alert_token_budget_threshold=0.7)
         assert settings.alert_failure_rate_threshold == 0.5
         assert settings.alert_token_budget_threshold == 0.7
 
@@ -601,11 +594,7 @@ class TestModelValidator:
     def test_tracing_otlp_without_endpoint_raises_error(self):
         """Test tracing OTLP without endpoint raises ValueError."""
         with pytest.raises(ValueError) as exc_info:
-            Settings(
-                tracing_enabled=True,
-                tracing_exporter="otlp",
-                tracing_otlp_endpoint=""
-            )
+            Settings(tracing_enabled=True, tracing_exporter="otlp", tracing_otlp_endpoint="")
         assert "tracing_otlp_endpoint must be configured" in str(exc_info.value)
 
     def test_tracing_otlp_with_endpoint_valid(self):
@@ -613,7 +602,7 @@ class TestModelValidator:
         settings = Settings(
             tracing_enabled=True,
             tracing_exporter="otlp",
-            tracing_otlp_endpoint="http://localhost:4317"
+            tracing_otlp_endpoint="http://localhost:4317",
         )
         assert settings.tracing_enabled is True
         assert settings.tracing_exporter == "otlp"
@@ -627,9 +616,7 @@ class TestModelValidator:
     def test_production_environment_with_all_requirements(self):
         """Test production environment with all required settings."""
         settings = Settings(
-            environment="prod",
-            log_to_json=True,
-            openai_api_key="sk-validkey1234567890123"
+            environment="prod", log_to_json=True, openai_api_key="sk-validkey1234567890123"
         )
         assert settings.environment == "prod"
         assert settings.log_to_json is True
@@ -637,11 +624,7 @@ class TestModelValidator:
     def test_production_environment_debug_log_level_rejected(self):
         """Test production environment rejects DEBUG log level."""
         with pytest.raises(ValueError) as exc_info:
-            Settings(
-                environment="prod",
-                log_to_json=True,
-                log_level="DEBUG"
-            )
+            Settings(environment="prod", log_to_json=True, log_level="DEBUG")
         assert "log_level must not be DEBUG in production environment" in str(exc_info.value)
 
 
@@ -658,11 +641,7 @@ class TestBackwardCompatibility:
 
     def test_existing_settings_behavior_unchanged(self):
         """Test existing Settings behavior is unchanged."""
-        settings = Settings(
-            default_model="gpt-4",
-            max_iterations=20,
-            max_sub_agents=5
-        )
+        settings = Settings(default_model="gpt-4", max_iterations=20, max_sub_agents=5)
         assert settings.default_model == "gpt-4"
         assert settings.max_iterations == 20
         assert settings.max_sub_agents == 5

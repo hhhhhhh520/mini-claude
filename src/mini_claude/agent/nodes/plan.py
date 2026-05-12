@@ -15,7 +15,7 @@ def _serialize_plan(plan) -> dict:
             {
                 "id": step.id,
                 "description": step.description,
-                "status": step.status.value if hasattr(step.status, 'value') else str(step.status),
+                "status": step.status.value if hasattr(step.status, "value") else str(step.status),
                 "dependencies": step.dependencies,
                 "details": step.details,
             }
@@ -51,7 +51,10 @@ async def plan_node(state: AgentState) -> dict:
         # 首次迭代：检查是否为简单对话
         if iteration == 1:
             simple_indicators = ["你好", "hello", "hi", "介绍", "什么", "如何", "怎么", "为什么"]
-            if any(ind in current_task.lower() for ind in simple_indicators) and len(current_task) < 100:
+            if (
+                any(ind in current_task.lower() for ind in simple_indicators)
+                and len(current_task) < 100
+            ):
                 logger.debug("plan_node: simple query, skip detailed planning")
                 if span:
                     span.set_attribute("query_type", "simple")
@@ -93,7 +96,9 @@ async def plan_node(state: AgentState) -> dict:
                     detected_tools.append(tool_name)
 
         if span:
-            span.set_attribute("detected_tools", ",".join(detected_tools) if detected_tools else "none")
+            span.set_attribute(
+                "detected_tools", ",".join(detected_tools) if detected_tools else "none"
+            )
 
         # 复杂任务可视化（仅首次迭代且启用时）
         if iteration == 1 and detected_tools:
@@ -109,13 +114,19 @@ async def plan_node(state: AgentState) -> dict:
                     visualizer = PlanVisualizer()
                     plan = create_plan_from_analysis(current_task, complexity)
                     visualizer.display_plan(plan, complexity)
-                    logger.debug("plan_node: plan visualization displayed", complexity=complexity.level.value, score=complexity.score)
+                    logger.debug(
+                        "plan_node: plan visualization displayed",
+                        complexity=complexity.level.value,
+                        score=complexity.score,
+                    )
                     if span:
                         span.set_attribute("complexity_score", complexity.score)
                         span.set_attribute("complexity_level", complexity.level.value)
 
                     serialized_plan = _serialize_plan(plan)
-                    logger.debug("plan_node: storing execution plan in state", steps=len(plan.steps))
+                    logger.debug(
+                        "plan_node: storing execution plan in state", steps=len(plan.steps)
+                    )
                     plan_msg = f"执行计划：使用 {', '.join(detected_tools)} 工具完成任务"
                     return {
                         "messages": [AIMessage(content=plan_msg)],
@@ -123,7 +134,10 @@ async def plan_node(state: AgentState) -> dict:
                         "current_step_index": 0,
                     }
                 else:
-                    logger.debug("plan_node: simple task, skipping plan visualization", score=complexity.score)
+                    logger.debug(
+                        "plan_node: simple task, skipping plan visualization",
+                        score=complexity.score,
+                    )
             except Exception as e:
                 logger.warning("plan_node: visualization failed", error=str(e), exc_info=True)
 

@@ -37,10 +37,12 @@ def _(event):
 
 
 # Custom style
-style = Style.from_dict({
-    "prompt": "bold green",
-    "": "#ffffff",
-})
+style = Style.from_dict(
+    {
+        "prompt": "bold green",
+        "": "#ffffff",
+    }
+)
 
 
 class REPLSession:
@@ -107,9 +109,8 @@ class REPLSession:
     def manage_history(self, messages: list, max_messages: int = 50) -> list:
         """Manage message history based on token count."""
         from mini_claude.config.settings import settings
-        return manage_message_history(
-            messages, max_messages, settings.default_model
-        )
+
+        return manage_message_history(messages, max_messages, settings.default_model)
 
     async def run_graph(self):
         """Run REPL with LangGraph state machine."""
@@ -143,10 +144,9 @@ class REPLSession:
                 if user_lower in ("yes", "y", "确认", "同意"):
                     if self.pending_confirmation_path:
                         from ..utils.safety import approve_path
+
                         approve_path(self.pending_confirmation_path)
-                        display.console.print(
-                            f"[green]OK {self.pending_confirmation_path}[/]"
-                        )
+                        display.console.print(f"[green]OK {self.pending_confirmation_path}[/]")
                         self.pending_confirmation_path = None
                         user_input = "请继续执行之前的任务"
 
@@ -155,7 +155,6 @@ class REPLSession:
                 display.show_thinking()
 
                 try:
-
                     history_messages = self._build_history_messages()
                     initial_state = create_initial_state(user_input, history_messages)
 
@@ -164,7 +163,7 @@ class REPLSession:
                         config={
                             "configurable": {"thread_id": self.thread_id},
                             "recursion_limit": 50,
-                        }
+                        },
                     )
 
                     self._process_result(result)
@@ -218,10 +217,7 @@ class REPLSession:
             if isinstance(msg, HumanMessage):
                 self.messages.append({"role": "user", "content": msg.content})
             elif isinstance(msg, AIMessage):
-                self.messages.append({
-                    "role": "assistant",
-                    "content": msg.content or ""
-                })
+                self.messages.append({"role": "assistant", "content": msg.content or ""})
 
         self.messages = self.manage_history(self.messages)
 
@@ -252,4 +248,5 @@ class REPLSession:
             True if command was handled
         """
         from .commands import dispatch_command
+
         return await dispatch_command(self, command, display)

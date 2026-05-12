@@ -62,19 +62,40 @@ class WebFetchTool(BaseTool):
             soup = BeautifulSoup(resp.text, "html.parser")
 
             # Remove non-content elements
-            for tag in soup(["script", "style", "nav", "footer", "header", "aside",
-                             "noscript", "iframe", "form", "button", "input"]):
+            for tag in soup(
+                [
+                    "script",
+                    "style",
+                    "nav",
+                    "footer",
+                    "header",
+                    "aside",
+                    "noscript",
+                    "iframe",
+                    "form",
+                    "button",
+                    "input",
+                ]
+            ):
                 tag.decompose()
 
-            title = soup.title.string.strip() if soup.title and soup.title.string else urlparse(url).netloc
+            title = (
+                soup.title.string.strip()
+                if soup.title and soup.title.string
+                else urlparse(url).netloc
+            )
 
             # Try to find main content area
             main = (
-                soup.find("main") or
-                soup.find("article") or
-                soup.find(role="main") or
-                soup.find(id=lambda x: x and ("content" in x.lower() or "article" in x.lower())) or
-                soup.find(class_=lambda x: x and ("content" in " ".join(x).lower() or "article" in " ".join(x).lower()))
+                soup.find("main")
+                or soup.find("article")
+                or soup.find(role="main")
+                or soup.find(id=lambda x: x and ("content" in x.lower() or "article" in x.lower()))
+                or soup.find(
+                    class_=lambda x: (
+                        x and ("content" in " ".join(x).lower() or "article" in " ".join(x).lower())
+                    )
+                )
             )
 
             body = main or soup.body or soup

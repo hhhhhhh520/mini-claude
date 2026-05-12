@@ -24,6 +24,7 @@ class ValidationResult:
         warnings: List of warning messages (non-blocking issues)
         errors: List of error messages (blocking issues for production)
     """
+
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
 
@@ -75,8 +76,8 @@ class ConfigValidator:
     """
 
     # API Key format patterns
-    OPENAI_KEY_PATTERN = re.compile(r'^sk-[a-zA-Z0-9]{20,}$')
-    ANTHROPIC_KEY_PATTERN = re.compile(r'^sk-ant-[a-zA-Z0-9-]{20,}$')
+    OPENAI_KEY_PATTERN = re.compile(r"^sk-[a-zA-Z0-9]{20,}$")
+    ANTHROPIC_KEY_PATTERN = re.compile(r"^sk-ant-[a-zA-Z0-9-]{20,}$")
 
     # Numeric ranges
     MAX_ITERATIONS_MIN = 1
@@ -120,7 +121,7 @@ class ConfigValidator:
         # Validate OpenAI API key
         if self.settings.openai_api_key:
             key = self.settings.openai_api_key
-            if not key.startswith('sk-'):
+            if not key.startswith("sk-"):
                 self.result.add_warning(
                     f"openai_api_key should start with 'sk-', got prefix '{key[:5]}...'"
                 )
@@ -132,7 +133,7 @@ class ConfigValidator:
         # Validate Anthropic API key
         if self.settings.anthropic_api_key:
             key = self.settings.anthropic_api_key
-            if not key.startswith('sk-ant-'):
+            if not key.startswith("sk-ant-"):
                 self.result.add_warning(
                     f"anthropic_api_key should start with 'sk-ant-', got prefix '{key[:10]}...'"
                 )
@@ -141,9 +142,7 @@ class ConfigValidator:
         if self.settings.google_api_key:
             key = self.settings.google_api_key
             if len(key) < 10:
-                self.result.add_warning(
-                    f"google_api_key seems too short ({len(key)} chars)"
-                )
+                self.result.add_warning(f"google_api_key seems too short ({len(key)} chars)")
 
     def validate_paths(self) -> None:
         """Validate path configurations.
@@ -176,17 +175,13 @@ class ConfigValidator:
         log_path = Path(self.settings.log_file_path)
         log_parent = log_path.parent
         if log_parent and not log_parent.exists():
-            self.result.add_warning(
-                f"log_file_path parent directory does not exist: {log_parent}"
-            )
+            self.result.add_warning(f"log_file_path parent directory does not exist: {log_parent}")
 
         # Validate log_json_path
         json_path = Path(self.settings.log_json_path)
         json_parent = json_path.parent
         if json_parent and not json_parent.exists():
-            self.result.add_warning(
-                f"log_json_path parent directory does not exist: {json_parent}"
-            )
+            self.result.add_warning(f"log_json_path parent directory does not exist: {json_parent}")
 
         # Validate log_audit_path
         audit_path = Path(self.settings.log_audit_path)
@@ -238,7 +233,11 @@ class ConfigValidator:
             )
 
         # Validate token_budget_ratio
-        if not (self.TOKEN_BUDGET_RATIO_MIN <= self.settings.token_budget_ratio <= self.TOKEN_BUDGET_RATIO_MAX):
+        if not (
+            self.TOKEN_BUDGET_RATIO_MIN
+            <= self.settings.token_budget_ratio
+            <= self.TOKEN_BUDGET_RATIO_MAX
+        ):
             self.result.add_error(
                 f"token_budget_ratio must be between {self.TOKEN_BUDGET_RATIO_MIN} and "
                 f"{self.TOKEN_BUDGET_RATIO_MAX}, got {self.settings.token_budget_ratio}"
@@ -293,11 +292,13 @@ class ConfigValidator:
                 )
 
             # Must have at least one API key
-            if not any([
-                self.settings.anthropic_api_key,
-                self.settings.openai_api_key,
-                self.settings.google_api_key
-            ]):
+            if not any(
+                [
+                    self.settings.anthropic_api_key,
+                    self.settings.openai_api_key,
+                    self.settings.google_api_key,
+                ]
+            ):
                 self.result.add_error(
                     "Production environment requires at least one API key to be configured"
                 )
@@ -319,11 +320,9 @@ class ConfigValidator:
         # Notification validation
         if self.settings.notification_enabled:
             if "email" in self.settings.notification_channels:
-                if not all([
-                    self.settings.smtp_host,
-                    self.settings.smtp_user,
-                    self.settings.smtp_password
-                ]):
+                if not all(
+                    [self.settings.smtp_host, self.settings.smtp_user, self.settings.smtp_password]
+                ):
                     self.result.add_warning(
                         "Email notification enabled but SMTP settings are incomplete"
                     )

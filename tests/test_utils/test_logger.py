@@ -89,6 +89,7 @@ class TestStructuredFormatter:
             raise ValueError("Test error")
         except ValueError:
             import sys
+
             exc_info = sys.exc_info()
 
         record = logging.LogRecord(
@@ -416,8 +417,9 @@ class TestLogRotation:
 
         # Check that backup file was created
         # Note: RotatingFileHandler creates .1, .2, etc. files
-        backup_exists = (temp_log_dir / "rotate.log.1").exists() or \
-                       (temp_log_dir / "rotate.log").stat().st_size > 0
+        backup_exists = (temp_log_dir / "rotate.log.1").exists() or (
+            temp_log_dir / "rotate.log"
+        ).stat().st_size > 0
 
         assert backup_exists
 
@@ -714,7 +716,9 @@ class TestExecutionLogExporter:
     def test_export_markdown_basic(self, temp_log_dir: Path, clean_logging):
         """Test basic Markdown export."""
         exporter = ExecutionLogExporter()
-        output = exporter.export_markdown("test_session", include_metrics=False, include_audit=False)
+        output = exporter.export_markdown(
+            "test_session", include_metrics=False, include_audit=False
+        )
 
         # Verify Markdown structure
         assert "# Execution Log Export" in output
@@ -871,7 +875,9 @@ class TestExecutionLogExporter:
         )
 
         exporter = ExecutionLogExporter(sanitize_output=True)
-        output = exporter.export_json("sensitive_session", include_metrics=False, include_audit=False)
+        output = exporter.export_json(
+            "sensitive_session", include_metrics=False, include_audit=False
+        )
 
         # Verify sensitive data is sanitized
         assert "sk-abcdefghijklmnopqrstuvwxyz123456" not in output
@@ -892,7 +898,9 @@ class TestExecutionLogExporter:
         )
 
         exporter = ExecutionLogExporter(sanitize_output=True)
-        output = exporter.export_markdown("sensitive_session", include_metrics=False, include_audit=False)
+        output = exporter.export_markdown(
+            "sensitive_session", include_metrics=False, include_audit=False
+        )
 
         assert "sk-abcdefghijklmnopqrstuvwxyz123456" not in output
 
@@ -910,7 +918,9 @@ class TestExecutionLogExporter:
         )
 
         exporter = ExecutionLogExporter(sanitize_output=True)
-        output = exporter.export_html("sensitive_session", include_metrics=False, include_audit=False)
+        output = exporter.export_html(
+            "sensitive_session", include_metrics=False, include_audit=False
+        )
 
         assert "sk-abcdefghijklmnopqrstuvwxyz123456" not in output
 
@@ -1013,7 +1023,9 @@ class TestExecutionLogExporter:
     def test_export_empty_session(self, temp_log_dir: Path, clean_logging):
         """Test export of non-existent session."""
         exporter = ExecutionLogExporter()
-        output = exporter.export_json("nonexistent_session", include_metrics=False, include_audit=False)
+        output = exporter.export_json(
+            "nonexistent_session", include_metrics=False, include_audit=False
+        )
 
         data = json.loads(output)
         assert data["export_metadata"]["session_id"] == "nonexistent_session"

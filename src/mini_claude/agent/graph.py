@@ -65,11 +65,11 @@ def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
         "observe",
         route_after_observe,
         {
-            "reflect": "reflect",          # 复杂任务：先反思
-            "continue": "check_completion", # 简单任务：直接检查完成度
-            "error": "handle_error",         # 错误处理
-            "complete": END,                 # 任务完成
-        }
+            "reflect": "reflect",  # 复杂任务：先反思
+            "continue": "check_completion",  # 简单任务：直接检查完成度
+            "error": "handle_error",  # 错误处理
+            "complete": END,  # 任务完成
+        },
     )
 
     # Reflect 后进入 check_completion
@@ -78,7 +78,7 @@ def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
         route_after_reflect,
         {
             "continue": "check_completion",
-        }
+        },
     )
 
     # 条件路由：check_completion 后
@@ -86,10 +86,10 @@ def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
         "check_completion",
         route_completion_check,
         {
-            "complete": END,        # 任务完成
+            "complete": END,  # 任务完成
             "incomplete": "think",  # 继续循环
-            "retry": "retry",       # 重试
-        }
+            "retry": "retry",  # 重试
+        },
     )
 
     # 条件路由：handle_error 后
@@ -97,9 +97,9 @@ def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
         "handle_error",
         route_on_error,
         {
-            "retry": "retry",   # 重试
-            "abort": END,       # 终止
-        }
+            "retry": "retry",  # 重试
+            "abort": END,  # 终止
+        },
     )
 
     # 重试后回到 act
@@ -127,11 +127,7 @@ def build_agent_graph_simple():
     graph.add_edge("think", "plan")
     graph.add_edge("plan", "act")
     graph.add_edge("act", "observe")
-    graph.add_conditional_edges(
-        "observe",
-        should_continue_router,
-        {True: "think", False: END}
-    )
+    graph.add_conditional_edges("observe", should_continue_router, {True: "think", False: END})
 
     return graph.compile()
 
@@ -162,23 +158,15 @@ def build_agent_graph_no_checkpoint():
             "continue": "check_completion",
             "error": "handle_error",
             "complete": END,
-        }
+        },
     )
-    graph.add_conditional_edges(
-        "reflect",
-        route_after_reflect,
-        {"continue": "check_completion"}
-    )
+    graph.add_conditional_edges("reflect", route_after_reflect, {"continue": "check_completion"})
     graph.add_conditional_edges(
         "check_completion",
         route_completion_check,
-        {"complete": END, "incomplete": "think", "retry": "retry"}
+        {"complete": END, "incomplete": "think", "retry": "retry"},
     )
-    graph.add_conditional_edges(
-        "handle_error",
-        route_on_error,
-        {"retry": "retry", "abort": END}
-    )
+    graph.add_conditional_edges("handle_error", route_on_error, {"retry": "retry", "abort": END})
     graph.add_edge("retry", "act")
 
     return graph.compile()

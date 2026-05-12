@@ -122,11 +122,7 @@ class TestSettingsBackwardCompatibility:
 
     def test_new_settings_dont_affect_existing(self):
         """Test new settings don't break existing functionality."""
-        settings = Settings(
-            default_model="gpt-4",
-            max_iterations=20,
-            vector_db_type="faiss"
-        )
+        settings = Settings(default_model="gpt-4", max_iterations=20, vector_db_type="faiss")
         assert settings.default_model == "gpt-4"
         assert settings.max_iterations == 20
         assert settings.vector_db_type == "faiss"

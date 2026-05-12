@@ -79,18 +79,41 @@ class SessionManager:
             # Use UPDATE if session exists to preserve execution_state
             cursor.execute("SELECT id FROM sessions WHERE id = ?", (session_id,))
             if cursor.fetchone():
-                cursor.execute("""
+                cursor.execute(
+                    """
                     UPDATE sessions SET
                     updated_at = ?, messages = ?, context = ?, summary = ?, token_count = ?, compressed_at = ?
                     WHERE id = ?
-                """, (now, messages_json, context_json, summary, token_count, compressed_at, session_id))
+                """,
+                    (
+                        now,
+                        messages_json,
+                        context_json,
+                        summary,
+                        token_count,
+                        compressed_at,
+                        session_id,
+                    ),
+                )
             else:
                 # INSERT new session without execution_state
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO sessions
                     (id, created_at, updated_at, messages, context, summary, token_count, compressed_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (session_id, now, now, messages_json, context_json, summary, token_count, compressed_at))
+                """,
+                    (
+                        session_id,
+                        now,
+                        now,
+                        messages_json,
+                        context_json,
+                        summary,
+                        token_count,
+                        compressed_at,
+                    ),
+                )
 
     def load_session(self, session_id: str) -> tuple[Optional[List[Dict[str, Any]]], Optional[str]]:
         """Load a session by ID.
@@ -114,7 +137,7 @@ class SessionManager:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT id, created_at, updated_at, messages, context, summary, token_count, compressed_at FROM sessions WHERE id = ?",
-                (session_id,)
+                (session_id,),
             )
             row = cursor.fetchone()
 
@@ -144,12 +167,14 @@ class SessionManager:
 
             sessions = []
             for row in cursor.fetchall():
-                sessions.append({
-                    "id": row[0],
-                    "created_at": row[1],
-                    "updated_at": row[2],
-                    "message_count": row[3],
-                })
+                sessions.append(
+                    {
+                        "id": row[0],
+                        "created_at": row[1],
+                        "updated_at": row[2],
+                        "message_count": row[3],
+                    }
+                )
 
         return sessions
 
@@ -188,7 +213,7 @@ class SessionManager:
             if cursor.fetchone():
                 cursor.execute(
                     "UPDATE sessions SET execution_state = ?, updated_at = ? WHERE id = ?",
-                    (state_json, datetime.now().isoformat(), session_id)
+                    (state_json, datetime.now().isoformat(), session_id),
                 )
             else:
                 # Create a new session with execution state
@@ -197,7 +222,7 @@ class SessionManager:
                     """INSERT INTO sessions
                     (id, created_at, updated_at, messages, execution_state)
                     VALUES (?, ?, ?, '[]', ?)""",
-                    (session_id, now, now, state_json)
+                    (session_id, now, now, state_json),
                 )
         return True
 
@@ -212,10 +237,7 @@ class SessionManager:
         """
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT execution_state FROM sessions WHERE id = ?",
-                (session_id,)
-            )
+            cursor.execute("SELECT execution_state FROM sessions WHERE id = ?", (session_id,))
             row = cursor.fetchone()
 
         if row and row[0]:
@@ -241,7 +263,7 @@ class SessionManager:
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE sessions SET execution_state = NULL, updated_at = ? WHERE id = ?",
-                (datetime.now().isoformat(), session_id)
+                (datetime.now().isoformat(), session_id),
             )
         return True
 
@@ -267,14 +289,16 @@ class SessionManager:
                 state_data = json.loads(row[3])
                 state = ExecutionState.from_dict(state_data)
                 if state.is_valid():
-                    interrupted.append({
-                        "id": row[0],
-                        "created_at": row[1],
-                        "updated_at": row[2],
-                        "current_node": state.current_node,
-                        "iteration_count": state.iteration_count,
-                        "has_error": bool(state.last_error),
-                    })
+                    interrupted.append(
+                        {
+                            "id": row[0],
+                            "created_at": row[1],
+                            "updated_at": row[2],
+                            "current_node": state.current_node,
+                            "iteration_count": state.iteration_count,
+                            "has_error": bool(state.last_error),
+                        }
+                    )
             except (json.JSONDecodeError, KeyError, TypeError):
                 continue
 
@@ -302,6 +326,7 @@ def get_session_manager(db_path: str = "sessions.db") -> SessionManager:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._session_manager.is_initialized():
                 _session_manager = ctx.session_manager
@@ -320,6 +345,7 @@ def reset_session_manager() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._session_manager.reset()
     except ImportError:

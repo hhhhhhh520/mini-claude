@@ -25,6 +25,7 @@ def lock_manager():
 
 # ========== FileLockManager Tests (20个) ==========
 
+
 class TestFileLockManager:
     """测试文件锁管理器 - 20个测试用例"""
 
@@ -157,7 +158,9 @@ class TestFileLockManager:
     @pytest.mark.asyncio
     async def test_lock_nonexistent_file(self, lock_manager):
         """测试锁定不存在的文件"""
-        success, message = await lock_manager.acquire_lock("/nonexistent/path/file.txt", "agent1", "write")
+        success, message = await lock_manager.acquire_lock(
+            "/nonexistent/path/file.txt", "agent1", "write"
+        )
         # 可能成功（创建新文件）或失败（路径不存在）
         assert success is not None
 
@@ -253,6 +256,7 @@ class TestFileLockManager:
 
 # ========== FileLock Dataclass Tests (10个) ==========
 
+
 class TestFileLock:
     """测试文件锁数据类 - 10个测试用例"""
 
@@ -316,6 +320,7 @@ class TestFileLock:
 
 # ========== FileVersion Tests (10个) ==========
 
+
 class TestFileVersion:
     """测试文件版本 - 10个测试用例"""
 
@@ -376,6 +381,7 @@ class TestFileVersion:
 
 
 # ========== LockState Enum Tests (5个) ==========
+
 
 class TestLockState:
     """测试锁状态枚举 - 5个测试用例"""

@@ -7,6 +7,7 @@ import time
 
 try:
     import tiktoken
+
     TIKTOKEN_AVAILABLE = True
 except ImportError:
     TIKTOKEN_AVAILABLE = False
@@ -14,6 +15,7 @@ except ImportError:
 
 class TokenLimitStrategy(str, Enum):
     """Token limit handling strategy."""
+
     WARN = "warn"  # Log warning when approaching limit
     TRUNCATE = "truncate"  # Truncate oldest messages
     SUMMARIZE = "summarize"  # Summarize old messages
@@ -27,6 +29,7 @@ CIRCUIT_BREAKER_RESET_AFTER = 300  # Reset failure count after 300 seconds (5 mi
 @dataclass
 class ModelTokenLimits:
     """Token limits for different models."""
+
     context_window: int
     max_output: int
     encoding_name: str = "cl100k_base"  # Default for GPT-4/Claude
@@ -41,19 +44,16 @@ MODEL_LIMITS: Dict[str, ModelTokenLimits] = {
     "claude-opus-4-7": ModelTokenLimits(200000, 16384, "cl100k_base"),
     "claude-sonnet-4-6": ModelTokenLimits(200000, 16384, "cl100k_base"),
     "claude-haiku-4-5": ModelTokenLimits(200000, 8192, "cl100k_base"),
-
     # OpenAI models
     "gpt-4": ModelTokenLimits(8192, 4096, "cl100k_base"),
     "gpt-4-32k": ModelTokenLimits(32768, 4096, "cl100k_base"),
     "gpt-4-turbo": ModelTokenLimits(128000, 4096, "cl100k_base"),
     "gpt-4o": ModelTokenLimits(128000, 16384, "cl100k_base"),
     "gpt-4o-mini": ModelTokenLimits(128000, 16384, "cl100k_base"),
-
     # DeepSeek models
     "deepseek-chat": ModelTokenLimits(128000, 8192, "cl100k_base"),
     "deepseek-coder": ModelTokenLimits(128000, 8192, "cl100k_base"),
     "deepseek-v4-flash": ModelTokenLimits(128000, 16384, "cl100k_base"),
-
     # Default fallback
     "default": ModelTokenLimits(128000, 4096, "cl100k_base"),
 }
@@ -117,7 +117,10 @@ class TokenCounter:
         current_time = time.time()
 
         # Reset circuit breaker after cooldown period
-        if self._circuit_open and (current_time - self._last_failure_time) > CIRCUIT_BREAKER_RESET_AFTER:
+        if (
+            self._circuit_open
+            and (current_time - self._last_failure_time) > CIRCUIT_BREAKER_RESET_AFTER
+        ):
             self._summarize_failures = 0
             self._circuit_open = False
             return True
@@ -268,7 +271,7 @@ class TokenCounter:
         self,
         messages: List[Dict[str, Any]],
         keep_first: int = 1,  # Keep system message
-        keep_last: int = 4,   # Keep recent context
+        keep_last: int = 4,  # Keep recent context
     ) -> List[Dict[str, Any]]:
         """Truncate messages to fit within budget.
 
@@ -341,7 +344,7 @@ class TokenCounter:
         messages: List[Dict[str, Any]],
         llm_chat_func: Callable,
         keep_first: int = 1,  # Keep system message
-        keep_last: int = 4,   # Keep recent context
+        keep_last: int = 4,  # Keep recent context
         max_summary_tokens: int = 500,
         return_summary_only: bool = False,
     ) -> tuple[List[Dict[str, Any]], Optional[str]]:
@@ -369,8 +372,12 @@ class TokenCounter:
         # Check circuit breaker before attempting summarization
         if not self._check_circuit_breaker():
             # Circuit is open, fall back to truncation immediately
-            print(f"[WARN] Circuit breaker open - summarization disabled after {self._summarize_failures} failures")
-            return self.truncate_messages(messages, keep_first=keep_first, keep_last=keep_last), None
+            print(
+                f"[WARN] Circuit breaker open - summarization disabled after {self._summarize_failures} failures"
+            )
+            return self.truncate_messages(
+                messages, keep_first=keep_first, keep_last=keep_last
+            ), None
 
         # Split messages
         first = messages[:keep_first]
@@ -427,7 +434,9 @@ class TokenCounter:
             stats = self.get_usage_stats(result)
             if stats["is_over_budget"]:
                 # Still over budget, truncate further
-                return self.truncate_messages(result, keep_first=keep_first, keep_last=keep_last - 1), summary
+                return self.truncate_messages(
+                    result, keep_first=keep_first, keep_last=keep_last - 1
+                ), summary
 
             return result, summary
 
@@ -437,9 +446,14 @@ class TokenCounter:
 
             # If summarization fails, fall back to truncation
             import traceback
-            print(f"[WARN] Summarization failed (attempt {self._summarize_failures}/{CIRCUIT_BREAKER_MAX_FAILURES}): {e}")
+
+            print(
+                f"[WARN] Summarization failed (attempt {self._summarize_failures}/{CIRCUIT_BREAKER_MAX_FAILURES}): {e}"
+            )
             print(f"[DEBUG] Traceback: {traceback.format_exc()}")
-            return self.truncate_messages(messages, keep_first=keep_first, keep_last=keep_last), None
+            return self.truncate_messages(
+                messages, keep_first=keep_first, keep_last=keep_last
+            ), None
 
     def _format_messages_for_summary(self, messages: List[Dict[str, Any]]) -> str:
         """Format messages into text for summarization."""
@@ -503,6 +517,7 @@ def get_token_counter(model: str = "deepseek-chat") -> TokenCounter:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._token_counter.is_initialized():
                 cached = ctx.token_counter
@@ -526,6 +541,7 @@ def reset_token_counter() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._token_counter.reset()
     except ImportError:

@@ -15,10 +15,12 @@ from typing import Optional
 # Security: Use defusedxml for XML parsing to prevent XML attacks
 try:
     from defusedxml.ElementTree import parse as safe_parse
+
     XML_SAFE = True
 except ImportError:
     # Fallback to standard library if defusedxml not installed
     import xml.etree.ElementTree as ET  # noqa: B314
+
     safe_parse = ET.parse  # type: ignore[assignment]
     XML_SAFE = False
 
@@ -26,6 +28,7 @@ except ImportError:
 @dataclass
 class RegressionResult:
     """Single test result."""
+
     name: str
     status: str  # passed, failed, skipped, error
     duration: float
@@ -36,6 +39,7 @@ class RegressionResult:
 @dataclass
 class GroupResult:
     """Results for a test group (unit, integration, etc.)."""
+
     group_name: str
     total: int = 0
     passed: int = 0
@@ -55,6 +59,7 @@ class GroupResult:
 @dataclass
 class Report:
     """Full regression test report."""
+
     timestamp: str
     duration: float
     groups: list[GroupResult]
@@ -109,14 +114,18 @@ class RegressionRunner:
         self.report_dir = report_dir or self.project_root / "reports"
         self.report_dir.mkdir(parents=True, exist_ok=True)
 
-    def run_group(self, group_name: str, test_paths: list[str], extra_args: Optional[list[str]] = None) -> GroupResult:
+    def run_group(
+        self, group_name: str, test_paths: list[str], extra_args: Optional[list[str]] = None
+    ) -> GroupResult:
         """Run tests for a specific group."""
         result = GroupResult(group_name=group_name)
         start_time = time.time()
 
         # Build pytest command
         cmd = [
-            sys.executable, "-m", "pytest",
+            sys.executable,
+            "-m",
+            "pytest",
             "-v",
             "--tb=short",
             f"--junitxml=.baseline/junit_{group_name}.xml",
@@ -147,22 +156,26 @@ class RegressionRunner:
 
         except subprocess.TimeoutExpired:
             result.errors = 1
-            result.tests.append(RegressionResult(
-                name=f"{group_name}_timeout",
-                status="error",
-                duration=600,
-                message="Test group timed out after 10 minutes",
-            ))
+            result.tests.append(
+                RegressionResult(
+                    name=f"{group_name}_timeout",
+                    status="error",
+                    duration=600,
+                    message="Test group timed out after 10 minutes",
+                )
+            )
             result.duration = 600
 
         except Exception as e:
             result.errors = 1
-            result.tests.append(RegressionResult(
-                name=f"{group_name}_error",
-                status="error",
-                duration=time.time() - start_time,
-                message=str(e),
-            ))
+            result.tests.append(
+                RegressionResult(
+                    name=f"{group_name}_error",
+                    status="error",
+                    duration=time.time() - start_time,
+                    message=str(e),
+                )
+            )
             result.duration = time.time() - start_time
 
         return result
@@ -215,13 +228,15 @@ class RegressionRunner:
                 except ValueError:
                     duration = 0.0
 
-                result.tests.append(RegressionResult(
-                    name=full_name,
-                    status=status,
-                    duration=duration,
-                    message=message,
-                    traceback=traceback,
-                ))
+                result.tests.append(
+                    RegressionResult(
+                        name=full_name,
+                        status=status,
+                        duration=duration,
+                        message=message,
+                        traceback=traceback,
+                    )
+                )
 
         except ET.ParseError:
             # If XML parsing fails, return empty result
@@ -262,28 +277,28 @@ class RegressionRunner:
 
             # Check if test paths exist
             existing_paths = [
-                str(self.project_root / p)
-                for p in test_paths
-                if (self.project_root / p).exists()
+                str(self.project_root / p) for p in test_paths if (self.project_root / p).exists()
             ]
 
             if not existing_paths:
                 # Try running by marker only if paths don't exist
                 existing_paths = [str(self.project_root / "tests")]
 
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"Running {group_name} tests...")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             group_result = self.run_group(group_name, existing_paths)
             report_groups.append(group_result)
 
-            print(f"\n{group_name.capitalize()} tests: "
-                  f"{group_result.passed} passed, "
-                  f"{group_result.failed} failed, "
-                  f"{group_result.skipped} skipped, "
-                  f"{group_result.errors} errors "
-                  f"in {group_result.duration:.2f}s")
+            print(
+                f"\n{group_name.capitalize()} tests: "
+                f"{group_result.passed} passed, "
+                f"{group_result.failed} failed, "
+                f"{group_result.skipped} skipped, "
+                f"{group_result.errors} errors "
+                f"in {group_result.duration:.2f}s"
+            )
 
         total_duration = time.time() - start_time
 
@@ -334,33 +349,41 @@ class RegressionRunner:
             if name in baseline_tests:
                 old_status = baseline_tests[name]
                 if old_status == "passed" and status in ("failed", "error"):
-                    comparison["regressions"].append({
-                        "name": name,
-                        "old_status": old_status,
-                        "new_status": status,
-                    })
+                    comparison["regressions"].append(
+                        {
+                            "name": name,
+                            "old_status": old_status,
+                            "new_status": status,
+                        }
+                    )
                 elif old_status in ("failed", "error") and status == "passed":
-                    comparison["improvements"].append({
-                        "name": name,
-                        "old_status": old_status,
-                        "new_status": status,
-                    })
+                    comparison["improvements"].append(
+                        {
+                            "name": name,
+                            "old_status": old_status,
+                            "new_status": status,
+                        }
+                    )
 
         # Find new failures (tests that didn't exist before)
         for name, status in current_tests.items():
             if name not in baseline_tests and status in ("failed", "error"):
-                comparison["new_failures"].append({
-                    "name": name,
-                    "status": status,
-                })
+                comparison["new_failures"].append(
+                    {
+                        "name": name,
+                        "status": status,
+                    }
+                )
 
         # Find new passes
         for name, status in current_tests.items():
             if name not in baseline_tests and status == "passed":
-                comparison["new_passes"].append({
-                    "name": name,
-                    "status": status,
-                })
+                comparison["new_passes"].append(
+                    {
+                        "name": name,
+                        "status": status,
+                    }
+                )
 
         return comparison
 
@@ -468,26 +491,30 @@ class RegressionRunner:
         ]
 
         for group in report.groups:
-            lines.extend([
-                f"### {group.group_name.capitalize()}",
-                "",
-                "| Status | Count |",
-                "|--------|-------|",
-                f"| Passed | {group.passed} |",
-                f"| Failed | {group.failed} |",
-                f"| Skipped | {group.skipped} |",
-                f"| Errors | {group.errors} |",
-                f"| Duration | {group.duration:.2f}s |",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"### {group.group_name.capitalize()}",
+                    "",
+                    "| Status | Count |",
+                    "|--------|-------|",
+                    f"| Passed | {group.passed} |",
+                    f"| Failed | {group.failed} |",
+                    f"| Skipped | {group.skipped} |",
+                    f"| Errors | {group.errors} |",
+                    f"| Duration | {group.duration:.2f}s |",
+                    "",
+                ]
+            )
 
             # List failed tests
             failed_tests = [t for t in group.tests if t.status in ("failed", "error")]
             if failed_tests:
-                lines.extend([
-                    "#### Failed Tests",
-                    "",
-                ])
+                lines.extend(
+                    [
+                        "#### Failed Tests",
+                        "",
+                    ]
+                )
                 for test in failed_tests:
                     lines.append(f"- **{test.name}**")
                     if test.message:
@@ -496,10 +523,12 @@ class RegressionRunner:
 
         # Baseline comparison
         if report.baseline_comparison:
-            lines.extend([
-                "## Baseline Comparison",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Baseline Comparison",
+                    "",
+                ]
+            )
 
             regressions = report.baseline_comparison.get("regressions", [])
             if regressions:

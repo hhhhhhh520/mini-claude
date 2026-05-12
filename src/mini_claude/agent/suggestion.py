@@ -10,20 +10,22 @@ from typing import List, Optional, Dict, Any
 
 class ErrorType(Enum):
     """Error type classification."""
-    API_RATE_LIMIT = "api_rate_limit"       # API 限流
-    FILE_PERMISSION = "file_permission"      # 文件权限
-    NETWORK_TIMEOUT = "network_timeout"      # 网络超时
-    TOKEN_EXCEEDED = "token_exceeded"        # Token 超限
-    TOOL_FAILURE = "tool_failure"            # 工具失败
-    MODEL_ERROR = "model_error"              # 模型错误
-    FILE_NOT_FOUND = "file_not_found"        # 文件不存在
-    TEXT_NOT_FOUND = "text_not_found"        # 文本未找到
+
+    API_RATE_LIMIT = "api_rate_limit"  # API 限流
+    FILE_PERMISSION = "file_permission"  # 文件权限
+    NETWORK_TIMEOUT = "network_timeout"  # 网络超时
+    TOKEN_EXCEEDED = "token_exceeded"  # Token 超限
+    TOOL_FAILURE = "tool_failure"  # 工具失败
+    MODEL_ERROR = "model_error"  # 模型错误
+    FILE_NOT_FOUND = "file_not_found"  # 文件不存在
+    TEXT_NOT_FOUND = "text_not_found"  # 文本未找到
     INVALID_PARAMETER = "invalid_parameter"  # 参数无效
-    UNKNOWN = "unknown"                      # 未知错误
+    UNKNOWN = "unknown"  # 未知错误
 
 
 class Priority(Enum):
     """Suggestion priority level."""
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -41,6 +43,7 @@ class Suggestion:
         command: Optional command to execute
         doc_link: Optional documentation link
     """
+
     title: str
     description: str
     actions: List[str] = field(default_factory=list)
@@ -76,7 +79,6 @@ class SuggestionEngine:
         "quota exceeded": ErrorType.API_RATE_LIMIT,
         "请求频率超限": ErrorType.API_RATE_LIMIT,
         "速率限制": ErrorType.API_RATE_LIMIT,
-
         # File Permission patterns
         "permission denied": ErrorType.FILE_PERMISSION,
         "permissiondenied": ErrorType.FILE_PERMISSION,  # camel case: PermissionDenied
@@ -85,7 +87,6 @@ class SuggestionEngine:
         "权限不足": ErrorType.FILE_PERMISSION,
         "无法访问": ErrorType.FILE_PERMISSION,
         "chmod": ErrorType.FILE_PERMISSION,
-
         # Network Timeout patterns
         "timeout": ErrorType.NETWORK_TIMEOUT,
         "timed out": ErrorType.NETWORK_TIMEOUT,
@@ -93,7 +94,6 @@ class SuggestionEngine:
         "网络超时": ErrorType.NETWORK_TIMEOUT,
         "连接超时": ErrorType.NETWORK_TIMEOUT,
         "asyncio.TimeoutError": ErrorType.NETWORK_TIMEOUT,
-
         # Token Exceeded patterns
         "token limit": ErrorType.TOKEN_EXCEEDED,
         "context length": ErrorType.TOKEN_EXCEEDED,
@@ -101,7 +101,6 @@ class SuggestionEngine:
         "token 超限": ErrorType.TOKEN_EXCEEDED,
         "上下文过长": ErrorType.TOKEN_EXCEEDED,
         "token budget exceeded": ErrorType.TOKEN_EXCEEDED,
-
         # Tool Failure patterns
         "tool error": ErrorType.TOOL_FAILURE,
         "tool failed": ErrorType.TOOL_FAILURE,
@@ -109,7 +108,6 @@ class SuggestionEngine:
         "工具执行失败": ErrorType.TOOL_FAILURE,
         "工具错误": ErrorType.TOOL_FAILURE,
         "tool execution error": ErrorType.TOOL_FAILURE,
-
         # Model Error patterns
         "model error": ErrorType.MODEL_ERROR,
         "invalid model": ErrorType.MODEL_ERROR,
@@ -118,14 +116,12 @@ class SuggestionEngine:
         "模型错误": ErrorType.MODEL_ERROR,
         "invalid api key": ErrorType.MODEL_ERROR,
         "authentication": ErrorType.MODEL_ERROR,
-
         # File Not Found patterns
         "file not found": ErrorType.FILE_NOT_FOUND,
         "no such file": ErrorType.FILE_NOT_FOUND,
         "filenotfounderror": ErrorType.FILE_NOT_FOUND,
         "文件不存在": ErrorType.FILE_NOT_FOUND,
         "找不到文件": ErrorType.FILE_NOT_FOUND,
-
         # Invalid Parameter patterns
         "invalid parameter": ErrorType.INVALID_PARAMETER,
         "invalid argument": ErrorType.INVALID_PARAMETER,
@@ -133,7 +129,6 @@ class SuggestionEngine:
         "value error": ErrorType.INVALID_PARAMETER,
         "参数错误": ErrorType.INVALID_PARAMETER,
         "参数无效": ErrorType.INVALID_PARAMETER,
-
         # Text Not Found patterns
         "text not found": ErrorType.TEXT_NOT_FOUND,
         "old_text": ErrorType.TEXT_NOT_FOUND,
@@ -559,9 +554,7 @@ class SuggestionEngine:
         Returns:
             List of suggestions for the error type
         """
-        suggestions_map = (
-            self.SUGGESTIONS_CN if self.language == "zh" else self.SUGGESTIONS_EN
-        )
+        suggestions_map = self.SUGGESTIONS_CN if self.language == "zh" else self.SUGGESTIONS_EN
         return suggestions_map.get(error_type, [self._get_default_suggestion()])
 
     def _classify_error(self, error: str) -> ErrorType:

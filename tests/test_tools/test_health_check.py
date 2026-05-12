@@ -160,6 +160,7 @@ class TestToolHealthChecker:
 
     def test_register_custom_check(self, checker):
         """Test registering custom health check."""
+
         def custom_check():
             return ToolHealthResult(
                 tool_name="custom_tool",
@@ -292,6 +293,7 @@ class TestToolHealthChecker:
     @pytest.mark.asyncio
     async def test_custom_check_execution(self, checker):
         """Test executing custom health check."""
+
         def custom_check():
             return ToolHealthResult(
                 tool_name="custom",
@@ -310,6 +312,7 @@ class TestToolHealthChecker:
     @pytest.mark.asyncio
     async def test_async_custom_check(self, checker):
         """Test executing async custom health check."""
+
         async def async_custom_check():
             return ToolHealthResult(
                 tool_name="async_custom",

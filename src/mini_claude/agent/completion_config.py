@@ -8,10 +8,11 @@ import os
 @dataclass
 class CompletionCondition:
     """任务完成条件配置"""
-    name: str                               # 模板名称
-    required_files: List[str]               # 必需文件
+
+    name: str  # 模板名称
+    required_files: List[str]  # 必需文件
     optional_files: Optional[List[str]] = None  # 可选文件
-    custom_check: Optional[Callable] = None     # 自定义检查函数
+    custom_check: Optional[Callable] = None  # 自定义检查函数
 
 
 # 预定义的项目模板
@@ -69,10 +70,7 @@ def detect_project_type(task: str) -> Optional[str]:
     return None
 
 
-def check_project_completion(
-    workspace: str,
-    project_type: str
-) -> Dict[str, any]:
+def check_project_completion(workspace: str, project_type: str) -> Dict[str, any]:
     """检查项目文件是否完整
 
     Args:
@@ -128,11 +126,14 @@ def check_web_project_completion(workspace: str) -> Dict[str, any]:
         检查结果
     """
     html_path = os.path.join(workspace, "index.html")
-    css_exists = os.path.exists(os.path.join(workspace, "style.css")) or \
-                 os.path.exists(os.path.join(workspace, "css", "style.css"))
-    js_exists = os.path.exists(os.path.join(workspace, "script.js")) or \
-                os.path.exists(os.path.join(workspace, "js", "main.js")) or \
-                os.path.exists(os.path.join(workspace, "js", "script.js"))
+    css_exists = os.path.exists(os.path.join(workspace, "style.css")) or os.path.exists(
+        os.path.join(workspace, "css", "style.css")
+    )
+    js_exists = (
+        os.path.exists(os.path.join(workspace, "script.js"))
+        or os.path.exists(os.path.join(workspace, "js", "main.js"))
+        or os.path.exists(os.path.join(workspace, "js", "script.js"))
+    )
 
     has_html = os.path.exists(html_path)
     has_css = css_exists

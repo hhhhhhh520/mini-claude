@@ -200,22 +200,14 @@ class TestPlanVisualizer:
 
     def test_display_plan_tree_format(self, visualizer, multi_step_plan, medium_complexity):
         """Test displaying plan in tree format."""
-        visualizer.display_plan(
-            multi_step_plan,
-            medium_complexity,
-            format=DisplayFormat.TREE
-        )
+        visualizer.display_plan(multi_step_plan, medium_complexity, format=DisplayFormat.TREE)
 
         output = visualizer.console.file.getvalue()
         assert "Execution Plan" in output
 
     def test_display_plan_list_format(self, visualizer, multi_step_plan, medium_complexity):
         """Test displaying plan in list format."""
-        visualizer.display_plan(
-            multi_step_plan,
-            medium_complexity,
-            format=DisplayFormat.LIST
-        )
+        visualizer.display_plan(multi_step_plan, medium_complexity, format=DisplayFormat.LIST)
 
         output = visualizer.console.file.getvalue()
         assert "Execution Plan" in output

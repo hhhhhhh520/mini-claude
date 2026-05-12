@@ -32,23 +32,26 @@ from mini_claude.agent.degradation import (
 # Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def degradation_manager():
     """Create a fresh degradation manager for each test."""
-    manager = DegradationManager({
-        "model": {
-            "primary": "deepseek-chat",
-            "fallbacks": ["gpt-4o-mini"],
-            "max_failures": 1,
-        },
-        "backoff": {
-            "max_retries": 2,
-            "initial_delay": 0.01,
-        },
-        "tool": {
-            "max_failures": 2,
-        },
-    })
+    manager = DegradationManager(
+        {
+            "model": {
+                "primary": "deepseek-chat",
+                "fallbacks": ["gpt-4o-mini"],
+                "max_failures": 1,
+            },
+            "backoff": {
+                "max_retries": 2,
+                "initial_delay": 0.01,
+            },
+            "tool": {
+                "max_failures": 2,
+            },
+        }
+    )
     yield manager
     manager.reset_all()
 
@@ -64,6 +67,7 @@ def chaos_test(degradation_manager):
 # =============================================================================
 # ChaosScenario Tests
 # =============================================================================
+
 
 class TestChaosScenario:
     """Tests for ChaosScenario dataclass."""
@@ -99,6 +103,7 @@ class TestChaosScenario:
 # =============================================================================
 # NetworkChaosInjector Tests
 # =============================================================================
+
 
 class TestNetworkChaosInjector:
     """Tests for network chaos injection."""
@@ -191,6 +196,7 @@ class TestNetworkChaosInjector:
 # APIChaosInjector Tests
 # =============================================================================
 
+
 class TestAPIChaosInjector:
     """Tests for API chaos injection."""
 
@@ -269,6 +275,7 @@ class TestAPIChaosInjector:
 # ResourceChaosInjector Tests
 # =============================================================================
 
+
 class TestResourceChaosInjector:
     """Tests for resource chaos injection."""
 
@@ -333,6 +340,7 @@ class TestResourceChaosInjector:
 # =============================================================================
 # ChaosTest Tests
 # =============================================================================
+
 
 class TestChaosTest:
     """Tests for the ChaosTest framework."""
@@ -444,6 +452,7 @@ class TestChaosTest:
 # Chaos Context Manager Tests
 # =============================================================================
 
+
 class TestChaosContext:
     """Tests for the chaos_context context manager."""
 
@@ -474,6 +483,7 @@ class TestChaosContext:
 # =============================================================================
 # Integration Tests - Degradation Verification
 # =============================================================================
+
 
 class TestDegradationIntegration:
     """Integration tests for degradation with chaos."""
@@ -544,6 +554,7 @@ class TestDegradationIntegration:
 # ChaosResult Tests
 # =============================================================================
 
+
 class TestChaosResult:
     """Tests for ChaosResult dataclass."""
 
@@ -597,6 +608,7 @@ class TestChaosResult:
 # Error Handling Tests
 # =============================================================================
 
+
 class TestErrorHandling:
     """Tests for error handling in chaos scenarios."""
 
@@ -629,6 +641,7 @@ class TestErrorHandling:
 # =============================================================================
 # Edge Cases and Error Conditions
 # =============================================================================
+
 
 class TestEdgeCases:
     """Tests for edge cases and error conditions."""
@@ -679,6 +692,7 @@ class TestEdgeCases:
 # =============================================================================
 # Pytest Marker Registration
 # =============================================================================
+
 
 # Tests marked with @pytest.mark.chaos will be included in the chaos test suite
 # Run with: pytest -m chaos

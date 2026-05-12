@@ -24,7 +24,7 @@ class TestEditFileRetry:
     @pytest.fixture
     def temp_file(self):
         """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
             f.write("Initial content\n")
             filepath = f.name
         yield filepath
@@ -41,7 +41,7 @@ class TestEditFileRetry:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        with patch('mini_claude.utils.safety.settings.workspace_root', temp_dir):
+        with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
             yield temp_dir
 
     # ========== Test 1: Consecutive Edits - Second Fails ==========
@@ -76,8 +76,9 @@ class TestEditFileRetry:
             path=filepath, old_text="Initial content", new_text="New content"
         )
         assert "Error" in result2, f"Second edit should fail: {result2}"
-        assert "Text not found" in result2 or "not found" in result2.lower(), \
+        assert "Text not found" in result2 or "not found" in result2.lower(), (
             f"Error should indicate text not found: {result2}"
+        )
 
     @pytest.mark.asyncio
     async def test_consecutive_edits_with_correct_content(self, temp_dir, mock_workspace):
@@ -95,9 +96,7 @@ class TestEditFileRetry:
         await write_tool.execute(path=filepath, content="Version 1\n")
 
         # First edit
-        result1 = await edit_tool.execute(
-            path=filepath, old_text="Version 1", new_text="Version 2"
-        )
+        result1 = await edit_tool.execute(path=filepath, old_text="Version 1", new_text="Version 2")
         assert "Successfully" in result1
 
         # Verify content changed
@@ -105,9 +104,7 @@ class TestEditFileRetry:
         assert "Version 2" in content1
 
         # Second edit with correct old_text
-        result2 = await edit_tool.execute(
-            path=filepath, old_text="Version 2", new_text="Version 3"
-        )
+        result2 = await edit_tool.execute(path=filepath, old_text="Version 2", new_text="Version 3")
         assert "Successfully" in result2
 
         # Verify final content
@@ -144,15 +141,17 @@ class TestEditFileRetry:
 
         # Read file to get current content
         current_content = await read_tool.execute(path=filepath)
-        assert "Modified content" in current_content, \
+        assert "Modified content" in current_content, (
             f"Read should return current content: {current_content}"
+        )
 
         # Retry edit with correct old_text - should succeed
         result_success = await edit_tool.execute(
             path=filepath, old_text="Modified content", new_text="New content"
         )
-        assert "Successfully" in result_success, \
+        assert "Successfully" in result_success, (
             f"Edit with correct content should succeed: {result_success}"
+        )
 
         # Verify final state
         final_content = await read_tool.execute(path=filepath)
@@ -177,9 +176,7 @@ class TestEditFileRetry:
         await edit_tool.execute(path=filepath, old_text="Content A", new_text="Content B")
 
         # Multiple failed attempts
-        result1 = await edit_tool.execute(
-            path=filepath, old_text="Content A", new_text="Content C"
-        )
+        result1 = await edit_tool.execute(path=filepath, old_text="Content A", new_text="Content C")
         assert "Error" in result1
 
         result2 = await edit_tool.execute(
@@ -191,9 +188,7 @@ class TestEditFileRetry:
         current = await read_tool.execute(path=filepath)
         assert "Content B" in current
 
-        result3 = await edit_tool.execute(
-            path=filepath, old_text="Content B", new_text="Content C"
-        )
+        result3 = await edit_tool.execute(path=filepath, old_text="Content B", new_text="Content C")
         assert "Successfully" in result3
 
     # ========== Test 3: Error Message Contains Content Preview ==========
@@ -215,19 +210,18 @@ class TestEditFileRetry:
         await write_tool.execute(path=filepath, content="Actual file content here\n")
 
         # Attempt edit with wrong old_text
-        result = await edit_tool.execute(
-            path=filepath, old_text="Wrong text", new_text="New text"
-        )
+        result = await edit_tool.execute(path=filepath, old_text="Wrong text", new_text="New text")
 
         # Verify error message structure
         assert "Error" in result, f"Should contain 'Error': {result}"
         assert "not found" in result.lower(), f"Should indicate text not found: {result}"
-        assert "Current file content" in result or "content" in result.lower(), \
+        assert "Current file content" in result or "content" in result.lower(), (
             f"Should show current content: {result}"
-        assert "Suggestion" in result or "suggestion" in result.lower(), \
+        )
+        assert "Suggestion" in result or "suggestion" in result.lower(), (
             f"Should contain suggestion: {result}"
-        assert "read_file" in result.lower(), \
-            f"Should suggest read_file tool: {result}"
+        )
+        assert "read_file" in result.lower(), f"Should suggest read_file tool: {result}"
 
     @pytest.mark.asyncio
     async def test_error_message_shows_expected_text(self, temp_dir, mock_workspace):
@@ -239,15 +233,14 @@ class TestEditFileRetry:
         await write_tool.execute(path=filepath, content="Current content\n")
 
         expected_text = "This is the text I expected to find"
-        result = await edit_tool.execute(
-            path=filepath, old_text=expected_text, new_text="New text"
-        )
+        result = await edit_tool.execute(path=filepath, old_text=expected_text, new_text="New text")
 
         # The error should mention what was expected
         assert "Error" in result
         # Check that either the expected text or a preview is shown
-        assert expected_text[:50] in result or "Expected text" in result, \
+        assert expected_text[:50] in result or "Expected text" in result, (
             f"Should show expected text: {result}"
+        )
 
     @pytest.mark.asyncio
     async def test_error_message_truncates_long_content(self, temp_dir, mock_workspace):
@@ -260,9 +253,7 @@ class TestEditFileRetry:
         long_content = "Line " * 1000  # Very long content
         await write_tool.execute(path=filepath, content=long_content)
 
-        result = await edit_tool.execute(
-            path=filepath, old_text="Not found", new_text="New"
-        )
+        result = await edit_tool.execute(path=filepath, old_text="Not found", new_text="New")
 
         assert "Error" in result
         # Error message should not be excessively long
@@ -276,30 +267,30 @@ class TestEditFileRetry:
 
         # Test classification
         error_type = engine._classify_error("Error: Text not found in file")
-        assert error_type == ErrorType.TEXT_NOT_FOUND, \
-            f"Expected TEXT_NOT_FOUND, got {error_type}"
+        assert error_type == ErrorType.TEXT_NOT_FOUND, f"Expected TEXT_NOT_FOUND, got {error_type}"
 
         # Test suggestion content
         suggestion = engine.analyze_error("Error: Text not found in file")
         actions_str = str(suggestion.actions).lower()
-        assert "read_file" in actions_str or "read" in actions_str, \
+        assert "read_file" in actions_str or "read" in actions_str, (
             f"Suggestion should mention read_file: {suggestion.actions}"
+        )
 
     def test_suggestion_for_old_text_not_found(self):
         """Test SuggestionEngine recognizes old_text related errors."""
         engine = SuggestionEngine()
 
         error_type = engine._classify_error("old_text was not found in the file")
-        assert error_type == ErrorType.TEXT_NOT_FOUND, \
+        assert error_type == ErrorType.TEXT_NOT_FOUND, (
             f"Expected TEXT_NOT_FOUND for old_text error, got {error_type}"
+        )
 
     def test_suggestion_for_expected_text_not_found(self):
         """Test SuggestionEngine recognizes expected text errors."""
         engine = SuggestionEngine()
 
         error_type = engine._classify_error("Expected text not found during edit operation")
-        assert error_type == ErrorType.TEXT_NOT_FOUND, \
-            f"Expected TEXT_NOT_FOUND, got {error_type}"
+        assert error_type == ErrorType.TEXT_NOT_FOUND, f"Expected TEXT_NOT_FOUND, got {error_type}"
 
     def test_suggestion_text_not_found_has_priority(self):
         """Test that TEXT_NOT_FOUND suggestions have appropriate priority."""
@@ -310,24 +301,28 @@ class TestEditFileRetry:
         assert len(suggestions) > 0, "Should have suggestions for TEXT_NOT_FOUND"
         # First suggestion should be high priority
         from mini_claude.agent.suggestion import Priority
-        assert suggestions[0].priority == Priority.HIGH, \
+
+        assert suggestions[0].priority == Priority.HIGH, (
             "TEXT_NOT_FOUND should have HIGH priority suggestion"
+        )
 
     def test_suggestion_engine_chinese_text_not_found(self):
         """Test SuggestionEngine recognizes Chinese text not found errors."""
         engine = SuggestionEngine(language="zh")
 
         error_type = engine._classify_error("Error: 文本未找到")
-        assert error_type == ErrorType.TEXT_NOT_FOUND, \
+        assert error_type == ErrorType.TEXT_NOT_FOUND, (
             f"Expected TEXT_NOT_FOUND for Chinese error, got {error_type}"
+        )
 
         # Test Chinese suggestion content
         suggestion = engine.analyze_error("Error: 文本未找到")
         assert suggestion.title, "Should have a title"
         actions_str = str(suggestion.actions)
         # Chinese version should mention read_file or 读取
-        assert "read_file" in actions_str.lower() or "读取" in actions_str, \
+        assert "read_file" in actions_str.lower() or "读取" in actions_str, (
             f"Chinese suggestion should mention read_file: {suggestion.actions}"
+        )
 
     def test_suggestion_engine_english_text_not_found(self):
         """Test SuggestionEngine with explicit English language."""
@@ -340,8 +335,9 @@ class TestEditFileRetry:
         assert len(suggestions) > 0
         # English suggestion should mention read_file tool
         actions_str = str(suggestions[0].actions).lower()
-        assert "read_file" in actions_str, \
+        assert "read_file" in actions_str, (
             f"English suggestion should mention read_file: {suggestions[0].actions}"
+        )
 
 
 class TestEditFileRetryEdgeCases:
@@ -356,7 +352,7 @@ class TestEditFileRetryEdgeCases:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        with patch('mini_claude.utils.safety.settings.workspace_root', temp_dir):
+        with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
             yield temp_dir
 
     @pytest.mark.asyncio
@@ -371,9 +367,7 @@ class TestEditFileRetryEdgeCases:
         await write_tool.execute(path=filepath, content="")
 
         # Try to edit empty file - should fail
-        result = await edit_tool.execute(
-            path=filepath, old_text="something", new_text="new"
-        )
+        result = await edit_tool.execute(path=filepath, old_text="something", new_text="new")
         assert "Error" in result or "not found" in result.lower()
 
         # Read file to confirm it's empty
@@ -398,9 +392,7 @@ class TestEditFileRetryEdgeCases:
         assert "Successfully" in result1
 
         # Try with stale content - should fail
-        result2 = await edit_tool.execute(
-            path=filepath, old_text="中文内容", new_text="另一个修改"
-        )
+        result2 = await edit_tool.execute(path=filepath, old_text="中文内容", new_text="另一个修改")
         assert "Error" in result2
 
         # Read and retry
@@ -460,8 +452,9 @@ Line 4
         result1 = await edit_tool.execute(
             path=filepath, old_text="function goodbye_world() {}", new_text="def goodbye"
         )
-        assert "Error" in result1 or "not found" in result1.lower(), \
+        assert "Error" in result1 or "not found" in result1.lower(), (
             f"Should fail with non-existent text: {result1}"
+        )
 
         # Read to see exact content
         await read_tool.execute(path=filepath)
@@ -485,7 +478,7 @@ class TestEditFileRetryIntegration:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        with patch('mini_claude.utils.safety.settings.workspace_root', temp_dir):
+        with patch("mini_claude.utils.safety.settings.workspace_root", temp_dir):
             yield temp_dir
 
     @pytest.mark.asyncio

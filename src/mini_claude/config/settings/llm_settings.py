@@ -53,11 +53,18 @@ class LLMSettings(BaseSettings):
 
     # Sub-agent settings
     max_subagent_iterations: int = Field(default=5)
-    subagent_allowed_tools: List[str] = Field(default=[
-        "read_file", "write_file", "edit_file",
-        "list_dir", "search_files", "search_content",
-        "run_command", "web_search"
-    ])
+    subagent_allowed_tools: List[str] = Field(
+        default=[
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_dir",
+            "search_files",
+            "search_content",
+            "run_command",
+            "web_search",
+        ]
+    )
 
     # Session settings
     auto_save_enabled: bool = Field(default=True)

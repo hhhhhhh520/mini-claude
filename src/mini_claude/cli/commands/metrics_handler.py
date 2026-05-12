@@ -42,7 +42,11 @@ class MetricsCommandHandler(CommandHandler):
                 messages_for_count.append(msg)
             else:
                 # LangChain message
-                role = "user" if hasattr(msg, "content") and not isinstance(msg, AIMessage) else "assistant"
+                role = (
+                    "user"
+                    if hasattr(msg, "content") and not isinstance(msg, AIMessage)
+                    else "assistant"
+                )
                 if hasattr(msg, "content"):
                     messages_for_count.append({"role": role, "content": msg.content})
         return messages_for_count

@@ -97,10 +97,12 @@ class SpawnAgentTool(BaseTool):
 
         for msg in messages:
             # Collect tool results (HumanMessage with name = tool name)
-            if isinstance(msg, HumanMessage) and hasattr(msg, 'name') and msg.name:
+            if isinstance(msg, HumanMessage) and hasattr(msg, "name") and msg.name:
                 tool_results.append(msg.content)
             # Record last AI response without tool_calls
-            elif isinstance(msg, AIMessage) and msg.content and not getattr(msg, 'tool_calls', None):
+            elif (
+                isinstance(msg, AIMessage) and msg.content and not getattr(msg, "tool_calls", None)
+            ):
                 ai_response = msg.content
 
         # Priority: AI summary > tool results > last message
@@ -111,12 +113,7 @@ class SpawnAgentTool(BaseTool):
         else:
             return messages[-1].content if messages else "No result"
 
-    async def execute(
-        self,
-        task: str,
-        context: str = "",
-        agent_id: str = None
-    ) -> str:
+    async def execute(self, task: str, context: str = "", agent_id: str = None) -> str:
         # Generate agent ID if not provided
         if not agent_id:
             agent_id = generate_agent_id("subagent")
@@ -147,23 +144,27 @@ class SpawnAgentTool(BaseTool):
                 # CRITICAL: Mark as subagent and limit allowed tools
                 # Sub-agents cannot spawn more agents (prevent infinite recursion)
                 subagent_allowed_tools = [
-                    "read_file", "write_file", "edit_file",
-                    "list_dir", "search_files", "search_content",
-                    "web_search"
+                    "read_file",
+                    "write_file",
+                    "edit_file",
+                    "list_dir",
+                    "search_files",
+                    "search_content",
+                    "web_search",
                 ]
 
                 state = create_initial_state(
                     prompt,
                     thread_id=agent_id,
                     is_subagent=True,
-                    allowed_tools=subagent_allowed_tools
+                    allowed_tools=subagent_allowed_tools,
                 )
 
                 # Add timeout to prevent hanging
                 try:
                     result = await asyncio.wait_for(
                         graph.ainvoke(state, config={"recursion_limit": 50}),
-                        timeout=180  # 180 second timeout
+                        timeout=180,  # 180 second timeout
                     )
                 except asyncio.TimeoutError:
                     return "Error: Sub-agent execution timed out after 180 seconds"
@@ -271,7 +272,7 @@ class GetResultTool(BaseTool):
                 result = await subagent_manager.wait_for_one(agent_id)
                 return f"Result from {agent_id}:\n{result.output}"
             else:
-                return f"Agent {agent_id} is still running ({agent_status['progress']*100:.0f}%)"
+                return f"Agent {agent_id} is still running ({agent_status['progress'] * 100:.0f}%)"
 
         elif agent_status["status"] == AgentStatus.COMPLETED.value:
             output = agent_status.get("output", "(no output)")
@@ -361,23 +362,21 @@ class SpawnParallelTool(BaseTool):
             graph = build_agent_graph_no_checkpoint()
 
             subagent_allowed_tools = [
-                "read_file", "write_file", "edit_file",
-                "list_dir", "search_files", "search_content",
-                "web_search"
+                "read_file",
+                "write_file",
+                "edit_file",
+                "list_dir",
+                "search_files",
+                "search_content",
+                "web_search",
             ]
 
             state = create_initial_state(
-                task,
-                thread_id=agent_id,
-                is_subagent=True,
-                allowed_tools=subagent_allowed_tools
+                task, thread_id=agent_id, is_subagent=True, allowed_tools=subagent_allowed_tools
             )
 
             task_start = time.time()
-            result = await asyncio.wait_for(
-                graph.ainvoke(state),
-                timeout=180
-            )
+            result = await asyncio.wait_for(graph.ainvoke(state), timeout=180)
             task_elapsed = time.time() - task_start
 
             logger.debug("Agent completed", agent_id=agent_id, elapsed=task_elapsed)

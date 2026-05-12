@@ -62,6 +62,7 @@ class OutputSanitizer:
         Returns:
             Sanitized text.
         """
+
         def replace_match(match: re.Match) -> str:
             matched_text = match.group(0)
 
@@ -91,11 +92,15 @@ class OutputSanitizer:
             AKIAIOSFODNN7EXAMPLE -> AKIA****
         """
         # Find the prefix (sk-, sk-proj-, AKIA, etc.)
-        prefix_match = re.match(r'^(sk-proj-|sk-|AKIA|x-api-key\s*[:=]\s*["\']?|api[_-]?key\s*=\s*["\']?)', matched, re.IGNORECASE)
+        prefix_match = re.match(
+            r'^(sk-proj-|sk-|AKIA|x-api-key\s*[:=]\s*["\']?|api[_-]?key\s*=\s*["\']?)',
+            matched,
+            re.IGNORECASE,
+        )
         if prefix_match:
             prefix = prefix_match.group(1)
             # Clean up trailing quotes/whitespace in prefix
-            prefix_clean = re.sub(r'["\']$', '', prefix)
+            prefix_clean = re.sub(r'["\']$', "", prefix)
             return f"{prefix_clean}****"
         return "****"
 
@@ -108,12 +113,12 @@ class OutputSanitizer:
             token=xxx -> token=****
         """
         # Handle Bearer/JWT prefix
-        bearer_match = re.match(r'^(bearer\s+|jwt\s+)', matched, re.IGNORECASE)
+        bearer_match = re.match(r"^(bearer\s+|jwt\s+)", matched, re.IGNORECASE)
         if bearer_match:
             return f"{bearer_match.group(1).rstrip()} ****"
 
         # Handle GitHub tokens (ghp_, gho_, ghr_, etc.)
-        gh_match = re.match(r'^(gh[porsu]_)', matched, re.IGNORECASE)
+        gh_match = re.match(r"^(gh[porsu]_)", matched, re.IGNORECASE)
         if gh_match:
             return f"{gh_match.group(1)}****"
 
@@ -132,7 +137,7 @@ class OutputSanitizer:
         if kv_match:
             prefix = kv_match.group(1)
             # Remove trailing quote if present
-            prefix_clean = re.sub(r'["\']$', '', prefix)
+            prefix_clean = re.sub(r'["\']$', "", prefix)
             return f"{prefix_clean}****"
         return "****"
 
@@ -144,7 +149,7 @@ class OutputSanitizer:
             postgresql://user:pass@host/db -> postgresql://user:****@host/db
         """
         # Pattern: protocol://user:password@host
-        conn_match = re.match(r'^([a-z]+://[^:]+:)([^@]+)(@.+)', matched, re.IGNORECASE)
+        conn_match = re.match(r"^([a-z]+://[^:]+:)([^@]+)(@.+)", matched, re.IGNORECASE)
         if conn_match:
             protocol_user = conn_match.group(1)
             host_rest = conn_match.group(3)
@@ -191,7 +196,7 @@ class OutputSanitizer:
             pass
 
         # Look for JSON objects embedded in text
-        json_pattern = re.compile(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}')
+        json_pattern = re.compile(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}")
 
         def sanitize_embedded(match: re.Match) -> str:
             try:
@@ -245,6 +250,7 @@ def get_sanitizer() -> OutputSanitizer:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._output_sanitizer.is_initialized():
                 _sanitizer = ctx.output_sanitizer
@@ -263,6 +269,7 @@ def reset_sanitizer() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._output_sanitizer.reset()
     except ImportError:
@@ -314,10 +321,10 @@ class ColoredFormatter(logging.Formatter):
     """Colored formatter for console output."""
 
     COLORS = {
-        "DEBUG": "\033[36m",     # Cyan
-        "INFO": "\033[32m",      # Green
-        "WARNING": "\033[33m",   # Yellow
-        "ERROR": "\033[31m",     # Red
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
         "CRITICAL": "\033[35m",  # Magenta
     }
     RESET = "\033[0m"
@@ -369,16 +376,31 @@ class AuditLogger:
 
     # Extended sensitive keys for argument sanitization
     SENSITIVE_KEYS = {
-        "password", "passwd", "pwd",
-        "api_key", "apikey", "api_token",
-        "token", "access_token", "refresh_token", "auth_token",
-        "secret", "secret_key", "secret_token",
-        "credential", "credentials",
-        "private_key", "privatekey",
-        "authorization", "auth",
-        "session_key", "session_token",
-        "api_secret", "apisecret",
-        "access_key", "secret_access_key",
+        "password",
+        "passwd",
+        "pwd",
+        "api_key",
+        "apikey",
+        "api_token",
+        "token",
+        "access_token",
+        "refresh_token",
+        "auth_token",
+        "secret",
+        "secret_key",
+        "secret_token",
+        "credential",
+        "credentials",
+        "private_key",
+        "privatekey",
+        "authorization",
+        "auth",
+        "session_key",
+        "session_token",
+        "api_secret",
+        "apisecret",
+        "access_key",
+        "secret_access_key",
     }
 
     def __init__(
@@ -437,7 +459,7 @@ class AuditLogger:
                     "agent_id": agent_id,
                     "session_id": session_id,
                 }
-            }
+            },
         )
 
     def log_agent_spawn(
@@ -456,7 +478,7 @@ class AuditLogger:
                     "task": task[:200],  # Truncate long tasks
                     "model": model,
                 }
-            }
+            },
         )
 
     def log_agent_complete(
@@ -477,7 +499,7 @@ class AuditLogger:
                     "duration_ms": round(duration_ms, 2),
                     "result_length": result_length,
                 }
-            }
+            },
         )
 
     def _sanitize_args(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -653,10 +675,12 @@ def init_logging(
     if log_to_console:
         console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setLevel(logging.DEBUG)
-        console_handler.setFormatter(ColoredFormatter(
-            fmt=log_format,
-            datefmt=log_date_format,
-        ))
+        console_handler.setFormatter(
+            ColoredFormatter(
+                fmt=log_format,
+                datefmt=log_date_format,
+            )
+        )
         root_logger.addHandler(console_handler)
 
     # File handler (human-readable)
@@ -668,10 +692,12 @@ def init_logging(
             encoding="utf-8",
         )
         file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(logging.Formatter(
-            fmt=log_format,
-            datefmt=log_date_format,
-        ))
+        file_handler.setFormatter(
+            logging.Formatter(
+                fmt=log_format,
+                datefmt=log_date_format,
+            )
+        )
         root_logger.addHandler(file_handler)
 
     # JSON file handler (machine-readable)
@@ -702,6 +728,7 @@ def init_logging_from_settings() -> logging.Logger:
     """Initialize logging from settings."""
     try:
         from ..config.settings import settings
+
         return init_logging(
             log_level=getattr(settings, "log_level", "INFO"),
             log_to_console=getattr(settings, "log_to_console", True),
@@ -835,7 +862,9 @@ class ExecutionLogExporter:
         # Header
         lines.append("# Execution Log Export")
         lines.append(f"\n**Session ID**: `{session_id}`")
-        lines.append(f"**Exported At**: {datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}")
+        lines.append(
+            f"**Exported At**: {datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}"
+        )
         lines.append("")
 
         # Session metadata
@@ -905,7 +934,9 @@ class ExecutionLogExporter:
                 lines.append("### Tool Calls")
                 lines.append("")
                 tools = metrics.get("tools", {})
-                all_tools = set(tools.get("success", {}).keys()) | set(tools.get("failure", {}).keys())
+                all_tools = set(tools.get("success", {}).keys()) | set(
+                    tools.get("failure", {}).keys()
+                )
                 if all_tools:
                     lines.append("| Tool | Success | Failure |")
                     lines.append("|------|---------|---------|")
@@ -917,8 +948,12 @@ class ExecutionLogExporter:
 
                 perf = metrics.get("performance", {})
                 if perf:
-                    lines.append(f"**Average Duration**: {perf.get('avg_duration_seconds', 0):.3f}s")
-                    lines.append(f"**Total Duration**: {perf.get('total_duration_seconds', 0):.3f}s")
+                    lines.append(
+                        f"**Average Duration**: {perf.get('avg_duration_seconds', 0):.3f}s"
+                    )
+                    lines.append(
+                        f"**Total Duration**: {perf.get('total_duration_seconds', 0):.3f}s"
+                    )
                     lines.append("")
 
         # Audit log
@@ -991,7 +1026,9 @@ class ExecutionLogExporter:
         lines.append("<div class='header'>")
         lines.append("<h1>Execution Log Export</h1>")
         lines.append(f"<p>Session: <code>{session_id}</code></p>")
-        lines.append(f"<p>Exported: {datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}</p>")
+        lines.append(
+            f"<p>Exported: {datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}</p>"
+        )
         lines.append("</div>")
 
         # Session info
@@ -1004,7 +1041,9 @@ class ExecutionLogExporter:
                 lines.append(f"<tr><td>Created At</td><td>{session_data['created_at']}</td></tr>")
             if session_data.get("updated_at"):
                 lines.append(f"<tr><td>Updated At</td><td>{session_data['updated_at']}</td></tr>")
-            lines.append(f"<tr><td>Message Count</td><td>{len(session_data.get('messages', []))}</td></tr>")
+            lines.append(
+                f"<tr><td>Message Count</td><td>{len(session_data.get('messages', []))}</td></tr>"
+            )
             if session_data.get("token_count"):
                 lines.append(f"<tr><td>Token Count</td><td>{session_data['token_count']}</td></tr>")
             lines.append("</table>")
@@ -1021,7 +1060,9 @@ class ExecutionLogExporter:
                     if self._sanitizer:
                         content = self._sanitizer.sanitize(content)
                     # Escape HTML
-                    content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    content = (
+                        content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    )
                     role_class = "user" if role == "user" else "assistant"
                     lines.append(f"<div class='message {role_class}'>")
                     lines.append(f"<h3>{i}. {role.title()}</h3>")
@@ -1041,7 +1082,9 @@ class ExecutionLogExporter:
             lines.append(f"<tr><td>Total Requests</td><td>{req.get('total', 0)}</td></tr>")
             lines.append(f"<tr><td>Successful</td><td>{req.get('success', 0)}</td></tr>")
             lines.append(f"<tr><td>Failed</td><td>{req.get('failed', 0)}</td></tr>")
-            lines.append(f"<tr><td>Success Rate</td><td>{req.get('success_rate', 0):.1f}%</td></tr>")
+            lines.append(
+                f"<tr><td>Success Rate</td><td>{req.get('success_rate', 0):.1f}%</td></tr>"
+            )
             lines.append("</table>")
 
             tokens = metrics.get("tokens", {})
@@ -1131,6 +1174,7 @@ class ExecutionLogExporter:
         """
         try:
             from .session import get_session_manager
+
             manager = get_session_manager()
             return manager.load_session_full(session_id)
         except Exception:
@@ -1144,6 +1188,7 @@ class ExecutionLogExporter:
         """
         try:
             from ..monitoring.metrics import get_metrics_collector
+
             collector = get_metrics_collector()
             return collector.get_summary()
         except Exception:
@@ -1165,6 +1210,7 @@ class ExecutionLogExporter:
         try:
             # Read audit log file
             from ..config.settings import settings
+
             audit_path = Path(getattr(settings, "log_audit_path", "logs/audit.log"))
 
             if not audit_path.exists():
@@ -1282,6 +1328,7 @@ def get_execution_log_exporter(sanitize_output: bool = True) -> ExecutionLogExpo
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._execution_log_exporter.is_initialized():
                 _exporter = ctx.execution_log_exporter
@@ -1300,6 +1347,7 @@ def reset_execution_log_exporter() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._execution_log_exporter.reset()
     except ImportError:

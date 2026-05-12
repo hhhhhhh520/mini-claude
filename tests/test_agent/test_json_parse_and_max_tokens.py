@@ -23,7 +23,7 @@ class TestJSONParseErrorHandling:
             {
                 "id": "call_1",
                 "name": "write_file",
-                "arguments": '{"path": "test.py", "content": "print(1)"}'
+                "arguments": '{"path": "test.py", "content": "print(1)"}',
             }
         ]
         result = parse_tool_calls(raw_tool_calls)
@@ -39,7 +39,7 @@ class TestJSONParseErrorHandling:
             {
                 "id": "call_1",
                 "name": "edit_file",
-                "arguments": '{"path": "test.py", "old_text": "very long content that got truncat'  # 不完整的 JSON
+                "arguments": '{"path": "test.py", "old_text": "very long content that got truncat',  # 不完整的 JSON
             }
         ]
         result = parse_tool_calls(raw_tool_calls)
@@ -51,13 +51,7 @@ class TestJSONParseErrorHandling:
 
     def test_parse_tool_calls_empty_arguments(self):
         """测试空参数"""
-        raw_tool_calls = [
-            {
-                "id": "call_1",
-                "name": "list_dir",
-                "arguments": '{}'
-            }
-        ]
+        raw_tool_calls = [{"id": "call_1", "name": "list_dir", "arguments": "{}"}]
         result = parse_tool_calls(raw_tool_calls)
         assert len(result) == 1
         assert result[0]["args"] == {}
@@ -80,7 +74,7 @@ class TestJSONParseErrorHandling:
             {
                 "id": "call_1",
                 "name": "write_file",
-                "arguments": '{"path": "test.py", "content": "line1\nline2\nunterminated'  # 换行符导致问题
+                "arguments": '{"path": "test.py", "content": "line1\nline2\nunterminated',  # 换行符导致问题
             }
         ]
         result = parse_tool_calls(raw_tool_calls)
@@ -106,7 +100,7 @@ class TestExecuteToolWithParseError:
         # 模拟解析错误
         tool_args = {
             "_parse_error": "JSON 解析失败: Unterminated string",
-            "_raw_args": '{"path": "test.py...'
+            "_raw_args": '{"path": "test.py...',
         }
 
         # Mock 依赖
@@ -122,7 +116,7 @@ class TestExecuteToolWithParseError:
             degr_manager,
             metrics_collector,
             lambda name, args: MagicMock(),
-            new_messages
+            new_messages,
         )
 
         # 应该返回错误消息，不执行实际工具
@@ -147,7 +141,7 @@ class TestExecuteToolWithParseError:
             degr_manager,
             metrics_collector,
             lambda name, args: MagicMock(),
-            new_messages
+            new_messages,
         )
 
         assert len(result_messages) == 1
@@ -170,6 +164,7 @@ class TestLLMMaxTokensConfig:
         # 这个测试验证配置系统工作正常
         # 实际环境变量覆盖需要在运行时测试
         from mini_claude.config.settings.llm_settings import LLMSettings
+
         test_settings = LLMSettings(llm_max_tokens=32768)
         assert test_settings.llm_max_tokens == 32768
 
@@ -200,16 +195,15 @@ class TestActNodeUsesMaxTokens:
 
         # Mock provider
         mock_provider = MagicMock()
-        mock_provider.chat_stream_with_tools = AsyncMock(return_value={
-            "content": "test",
-            "tool_calls": None
-        })
+        mock_provider.chat_stream_with_tools = AsyncMock(
+            return_value={"content": "test", "tool_calls": None}
+        )
 
         await _streaming_llm_call(
             mock_provider,
             [{"role": "user", "content": "test"}],
             [],
-            max_tokens=settings.llm_max_tokens
+            max_tokens=settings.llm_max_tokens,
         )
 
         # 验证调用时传入了正确的 max_tokens
@@ -236,7 +230,7 @@ class TestLongToolArguments:
             {
                 "id": "call_1",
                 "name": "write_file",
-                "arguments": json.dumps({"path": "test.py", "content": long_content})
+                "arguments": json.dumps({"path": "test.py", "content": long_content}),
             }
         ]
         result = parse_tool_calls(raw_tool_calls)
@@ -247,13 +241,7 @@ class TestLongToolArguments:
         """测试 _raw_args 被截断到 500 字符"""
         # 模拟超长的截断 JSON
         long_truncated = '{"path": "test.py", "content": "' + "x" * 10000
-        raw_tool_calls = [
-            {
-                "id": "call_1",
-                "name": "write_file",
-                "arguments": long_truncated
-            }
-        ]
+        raw_tool_calls = [{"id": "call_1", "name": "write_file", "arguments": long_truncated}]
         result = parse_tool_calls(raw_tool_calls)
         assert "_parse_error" in result[0]["args"]
         assert "_raw_args" in result[0]["args"]
@@ -270,7 +258,7 @@ class TestIntegrationScenarios:
             {
                 "id": "call_1",
                 "name": "edit_file",
-                "arguments": '{"path": "test.py", "old_text": "some text", "new_text": "new'  # 不完整
+                "arguments": '{"path": "test.py", "old_text": "some text", "new_text": "new',  # 不完整
             }
         ]
         result = parse_tool_calls(raw_tool_calls)
@@ -286,7 +274,7 @@ class TestIntegrationScenarios:
         # 1. 模拟解析错误
         tool_args = {
             "_parse_error": "JSON 解析失败: Unterminated string",
-            "_raw_args": '{"path": "test.py", "content": "partial...'
+            "_raw_args": '{"path": "test.py", "content": "partial...',
         }
 
         degr_manager = MagicMock()
@@ -302,7 +290,7 @@ class TestIntegrationScenarios:
             degr_manager,
             metrics_collector,
             lambda name, args: MagicMock(),
-            new_messages
+            new_messages,
         )
 
         # 3. 验证错误消息被添加到消息列表

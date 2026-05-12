@@ -66,6 +66,7 @@ async def handle_token_budget(
             # Try LLM summarization first
             logger.debug(f"act_node: token at {usage_percent}%, attempting summarization")
             try:
+
                 async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:
                     return await llm_provider.chat(messages=messages, **kwargs)
 
@@ -79,26 +80,36 @@ async def handle_token_budget(
                 new_usage_percent = new_stats.get("usage_percent", 0)
                 if new_usage_percent < usage_percent:
                     litellm_messages = summarized
-                    logger.info(f"act_node: summarization reduced tokens from {usage_percent}% to {new_usage_percent}%")
+                    logger.info(
+                        f"act_node: summarization reduced tokens from {usage_percent}% to {new_usage_percent}%"
+                    )
                     # Sync LangChain messages
                     messages = _sync_messages_after_summary(messages, litellm_messages)
                 else:
                     # Summarization didn't help, fallback to truncate
-                    logger.warning("act_node: summarization didn't reduce tokens, falling back to truncate")
-                    messages, litellm_messages = _truncate_messages(messages, litellm_messages, token_counter)
+                    logger.warning(
+                        "act_node: summarization didn't reduce tokens, falling back to truncate"
+                    )
+                    messages, litellm_messages = _truncate_messages(
+                        messages, litellm_messages, token_counter
+                    )
 
             except Exception as e:
                 # Summarization failed, fallback to truncate immediately
                 logger.warning(f"act_node: summarization failed ({e}), falling back to truncate")
-                messages, litellm_messages = _truncate_messages(messages, litellm_messages, token_counter)
+                messages, litellm_messages = _truncate_messages(
+                    messages, litellm_messages, token_counter
+                )
 
         elif token_counter.strategy == TokenLimitStrategy.TRUNCATE:
             logger.debug(f"act_node: token at {usage_percent}%, truncating messages")
-            messages, litellm_messages = _truncate_messages(messages, litellm_messages, token_counter)
+            messages, litellm_messages = _truncate_messages(
+                messages, litellm_messages, token_counter
+            )
 
         else:
             # Warn strategy - just log warning
-            logger.warning(budget_check['reason'])
+            logger.warning(budget_check["reason"])
 
     return messages, litellm_messages
 
@@ -135,11 +146,13 @@ def _sync_messages_after_summary(messages: List, litellm_messages: List[Dict]) -
     return messages
 
 
-def _truncate_messages(messages: List, litellm_messages: List[Dict], token_counter) -> Tuple[List, List[Dict]]:
+def _truncate_messages(
+    messages: List, litellm_messages: List[Dict], token_counter
+) -> Tuple[List, List[Dict]]:
     """Truncate messages to fit within budget."""
     truncated = token_counter.truncate_messages(litellm_messages)
     keep_first = 1  # System message
-    keep_last = 4   # Recent context
+    keep_last = 4  # Recent context
     if len(messages) > keep_first + keep_last:
         messages = messages[:keep_first] + messages[-keep_last:]
     return messages, truncated
@@ -166,18 +179,22 @@ def parse_tool_calls(raw_tool_calls) -> List[Dict]:
                 args = json.loads(args)
             except json.JSONDecodeError as e:
                 # JSON 解析失败，记录错误并返回原始字符串让 LLM 修正
-                logger.warning("Failed to parse tool arguments JSON", error=str(e), args_preview=args_str[:200])
+                logger.warning(
+                    "Failed to parse tool arguments JSON", error=str(e), args_preview=args_str[:200]
+                )
                 args = {"_parse_error": f"JSON 解析失败: {str(e)}", "_raw_args": args_str[:500]}
 
         name = tc.get("name", "") if isinstance(tc, dict) else tc.function.name
         if not name:
             continue
 
-        tool_calls.append({
-            "id": tc.get("id", "") if isinstance(tc, dict) else tc.id,
-            "name": name,
-            "args": args,
-        })
+        tool_calls.append(
+            {
+                "id": tc.get("id", "") if isinstance(tc, dict) else tc.id,
+                "name": name,
+                "args": args,
+            }
+        )
 
     return tool_calls
 
@@ -209,14 +226,18 @@ async def execute_single_tool(
     if degr_manager.tool.should_skip(tool_name):
         replacement = degr_manager.tool.get_replacement(tool_name)
         if replacement:
-            logger.info("Tool degraded, using replacement", from_tool=tool_name, to_tool=replacement)
+            logger.info(
+                "Tool degraded, using replacement", from_tool=tool_name, to_tool=replacement
+            )
             tool_name = replacement
         else:
             logger.warning("Tool skipped due to failures", tool=tool_name)
-            new_messages.append(HumanMessage(
-                content=f"Tool {tool_name} 被跳过（之前多次失败）",
-                name=tool_name,
-            ))
+            new_messages.append(
+                HumanMessage(
+                    content=f"Tool {tool_name} 被跳过（之前多次失败）",
+                    name=tool_name,
+                )
+            )
             return new_messages, None
 
     # Validate required parameters
@@ -244,26 +265,33 @@ async def execute_single_tool(
         with trace_tool_call(tool_name, tool_args):
             result = await execute_tool(tool_name, tool_args)
 
-        logger.debug("Tool result", tool_name=tool_name, result_preview=result[:200] if result else 'None')
+        logger.debug(
+            "Tool result", tool_name=tool_name, result_preview=result[:200] if result else "None"
+        )
 
         # Record tool success
         degr_manager.tool.record_success(tool_name)
         metrics_collector.record_tool_call(tool_name, success=True)
 
-        new_messages.append(HumanMessage(
-            content=f"Tool {tool_name} result: {result}",
-            name=tool_name,
-        ))
+        new_messages.append(
+            HumanMessage(
+                content=f"Tool {tool_name} result: {result}",
+                name=tool_name,
+            )
+        )
         return new_messages, None
 
     except PathConfirmationRequired as e:
         # Path requires user confirmation
         from ._shared import StopReason
+
         logger.debug("Path confirmation required", path=e.path)
-        new_messages.append(HumanMessage(
-            content=f"路径确认请求：{e.path}\n\n原因：{e.reason}\n\n请回复 'yes' 或 'y' 确认访问此路径，或提供其他路径。",
-            name=tool_name,
-        ))
+        new_messages.append(
+            HumanMessage(
+                content=f"路径确认请求：{e.path}\n\n原因：{e.reason}\n\n请回复 'yes' 或 'y' 确认访问此路径，或提供其他路径。",
+                name=tool_name,
+            )
+        )
         return new_messages, {
             "stop_reason": StopReason.WAITING_CONFIRMATION,
             "pending_confirmation_path": e.path,
@@ -274,10 +302,12 @@ async def execute_single_tool(
         logger.debug("File system error", tool_name=tool_name, error=str(e))
         degr_manager.tool.record_failure(tool_name, f"File system error: {e}")
         metrics_collector.record_tool_call(tool_name, success=False)
-        new_messages.append(HumanMessage(
-            content=f"Tool {tool_name} 文件系统错误: {e}",
-            name=tool_name,
-        ))
+        new_messages.append(
+            HumanMessage(
+                content=f"Tool {tool_name} 文件系统错误: {e}",
+                name=tool_name,
+            )
+        )
         return new_messages, None
 
     except (ValueError, TypeError, KeyError) as e:
@@ -285,10 +315,12 @@ async def execute_single_tool(
         logger.debug("Parameter error", tool_name=tool_name, error=str(e))
         degr_manager.tool.record_failure(tool_name, f"Parameter error: {e}")
         metrics_collector.record_tool_call(tool_name, success=False)
-        new_messages.append(HumanMessage(
-            content=f"Tool {tool_name} 参数错误: {e}",
-            name=tool_name,
-        ))
+        new_messages.append(
+            HumanMessage(
+                content=f"Tool {tool_name} 参数错误: {e}",
+                name=tool_name,
+            )
+        )
         return new_messages, None
 
     except asyncio.TimeoutError:
@@ -296,10 +328,12 @@ async def execute_single_tool(
         logger.debug("Tool timeout", tool_name=tool_name)
         degr_manager.tool.record_failure(tool_name, "Timeout")
         metrics_collector.record_tool_call(tool_name, success=False)
-        new_messages.append(HumanMessage(
-            content=f"Tool {tool_name} 执行超时",
-            name=tool_name,
-        ))
+        new_messages.append(
+            HumanMessage(
+                content=f"Tool {tool_name} 执行超时",
+                name=tool_name,
+            )
+        )
         return new_messages, None
 
     except Exception as e:
@@ -307,10 +341,12 @@ async def execute_single_tool(
         logger.error("Unexpected tool error", exc_info=True, tool_name=tool_name, error=str(e))
         degr_manager.tool.record_failure(tool_name, f"Unexpected error: {type(e).__name__}")
         metrics_collector.record_tool_call(tool_name, success=False)
-        new_messages.append(HumanMessage(
-            content=f"Tool {tool_name} 执行失败，请检查参数或重试",
-            name=tool_name,
-        ))
+        new_messages.append(
+            HumanMessage(
+                content=f"Tool {tool_name} 执行失败，请检查参数或重试",
+                name=tool_name,
+            )
+        )
         return new_messages, None
 
 

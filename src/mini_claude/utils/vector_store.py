@@ -23,6 +23,7 @@ if "HF_ENDPOINT" not in os.environ:
 try:
     import chromadb
     from chromadb.config import Settings as ChromaSettings
+
     CHROMA_AVAILABLE = True
 except ImportError:
     CHROMA_AVAILABLE = False
@@ -32,6 +33,7 @@ except ImportError:
 try:
     import faiss
     import numpy as np
+
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
@@ -40,6 +42,7 @@ except ImportError:
 
 try:
     from sentence_transformers import SentenceTransformer
+
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
@@ -48,11 +51,13 @@ except ImportError:
 
 class VectorStoreError(Exception):
     """Base exception for vector store errors."""
+
     pass
 
 
 class DependencyNotFoundError(VectorStoreError):
     """Raised when a required dependency is not installed."""
+
     pass
 
 
@@ -66,6 +71,7 @@ class SearchResult:
         score: Similarity score (higher is more similar)
         metadata: Optional metadata associated with the document
     """
+
     id: str
     text: str
     score: float
@@ -91,6 +97,7 @@ class Document:
         metadata: Optional metadata associated with the document
         embedding: Optional pre-computed embedding
     """
+
     id: str
     text: str
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -157,8 +164,7 @@ class VectorStore:
 
         if self.db_type == "chroma" and not CHROMA_AVAILABLE:
             raise DependencyNotFoundError(
-                "chromadb is required for ChromaDB backend. "
-                "Install it with: pip install chromadb"
+                "chromadb is required for ChromaDB backend. Install it with: pip install chromadb"
             )
 
         if self.db_type == "faiss" and not FAISS_AVAILABLE:
@@ -169,10 +175,7 @@ class VectorStore:
             )
 
         if self.db_type not in ("chroma", "faiss"):
-            raise ValueError(
-                f"Unsupported db_type: {self.db_type}. "
-                "Supported types: chroma, faiss"
-            )
+            raise ValueError(f"Unsupported db_type: {self.db_type}. Supported types: chroma, faiss")
 
     def _init_embedding_model(self) -> None:
         """Initialize the embedding model."""
@@ -199,7 +202,7 @@ class VectorStore:
             settings=ChromaSettings(
                 anonymized_telemetry=False,
                 allow_reset=True,
-            )
+            ),
         )
 
         # Get or create collection
@@ -208,10 +211,7 @@ class VectorStore:
             metadata={"hnsw:space": "cosine"},
         )
 
-        logger.info(
-            f"Initialized ChromaDB at {self.path} "
-            f"with collection '{self.collection_name}'"
-        )
+        logger.info(f"Initialized ChromaDB at {self.path} with collection '{self.collection_name}'")
 
     def _init_faiss(self) -> None:
         """Initialize FAISS backend."""
@@ -401,6 +401,7 @@ class VectorStore:
 
         # Add to FAISS index
         import numpy as np
+
         embedding_array = np.array([embedding], dtype=np.float32)
         self._backend.add(embedding_array)
 
@@ -503,9 +504,7 @@ class VectorStore:
                 metadatas=update_metadatas,
             )
 
-        logger.debug(
-            f"Added {len(new_ids)} new and updated {len(update_ids)} documents"
-        )
+        logger.debug(f"Added {len(new_ids)} new and updated {len(update_ids)} documents")
         return True
 
     def _add_batch_to_faiss(
@@ -528,9 +527,7 @@ class VectorStore:
         for i, id in enumerate(ids):
             idx = start_idx + i
             self._id_map[id] = idx
-            self._documents[id] = Document(
-                id=id, text=texts[i], metadata=metadatas[i]
-            )
+            self._documents[id] = Document(id=id, text=texts[i], metadata=metadatas[i])
 
         # Save to disk
         self._save_faiss_data()
@@ -594,12 +591,14 @@ class VectorStore:
                 distance = results["distances"][0][i]
                 score = 1.0 - distance if distance is not None else 0.0
 
-                search_results.append(SearchResult(
-                    id=id,
-                    text=results["documents"][0][i] or "",
-                    score=score,
-                    metadata=results["metadatas"][0][i] or {},
-                ))
+                search_results.append(
+                    SearchResult(
+                        id=id,
+                        text=results["documents"][0][i] or "",
+                        score=score,
+                        metadata=results["metadatas"][0][i] or {},
+                    )
+                )
 
         logger.debug(f"Found {len(search_results)} results for query")
         return search_results
@@ -641,19 +640,18 @@ class VectorStore:
 
             # Apply metadata filter if specified
             if filter:
-                match = all(
-                    doc.metadata.get(key) == value
-                    for key, value in filter.items()
-                )
+                match = all(doc.metadata.get(key) == value for key, value in filter.items())
                 if not match:
                     continue
 
-            search_results.append(SearchResult(
-                id=doc_id,
-                text=doc.text,
-                score=float(distance),
-                metadata=doc.metadata,
-            ))
+            search_results.append(
+                SearchResult(
+                    id=doc_id,
+                    text=doc.text,
+                    score=float(distance),
+                    metadata=doc.metadata,
+                )
+            )
 
         logger.debug(f"Found {len(search_results)} results for query")
         return search_results
@@ -806,9 +804,7 @@ class VectorStore:
     def __repr__(self) -> str:
         """Return string representation."""
         return (
-            f"VectorStore(db_type={self.db_type!r}, "
-            f"path={self.path!r}, "
-            f"documents={self.count()})"
+            f"VectorStore(db_type={self.db_type!r}, path={self.path!r}, documents={self.count()})"
         )
 
 

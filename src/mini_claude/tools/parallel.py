@@ -5,9 +5,7 @@ import time
 from typing import Dict, Any, List
 
 from .base import BaseTool, register_tool
-from ..agent.coordinator import (
-    parallel_coordinator, DistributedTask, TaskPriority
-)
+from ..agent.coordinator import parallel_coordinator, DistributedTask, TaskPriority
 from ..config.settings import settings
 from ..utils import generate_agent_id
 from ..utils.logger import get_logger
@@ -179,7 +177,10 @@ class ExecuteParallelTool(BaseTool):
 
             # Print immediate status for user feedback (force flush)
             import sys
-            sys.stdout.write(f"\n[PARALLEL] Executing {len(task_ids)} tasks: {', '.join(task_ids)}\n")
+
+            sys.stdout.write(
+                f"\n[PARALLEL] Executing {len(task_ids)} tasks: {', '.join(task_ids)}\n"
+            )
             sys.stdout.flush()
 
             # Create all task coroutines FIRST (don't await yet)
@@ -189,7 +190,9 @@ class ExecuteParallelTool(BaseTool):
                 task_coroutines.append(self._run_task_with_logging(task_id, agent_id))
 
             # Launch ALL tasks at the SAME time using asyncio.gather
-            logger.debug("Launching all tasks simultaneously", level=level_num, count=len(task_coroutines))
+            logger.debug(
+                "Launching all tasks simultaneously", level=level_num, count=len(task_coroutines)
+            )
             start_time = time.time()
 
             # Show progress indicator while waiting (force flush)
@@ -224,6 +227,7 @@ class ExecuteParallelTool(BaseTool):
     async def _run_task_with_logging(self, task_id: str, agent_id: str):
         """Run a single task with detailed logging for concurrency verification."""
         import sys
+
         task = parallel_coordinator.tasks[task_id]
 
         # Assign task
@@ -265,14 +269,14 @@ class ExecuteParallelTool(BaseTool):
         target_file = task.target_files[0] if task.target_files else "output.txt"
 
         # Detect file type for content hint
-        file_ext = target_file.split('.')[-1] if '.' in target_file else 'txt'
+        file_ext = target_file.split(".")[-1] if "." in target_file else "txt"
         content_hint = {
-            'html': '<!DOCTYPE html>\n<html>\n<head><title>Page</title></head>\n<body>\n<!-- Content here -->\n</body>\n</html>',
-            'css': '/* Styles */\nbody { margin: 0; padding: 0; }',
-            'js': '// JavaScript\nconsole.log("Hello");',
-            'md': '# Title\n\nContent here.',
-            'txt': 'Content here.',
-        }.get(file_ext, 'Content here.')
+            "html": "<!DOCTYPE html>\n<html>\n<head><title>Page</title></head>\n<body>\n<!-- Content here -->\n</body>\n</html>",
+            "css": "/* Styles */\nbody { margin: 0; padding: 0; }",
+            "js": '// JavaScript\nconsole.log("Hello");',
+            "md": "# Title\n\nContent here.",
+            "txt": "Content here.",
+        }.get(file_ext, "Content here.")
 
         prompt = f"""You are a file writer. Your ONLY job is to write a file.
 
@@ -297,16 +301,17 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
         # CRITICAL: Mark as subagent and limit allowed tools
         # Sub-agents cannot spawn more agents (prevent infinite recursion)
         subagent_allowed_tools = [
-            "read_file", "write_file", "edit_file",
-            "list_dir", "search_files", "search_content",
-            "web_search"
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_dir",
+            "search_files",
+            "search_content",
+            "web_search",
         ]
 
         state = create_initial_state(
-            prompt,
-            thread_id=agent_id,
-            is_subagent=True,
-            allowed_tools=subagent_allowed_tools
+            prompt, thread_id=agent_id, is_subagent=True, allowed_tools=subagent_allowed_tools
         )
 
         # Add timeout to prevent hanging
@@ -316,7 +321,7 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
 
             result = await asyncio.wait_for(
                 graph.ainvoke(state, config={"recursion_limit": 50}),
-                timeout=180  # 180 second timeout
+                timeout=180,  # 180 second timeout
             )
 
             elapsed = time.time() - start
@@ -325,18 +330,24 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
             # Check if file was created - if not, create it directly
             import os
             from ..tools import execute_tool
+
             workspace = settings.workspace_root
-            full_path = os.path.join(workspace, target_file) if not os.path.isabs(target_file) else target_file
+            full_path = (
+                os.path.join(workspace, target_file)
+                if not os.path.isabs(target_file)
+                else target_file
+            )
 
             if not os.path.exists(full_path):
-                logger.debug("File not created, auto-creating", agent_id=agent_id, target_file=target_file)
+                logger.debug(
+                    "File not created, auto-creating", agent_id=agent_id, target_file=target_file
+                )
                 # Auto-create with basic content based on task description
                 auto_content = self._generate_basic_content(task.description, target_file)
                 try:
-                    create_result = await execute_tool("write_file", {
-                        "path": target_file,
-                        "content": auto_content
-                    })
+                    create_result = await execute_tool(
+                        "write_file", {"path": target_file, "content": auto_content}
+                    )
                     logger.debug("Auto-created file", agent_id=agent_id, result=create_result)
                 except Exception as e:
                     logger.error("Failed to auto-create", agent_id=agent_id, error=str(e))
@@ -344,7 +355,7 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
             # Extract result
             messages = result.get("messages", [])
             for msg in reversed(messages):
-                if isinstance(msg, AIMessage) and not getattr(msg, 'tool_calls', None):
+                if isinstance(msg, AIMessage) and not getattr(msg, "tool_calls", None):
                     return msg.content
 
             return messages[-1].content if messages else "No result"
@@ -359,15 +370,15 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
 
     def _generate_basic_content(self, task_description: str, target_file: str) -> str:
         """Generate basic file content based on task description and file type."""
-        file_ext = target_file.split('.')[-1] if '.' in target_file else 'txt'
+        file_ext = target_file.split(".")[-1] if "." in target_file else "txt"
 
         # Extract key info from task description
         desc_lower = task_description.lower()
 
-        if file_ext == 'html':
+        if file_ext == "html":
             # Check for specific page types
-            if 'about' in desc_lower or '关于' in desc_lower:
-                return '''<!DOCTYPE html>
+            if "about" in desc_lower or "关于" in desc_lower:
+                return """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -390,9 +401,9 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
         <p>&copy; 2026 公司名称</p>
     </footer>
 </body>
-</html>'''
+</html>"""
             else:
-                return f'''<!DOCTYPE html>
+                return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -407,10 +418,10 @@ DO THIS NOW: Call write_file(path="{target_file}", content="your content here")"
     </main>
     <footer><p>&copy; 2026</p></footer>
 </body>
-</html>'''
+</html>"""
 
-        elif file_ext == 'css':
-            return '''/* Main Styles */
+        elif file_ext == "css":
+            return """/* Main Styles */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
@@ -450,10 +461,10 @@ footer {
 
 h1 { color: #2c3e50; margin-bottom: 1rem; }
 p { margin-bottom: 1rem; }
-'''
+"""
 
-        elif file_ext == 'js':
-            return '''// Main JavaScript
+        elif file_ext == "js":
+            return """// Main JavaScript
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Page loaded');
 
@@ -467,10 +478,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
-'''
+"""
 
-        elif file_ext == 'md':
-            return f'''# {target_file}
+        elif file_ext == "md":
+            return f"""# {target_file}
 
 ## 概述
 
@@ -479,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
 ## 内容
 
 这里是文件内容。
-'''
+"""
 
         else:
             return f"# Auto-generated content for {target_file}\n\n{task_description}\n"
@@ -514,11 +525,11 @@ class ParallelStatusTool(BaseTool):
         lines.append(f"Pending: {report['pending']}")
         lines.append(f"Failed: {report['failed']}")
 
-        if report['agents']:
+        if report["agents"]:
             lines.append("\n--- Agents ---")
-            for aid, info in report['agents'].items():
+            for aid, info in report["agents"].items():
                 lines.append(f"  {aid}: {info['status']}")
-                if info['current_task']:
+                if info["current_task"]:
                     lines.append(f"    Working on: {info['current_task']}")
                 lines.append(f"    Completed: {info['completed_count']} tasks")
 
@@ -556,6 +567,7 @@ class AggregateResultsTool(BaseTool):
 
         if format == "json":
             import json
+
             return json.dumps(parallel_coordinator.get_status_report(), indent=2)
 
         return parallel_coordinator.aggregate_results()

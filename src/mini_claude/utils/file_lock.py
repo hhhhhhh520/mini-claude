@@ -11,6 +11,7 @@ from enum import Enum
 
 class LockState(Enum):
     """State of a file lock."""
+
     UNLOCKED = "unlocked"
     LOCKED = "locked"
     CONFLICT = "conflict"
@@ -19,6 +20,7 @@ class LockState(Enum):
 @dataclass
 class FileLock:
     """Represents a lock on a file."""
+
     path: str
     agent_id: str
     locked_at: datetime = field(default_factory=datetime.now)
@@ -29,6 +31,7 @@ class FileLock:
 @dataclass
 class FileVersion:
     """Tracks file version for optimistic locking."""
+
     path: str
     hash: str
     modified_at: datetime = field(default_factory=datetime.now)
@@ -62,10 +65,7 @@ class FileLockManager:
             return None
 
     async def acquire_lock(
-        self,
-        path: str,
-        agent_id: str,
-        lock_type: str = "write"
+        self, path: str, agent_id: str, lock_type: str = "write"
     ) -> Tuple[bool, str]:
         """Acquire a lock on a file.
 
@@ -95,18 +95,13 @@ class FileLockManager:
 
             # Create lock
             self._locks[norm_path] = FileLock(
-                path=norm_path,
-                agent_id=agent_id,
-                original_hash=file_hash,
-                lock_type=lock_type
+                path=norm_path, agent_id=agent_id, original_hash=file_hash, lock_type=lock_type
             )
 
             # Track version
             if file_hash:
                 self._versions[norm_path] = FileVersion(
-                    path=norm_path,
-                    hash=file_hash,
-                    modified_by=agent_id
+                    path=norm_path, hash=file_hash, modified_by=agent_id
                 )
 
             return True, f"Lock acquired for {path}"
@@ -171,9 +166,7 @@ class FileLockManager:
 
             if file_hash:
                 self._versions[norm_path] = FileVersion(
-                    path=norm_path,
-                    hash=file_hash,
-                    modified_by=agent_id
+                    path=norm_path, hash=file_hash, modified_by=agent_id
                 )
 
     def get_lock_info(self, path: str) -> Optional[Dict]:
@@ -203,10 +196,7 @@ class FileLockManager:
     async def release_all_for_agent(self, agent_id: str) -> int:
         """Release all locks held by an agent. Returns count of released locks."""
         async with self._lock:
-            to_release = [
-                path for path, lock in self._locks.items()
-                if lock.agent_id == agent_id
-            ]
+            to_release = [path for path, lock in self._locks.items() if lock.agent_id == agent_id]
             for path in to_release:
                 del self._locks[path]
             return len(to_release)

@@ -1,6 +1,5 @@
 """Tests for suggestion engine - User operation suggestions."""
 
-
 from mini_claude.agent.suggestion import (
     SuggestionEngine,
     Suggestion,
@@ -11,6 +10,7 @@ from mini_claude.agent.suggestion import (
 
 
 # ========== ErrorType Tests (8个) ==========
+
 
 class TestErrorType:
     """Test ErrorType enum."""
@@ -41,6 +41,7 @@ class TestErrorType:
 
 # ========== Priority Tests (3个) ==========
 
+
 class TestPriority:
     """Test Priority enum."""
 
@@ -61,6 +62,7 @@ class TestPriority:
 
 
 # ========== Suggestion Dataclass Tests (8个) ==========
+
 
 class TestSuggestion:
     """Test Suggestion dataclass."""
@@ -160,6 +162,7 @@ class TestSuggestion:
 
 
 # ========== SuggestionEngine Error Classification Tests (18个) ==========
+
 
 class TestSuggestionEngineErrorClassification:
     """Test error classification in SuggestionEngine."""
@@ -261,6 +264,7 @@ class TestSuggestionEngineErrorClassification:
 
 # ========== SuggestionEngine Suggestion Retrieval Tests (10个) ==========
 
+
 class TestSuggestionEngineGetSuggestions:
     """Test suggestion retrieval in SuggestionEngine."""
 
@@ -334,6 +338,7 @@ class TestSuggestionEngineGetSuggestions:
 
 # ========== SuggestionEngine Formatting Tests (6个) ==========
 
+
 class TestSuggestionEngineFormatting:
     """Test suggestion formatting."""
 
@@ -398,6 +403,7 @@ class TestSuggestionEngineFormatting:
 
 # ========== SuggestionEngine Language Tests (4个) ==========
 
+
 class TestSuggestionEngineLanguage:
     """Test language support."""
 
@@ -406,14 +412,18 @@ class TestSuggestionEngineLanguage:
         engine = SuggestionEngine(language="zh")
         suggestion = engine.analyze_error("rate limit")
         # Chinese suggestions should have Chinese content
-        assert any(ord(c) > 127 for c in suggestion.title) or any(ord(c) > 127 for c in suggestion.description)
+        assert any(ord(c) > 127 for c in suggestion.title) or any(
+            ord(c) > 127 for c in suggestion.description
+        )
 
     def test_english_suggestions(self):
         """Test English suggestions."""
         engine = SuggestionEngine(language="en")
         suggestion = engine.analyze_error("rate limit")
         # English suggestions should be ASCII-heavy
-        assert suggestion.title.isascii() or "Retry" in suggestion.title or "Wait" in suggestion.title
+        assert (
+            suggestion.title.isascii() or "Retry" in suggestion.title or "Wait" in suggestion.title
+        )
 
     def test_default_language(self):
         """Test default language is Chinese."""
@@ -434,12 +444,14 @@ class TestSuggestionEngineLanguage:
 
 # ========== Global Instance Tests (3个) ==========
 
+
 class TestGetSuggestionEngine:
     """Test global instance management."""
 
     def test_get_suggestion_engine_creates_instance(self):
         """Test get_suggestion_engine creates instance."""
         import mini_claude.agent.suggestion as sug_module
+
         sug_module._suggestion_engine = None  # Reset
 
         engine = get_suggestion_engine()
@@ -448,6 +460,7 @@ class TestGetSuggestionEngine:
     def test_get_suggestion_engine_singleton(self):
         """Test get_suggestion_engine returns same instance."""
         import mini_claude.agent.suggestion as sug_module
+
         sug_module._suggestion_engine = None  # Reset
 
         engine1 = get_suggestion_engine()
@@ -457,6 +470,7 @@ class TestGetSuggestionEngine:
     def test_get_suggestion_engine_language_change(self):
         """Test get_suggestion_engine with different language."""
         import mini_claude.agent.suggestion as sug_module
+
         sug_module._suggestion_engine = None  # Reset
 
         get_suggestion_engine("zh")
@@ -466,6 +480,7 @@ class TestGetSuggestionEngine:
 
 
 # ========== Integration Tests (5个) ==========
+
 
 class TestSuggestionEngineIntegration:
     """Integration tests for SuggestionEngine."""
@@ -488,8 +503,10 @@ class TestSuggestionEngineIntegration:
         suggestion = engine.analyze_error(error)
 
         assert suggestion.priority == Priority.HIGH
-        assert any("permission" in action.lower() or "chmod" in action.lower()
-                   for action in suggestion.actions)
+        assert any(
+            "permission" in action.lower() or "chmod" in action.lower()
+            for action in suggestion.actions
+        )
 
     def test_full_flow_token_exceeded(self):
         """Test full flow for token exceeded."""

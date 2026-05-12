@@ -294,6 +294,7 @@ class TestSettingsCallbacks:
 def _get_callbacks():
     """Helper to get callbacks list for testing."""
     from mini_claude.config.settings.composite_settings import _config_callbacks
+
     return _config_callbacks
 
 
@@ -417,6 +418,7 @@ class TestGlobalWatcherFunctions:
         """Test that get_config_watcher returns a singleton."""
         # Reset global watcher
         import mini_claude.config.watcher as watcher_module
+
         watcher_module._watcher = None
 
         watcher1 = get_config_watcher()
@@ -432,6 +434,7 @@ class TestGlobalWatcherFunctions:
             env_file.write_text("LOG_LEVEL=INFO\n")
 
             import mini_claude.config.watcher as watcher_module
+
             watcher_module._watcher = None
 
             settings = Settings()
@@ -507,11 +510,7 @@ MAX_ITERATIONS=20
             env_file = Path(tmpdir) / ".env"
             env_file.write_text("LOG_LEVEL=DEBUG\n")
 
-            settings = Settings(
-                default_model="custom-model",
-                max_iterations=15,
-                log_level="INFO"
-            )
+            settings = Settings(default_model="custom-model", max_iterations=15, log_level="INFO")
 
             original_model = settings.default_model
             original_iterations = settings.max_iterations

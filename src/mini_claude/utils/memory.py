@@ -15,13 +15,14 @@ from dataclasses import dataclass, field, asdict
 warnings.warn(
     "memory.py is deprecated. Use SessionManager from session.py instead.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
 
 @dataclass
 class SessionMemory:
     """Memory for a conversation session."""
+
     thread_id: str
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -34,12 +35,14 @@ class SessionMemory:
 
     def add_message(self, role: str, content: str, metadata: Dict[str, Any] = None):
         """Add a message to memory."""
-        self.messages.append({
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat(),
-            "metadata": metadata or {},
-        })
+        self.messages.append(
+            {
+                "role": role,
+                "content": content,
+                "timestamp": datetime.now().isoformat(),
+                "metadata": metadata or {},
+            }
+        )
         self.updated_at = datetime.now().isoformat()
 
     def get_recent_messages(self, n: int = 10) -> List[Dict[str, Any]]:
@@ -59,7 +62,7 @@ class SessionMemory:
         if self.summary:
             return {
                 "role": "system",
-                "content": f"<conversation_summary>\n{self.summary}\n</conversation_summary>"
+                "content": f"<conversation_summary>\n{self.summary}\n</conversation_summary>",
             }
         return None
 

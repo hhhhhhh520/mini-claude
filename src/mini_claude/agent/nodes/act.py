@@ -31,11 +31,7 @@ from ._act_helpers import (
 )
 
 
-def _update_plan_step_status(
-    execution_plan: Dict,
-    step_index: int,
-    status: str
-) -> Dict:
+def _update_plan_step_status(execution_plan: Dict, step_index: int, status: str) -> Dict:
     """Update execution plan step status.
 
     Args:
@@ -107,11 +103,13 @@ async def act_node(state: AgentState) -> dict:
             if span:
                 span.set_attribute("rate_limit_exceeded", True)
             return {
-                "messages": [AIMessage(
-                    content=f"请求频率超限，请等待 {int(retry_after)} 秒后再试。\n"
-                    f"当前限制：每分钟 {settings.rate_limit_requests_per_minute} 次请求。\n"
-                    f"剩余配额：{remaining} 次。"
-                )],
+                "messages": [
+                    AIMessage(
+                        content=f"请求频率超限，请等待 {int(retry_after)} 秒后再试。\n"
+                        f"当前限制：每分钟 {settings.rate_limit_requests_per_minute} 次请求。\n"
+                        f"剩余配额：{remaining} 次。"
+                    )
+                ],
                 "stop_reason": StopReason.ERROR,
             }
 
@@ -140,8 +138,14 @@ async def act_node(state: AgentState) -> dict:
 
             # LLM call with retry
             content, raw_tool_calls = await _call_llm_with_retry(
-                state, litellm_messages, litellm_tools,
-                degr_manager, metrics_collector, span, max_retries, backoff
+                state,
+                litellm_messages,
+                litellm_tools,
+                degr_manager,
+                metrics_collector,
+                span,
+                max_retries,
+                backoff,
             )
 
             # Parse tool calls
@@ -164,13 +168,19 @@ async def act_node(state: AgentState) -> dict:
                 # Update plan step to RUNNING if we have a plan
                 updated_plan = None
                 if execution_plan:
-                    updated_plan = _update_plan_step_status(execution_plan, current_step_index, "running")
+                    updated_plan = _update_plan_step_status(
+                        execution_plan, current_step_index, "running"
+                    )
                     progress_msg = _get_plan_progress_message(updated_plan, current_step_index)
                     if progress_msg:
                         logger.info("act_node: plan progress", progress=progress_msg)
 
                 new_messages, early_return, step_success = await _execute_tools(
-                    tool_calls, degr_manager, metrics_collector, new_messages, span,
+                    tool_calls,
+                    degr_manager,
+                    metrics_collector,
+                    new_messages,
+                    span,
                     execution_plan=updated_plan or execution_plan,
                     step_index=current_step_index,
                 )
@@ -178,7 +188,9 @@ async def act_node(state: AgentState) -> dict:
                 # Update plan step status based on result
                 if updated_plan:
                     new_status = "completed" if step_success else "failed"
-                    updated_plan = _update_plan_step_status(updated_plan, current_step_index, new_status)
+                    updated_plan = _update_plan_step_status(
+                        updated_plan, current_step_index, new_status
+                    )
                     # Advance to next step
                     next_step_index = current_step_index + 1
 
@@ -259,8 +271,10 @@ async def _call_llm_with_retry(
 
                 if use_streaming:
                     result = await _streaming_llm_call(
-                        local_provider, litellm_messages, litellm_tools,
-                        max_tokens=settings.llm_max_tokens
+                        local_provider,
+                        litellm_messages,
+                        litellm_tools,
+                        max_tokens=settings.llm_max_tokens,
                     )
                     content = result.get("content", "")
                     raw_tool_calls = result.get("tool_calls")
@@ -273,11 +287,13 @@ async def _call_llm_with_retry(
                     )
                     message = response.choices[0].message
                     content = message.content or ""
-                    raw_tool_calls = message.tool_calls if hasattr(message, 'tool_calls') else None
+                    raw_tool_calls = message.tool_calls if hasattr(message, "tool_calls") else None
 
-                if llm_span and hasattr(response, 'usage') and response.usage:
+                if llm_span and hasattr(response, "usage") and response.usage:
                     llm_span.set_attribute("llm.prompt_tokens", response.usage.prompt_tokens)
-                    llm_span.set_attribute("llm.completion_tokens", response.usage.completion_tokens)
+                    llm_span.set_attribute(
+                        "llm.completion_tokens", response.usage.completion_tokens
+                    )
                     metrics_collector.record_token_usage(response.usage.prompt_tokens, "input")
                     metrics_collector.record_token_usage(response.usage.completion_tokens, "output")
 
@@ -371,21 +387,26 @@ async def _execute_tools(
             try:
                 tool_args = json.loads(tool_args)
             except json.JSONDecodeError as e:
-                logger.warning("Failed to parse tool args in execute loop", tool_name=tool_name, error=str(e))
-                tool_args = {"_parse_error": f"JSON 解析失败: {str(e)}", "_raw_args": tool_args[:500]}
+                logger.warning(
+                    "Failed to parse tool args in execute loop", tool_name=tool_name, error=str(e)
+                )
+                tool_args = {
+                    "_parse_error": f"JSON 解析失败: {str(e)}",
+                    "_raw_args": tool_args[:500],
+                }
 
-        logger.debug("Executing tool", index=i+1, total=len(tool_calls), tool_name=tool_name)
+        logger.debug("Executing tool", index=i + 1, total=len(tool_calls), tool_name=tool_name)
 
         # Display plan progress if available
         if execution_plan and i == 0:
             progress_msg = _get_plan_progress_message(execution_plan, step_index)
             if progress_msg:
                 from ...cli.display import display
+
                 display.show_info(progress_msg)
 
         new_messages, state_update = await execute_single_tool(
-            tool_name, tool_args, degr_manager, metrics_collector,
-            trace_tool_call, new_messages
+            tool_name, tool_args, degr_manager, metrics_collector, trace_tool_call, new_messages
         )
 
         # Check if tool execution failed

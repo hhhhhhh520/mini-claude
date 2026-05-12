@@ -99,14 +99,18 @@ class TestDependencyGraphBasic:
 
     def test_add_multiple_dependencies(self):
         """Test adding multiple dependencies for same tool."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_c"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_c"],
+            )
+        )
 
         deps = self.graph.get_dependencies("tool_a")
         assert "tool_b" in deps
@@ -114,10 +118,12 @@ class TestDependencyGraphBasic:
 
     def test_remove_dependency_all(self):
         """Test removing all dependencies for a tool."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b", "tool_c"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b", "tool_c"],
+            )
+        )
 
         count = self.graph.remove_dependency("tool_a")
 
@@ -127,14 +133,18 @@ class TestDependencyGraphBasic:
     def test_remove_specific_dependency(self):
         """Test removing a specific dependency."""
         # Create two separate dependencies for tool_a
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_c"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_c"],
+            )
+        )
 
         # Remove tool_b dependency
         count = self.graph.remove_dependency("tool_a", "tool_b")
@@ -157,14 +167,18 @@ class TestDependencyGraphGetDependencies:
         """Create graph with sample dependencies."""
         self.graph = DependencyGraph()
         # Create: tool_a -> tool_b -> tool_c
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_b",
-            depends_on=["tool_c"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_b",
+                depends_on=["tool_c"],
+            )
+        )
 
     def test_get_direct_dependencies(self):
         """Test getting direct dependencies."""
@@ -208,21 +222,24 @@ class TestDependencyGraphAvailability:
     def setup_method(self):
         """Create graph with sample dependencies."""
         self.graph = DependencyGraph()
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_c"],
-            optional=True,
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_c"],
+                optional=True,
+            )
+        )
 
     def test_all_available(self):
         """Test when all dependencies are available."""
         available, missing_req, missing_opt = self.graph.check_availability(
-            "tool_a",
-            {"tool_b", "tool_c"}
+            "tool_a", {"tool_b", "tool_c"}
         )
 
         assert available is True
@@ -233,7 +250,7 @@ class TestDependencyGraphAvailability:
         """Test when required dependency is missing."""
         available, missing_req, missing_opt = self.graph.check_availability(
             "tool_a",
-            {"tool_c"}  # tool_b missing
+            {"tool_c"},  # tool_b missing
         )
 
         assert available is False
@@ -243,7 +260,7 @@ class TestDependencyGraphAvailability:
         """Test when only optional dependency is missing."""
         available, missing_req, missing_opt = self.graph.check_availability(
             "tool_a",
-            {"tool_b"}  # tool_c missing but optional
+            {"tool_b"},  # tool_c missing but optional
         )
 
         assert available is True
@@ -252,10 +269,7 @@ class TestDependencyGraphAvailability:
 
     def test_no_dependencies(self):
         """Test tool with no dependencies."""
-        available, missing_req, missing_opt = self.graph.check_availability(
-            "tool_x",
-            set()
-        )
+        available, missing_req, missing_opt = self.graph.check_availability("tool_x", set())
 
         assert available is True
 
@@ -281,58 +295,74 @@ class TestDependencyGraphCycleDetection:
 
     def test_no_cycle(self):
         """Test graph without cycles."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_b",
-            depends_on=["tool_c"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_b",
+                depends_on=["tool_c"],
+            )
+        )
 
         cycle = self.graph.detect_cycle()
         assert cycle is None
 
     def test_simple_cycle(self):
         """Test detecting simple cycle a -> b -> a."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
 
         # This should raise because it creates a cycle
         with pytest.raises(CyclicDependencyError) as exc_info:
-            self.graph.add_dependency(ToolDependency(
-                tool_name="tool_b",
-                depends_on=["tool_a"],
-            ))
+            self.graph.add_dependency(
+                ToolDependency(
+                    tool_name="tool_b",
+                    depends_on=["tool_a"],
+                )
+            )
 
         assert "cycle" in str(exc_info.value).lower()
 
     def test_longer_cycle(self):
         """Test detecting longer cycle a -> b -> c -> a."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_b",
-            depends_on=["tool_c"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_b",
+                depends_on=["tool_c"],
+            )
+        )
 
         with pytest.raises(CyclicDependencyError):
-            self.graph.add_dependency(ToolDependency(
-                tool_name="tool_c",
-                depends_on=["tool_a"],
-            ))
+            self.graph.add_dependency(
+                ToolDependency(
+                    tool_name="tool_c",
+                    depends_on=["tool_a"],
+                )
+            )
 
     def test_self_cycle(self):
         """Test detecting self-dependency."""
         with pytest.raises(CyclicDependencyError):
-            self.graph.add_dependency(ToolDependency(
-                tool_name="tool_a",
-                depends_on=["tool_a"],
-            ))
+            self.graph.add_dependency(
+                ToolDependency(
+                    tool_name="tool_a",
+                    depends_on=["tool_a"],
+                )
+            )
 
     def test_detect_cycle_returns_path(self):
         """Test that detect_cycle returns the cycle path."""
@@ -358,10 +388,12 @@ class TestDependencyGraphTopologicalSort:
 
     def test_simple_order(self):
         """Test simple dependency order."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
 
         levels = self.graph.get_execution_order(["tool_a", "tool_b"])
 
@@ -372,14 +404,18 @@ class TestDependencyGraphTopologicalSort:
 
     def test_parallel_execution(self):
         """Test tools that can run in parallel."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_c"],
-        ))
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_b",
-            depends_on=["tool_c"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_c"],
+            )
+        )
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_b",
+                depends_on=["tool_c"],
+            )
+        )
 
         levels = self.graph.get_execution_order(["tool_a", "tool_b", "tool_c"])
 
@@ -389,14 +425,18 @@ class TestDependencyGraphTopologicalSort:
 
     def test_chain_order(self):
         """Test chain dependency order."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_b",
-            depends_on=["tool_c"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_b",
+                depends_on=["tool_c"],
+            )
+        )
 
         levels = self.graph.get_execution_order(["tool_a", "tool_b", "tool_c"])
 
@@ -459,10 +499,12 @@ class TestDependencyGraphToolRegistration:
 
     def test_check_availability_uses_registered(self):
         """Test check_availability uses registered tools."""
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+            )
+        )
         self.graph.register_tool("tool_b")
 
         available, _, _ = self.graph.check_availability("tool_a")
@@ -475,11 +517,13 @@ class TestDependencyGraphExport:
     def setup_method(self):
         """Create graph with sample data."""
         self.graph = DependencyGraph()
-        self.graph.add_dependency(ToolDependency(
-            tool_name="tool_a",
-            depends_on=["tool_b"],
-            description="a depends on b",
-        ))
+        self.graph.add_dependency(
+            ToolDependency(
+                tool_name="tool_a",
+                depends_on=["tool_b"],
+                description="a depends on b",
+            )
+        )
         self.graph.register_tool("tool_a")
         self.graph.register_tool("tool_b")
 
@@ -575,8 +619,7 @@ class TestBuiltinDependencies:
         # Find the force_write dependency
         force_write_deps = self.graph._dependencies.get("force_write", [])
         has_optional_read_file = any(
-            d.optional and "read_file" in d.depends_on
-            for d in force_write_deps
+            d.optional and "read_file" in d.depends_on for d in force_write_deps
         )
         assert has_optional_read_file
 

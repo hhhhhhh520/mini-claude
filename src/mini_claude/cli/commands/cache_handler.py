@@ -30,6 +30,7 @@ class CacheCommandHandler(CommandHandler):
             )
 
         from ...tools.cache import get_tool_cache
+
         cache = get_tool_cache()
 
         if not args or args == "status":

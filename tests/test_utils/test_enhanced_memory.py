@@ -165,7 +165,9 @@ class TestEnhancedMemoryManager:
         assert "session-1:0" in ids
         assert "session-1:1" in ids
 
-    def test_index_session_skips_system_messages(self, memory_manager, mock_session_manager, mock_vector_store):
+    def test_index_session_skips_system_messages(
+        self, memory_manager, mock_session_manager, mock_vector_store
+    ):
         """Test that system messages are skipped during indexing."""
         mock_session_manager.load_session_full.return_value = {
             "id": "session-1",
@@ -184,7 +186,9 @@ class TestEnhancedMemoryManager:
         assert len(ids) == 1
         assert "session-1:1" in ids  # Only the user message
 
-    def test_index_session_skips_empty_content(self, memory_manager, mock_session_manager, mock_vector_store):
+    def test_index_session_skips_empty_content(
+        self, memory_manager, mock_session_manager, mock_vector_store
+    ):
         """Test that empty messages are skipped."""
         mock_session_manager.load_session_full.return_value = {
             "id": "session-1",
@@ -582,18 +586,27 @@ class TestEnhancedMemoryManagerIntegration:
         """Test searching across multiple sessions."""
         # Create and index multiple sessions
         sessions = [
-            ("session-1", [
-                {"role": "user", "content": "React component for forms"},
-                {"role": "assistant", "content": "Use controlled components with useState."},
-            ]),
-            ("session-2", [
-                {"role": "user", "content": "Vue.js form validation"},
-                {"role": "assistant", "content": "Use vee-validate or Vuelidate."},
-            ]),
-            ("session-3", [
-                {"role": "user", "content": "Python data processing"},
-                {"role": "assistant", "content": "Use pandas for data manipulation."},
-            ]),
+            (
+                "session-1",
+                [
+                    {"role": "user", "content": "React component for forms"},
+                    {"role": "assistant", "content": "Use controlled components with useState."},
+                ],
+            ),
+            (
+                "session-2",
+                [
+                    {"role": "user", "content": "Vue.js form validation"},
+                    {"role": "assistant", "content": "Use vee-validate or Vuelidate."},
+                ],
+            ),
+            (
+                "session-3",
+                [
+                    {"role": "user", "content": "Python data processing"},
+                    {"role": "assistant", "content": "Use pandas for data manipulation."},
+                ],
+            ),
         ]
 
         for session_id, messages in sessions:
@@ -619,6 +632,7 @@ class TestGetEnhancedMemoryManager:
     def test_get_enhanced_memory_manager_singleton(self, temp_dir):
         """Test that get_enhanced_memory_manager returns singleton."""
         import mini_claude.utils.enhanced_memory as module
+
         module._enhanced_memory_manager = None
 
         try:

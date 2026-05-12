@@ -106,6 +106,7 @@ ITERATIONS_TOTAL = Counter(
 # Metrics Collector Class
 # =============================================================================
 
+
 @dataclass
 class MetricSnapshot:
     """Snapshot of current metrics values."""
@@ -228,11 +229,13 @@ class MetricsCollector:
         TOOL_CALLS_TOTAL.labels(tool_name=tool_name, status=status).inc()
 
         if success:
-            self._snapshot.tool_calls_success[tool_name] = \
+            self._snapshot.tool_calls_success[tool_name] = (
                 self._snapshot.tool_calls_success.get(tool_name, 0) + 1
+            )
         else:
-            self._snapshot.tool_calls_failure[tool_name] = \
+            self._snapshot.tool_calls_failure[tool_name] = (
                 self._snapshot.tool_calls_failure.get(tool_name, 0) + 1
+            )
 
         logger.debug("metrics: tool call recorded", tool=tool_name, success=success)
 
@@ -418,6 +421,7 @@ def get_metrics_collector() -> MetricsCollector:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             # Check if context has a cached instance
             if ctx._metrics_collector.is_initialized():
@@ -443,6 +447,7 @@ def reset_metrics_collector() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._metrics_collector.reset()
     except ImportError:
@@ -452,6 +457,7 @@ def reset_metrics_collector() -> None:
 # =============================================================================
 # Convenience Functions
 # =============================================================================
+
 
 def record_request_start() -> float:
     """Record request start using global collector."""
@@ -490,6 +496,7 @@ def get_metrics_summary() -> Dict:
 # =============================================================================
 # Prometheus HTTP Server
 # =============================================================================
+
 
 async def start_metrics_server(port: int = 9090, host: str = "0.0.0.0") -> None:
     """Start Prometheus metrics HTTP server.

@@ -19,6 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class ModelProvider(str, Enum):
     """Supported LLM providers."""
+
     CLAUDE = "claude"
     OPENAI = "openai"
     GEMINI = "gemini"
@@ -28,12 +29,14 @@ class ModelProvider(str, Enum):
 
 class VectorDBType(str, Enum):
     """Supported vector database types."""
+
     CHROMA = "chroma"
     FAISS = "faiss"
 
 
 class Environment(str, Enum):
     """Supported environment types."""
+
     DEV = "dev"
     STAGING = "staging"
     PROD = "prod"
@@ -42,6 +45,7 @@ class Environment(str, Enum):
 @dataclass
 class ConfigChange:
     """Represents a single configuration change."""
+
     key: str
     old_value: Any
     new_value: Any
@@ -50,6 +54,7 @@ class ConfigChange:
 @dataclass
 class ConfigReloadResult:
     """Result of a configuration reload operation."""
+
     success: bool
     changes: List[ConfigChange] = field(default_factory=list)
     error: Optional[str] = None
@@ -66,8 +71,7 @@ class ConfigReloadResult:
             "changed_count": len(self.changes),
             "changed_keys": [c.key for c in self.changes],
             "changes": [
-                {"key": c.key, "old": c.old_value, "new": c.new_value}
-                for c in self.changes
+                {"key": c.key, "old": c.old_value, "new": c.new_value} for c in self.changes
             ],
             "error": self.error,
             "timestamp": self.timestamp,

@@ -65,8 +65,9 @@ class WebSearchTool(BaseTool):
 
         # If query contains date numbers, add a simplified version as fallback
         import re
-        simplified = re.sub(r'\d{4}年\d{1,2}月\d{1,2}日?', '', query).strip()
-        simplified = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', simplified).strip()
+
+        simplified = re.sub(r"\d{4}年\d{1,2}月\d{1,2}日?", "", query).strip()
+        simplified = re.sub(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}", "", simplified).strip()
         if simplified and simplified != query:
             queries.append(simplified)
 
@@ -76,14 +77,20 @@ class WebSearchTool(BaseTool):
                 results = []
                 with DDGS(timeout=15) as ddgs:
                     for r in ddgs.text(q, max_results=num_results):
-                        results.append({
-                            "title": r.get("title", ""),
-                            "url": r.get("href", ""),
-                            "snippet": r.get("body", "")[:200],
-                        })
+                        results.append(
+                            {
+                                "title": r.get("title", ""),
+                                "url": r.get("href", ""),
+                                "snippet": r.get("body", "")[:200],
+                            }
+                        )
 
                 if results:
-                    prefix = f"Search results for '{q}'" if q == query else f"Search results (simplified from '{query}'):"
+                    prefix = (
+                        f"Search results for '{q}'"
+                        if q == query
+                        else f"Search results (simplified from '{query}'):"
+                    )
                     output = f"{prefix}\n\n"
                     for i, r in enumerate(results, 1):
                         output += f"{i}. {r['title']}\n"

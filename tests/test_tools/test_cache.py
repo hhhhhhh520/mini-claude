@@ -286,10 +286,10 @@ class TestToolCacheStats:
         cache = ToolCache()
         stats = cache.get_stats()
 
-        assert stats['size'] == 0
-        assert stats['hits'] == 0
-        assert stats['misses'] == 0
-        assert stats['hit_rate'] == 0.0
+        assert stats["size"] == 0
+        assert stats["hits"] == 0
+        assert stats["misses"] == 0
+        assert stats["hit_rate"] == 0.0
 
     def test_hit_rate_calculation(self):
         """Test hit rate calculation."""
@@ -307,9 +307,9 @@ class TestToolCacheStats:
         cache.get("read_file", {"path": "/tmp/c.txt"})
 
         stats = cache.get_stats()
-        assert stats['hits'] == 3
-        assert stats['misses'] == 2
-        assert stats['hit_rate'] == 60.0  # 3/(3+2) * 100
+        assert stats["hits"] == 3
+        assert stats["misses"] == 2
+        assert stats["hit_rate"] == 60.0  # 3/(3+2) * 100
 
     def test_stats_includes_evictions(self):
         """Test that stats track evictions."""
@@ -320,8 +320,8 @@ class TestToolCacheStats:
         cache.set("read_file", {"path": "/tmp/c.txt"}, "C")  # Evicts A
 
         stats = cache.get_stats()
-        assert stats['evictions'] == 1
-        assert stats['sets'] == 3
+        assert stats["evictions"] == 1
+        assert stats["sets"] == 3
 
     def test_stats_includes_invalidations(self):
         """Test that stats track invalidations."""
@@ -331,7 +331,7 @@ class TestToolCacheStats:
         cache.invalidate("read_file")
 
         stats = cache.get_stats()
-        assert stats['invalidations'] == 1
+        assert stats["invalidations"] == 1
 
 
 class TestToolCacheCleanup:
@@ -379,10 +379,10 @@ class TestToolCacheEntries:
 
         # Check entry structure
         for entry in entries:
-            assert 'key' in entry
-            assert 'tool_name' in entry
-            assert 'ttl_remaining' in entry
-            assert 'hit_count' in entry
+            assert "key" in entry
+            assert "tool_name" in entry
+            assert "ttl_remaining" in entry
+            assert "hit_count" in entry
 
     def test_get_entries_empty(self):
         """Test getting entries when cache is empty."""

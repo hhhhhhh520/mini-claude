@@ -29,6 +29,7 @@ from mini_claude.agent.complexity import ComplexityLevel, ComplexityResult
 
 # ========== UserProfileManager Integration Tests ==========
 
+
 class TestUserProfileManagerIntegration:
     """Tests for UserProfileManager integration with REPL - 8 test cases."""
 
@@ -123,9 +124,9 @@ class TestUserProfileManagerIntegration:
         # Verify we can access all profile data
         profile = profile_manager.load_profile()
         assert profile.preferred_model == "test-model"
-        assert hasattr(profile, 'recent_projects')
-        assert hasattr(profile, 'common_workflows')
-        assert hasattr(profile, 'custom_prompts')
+        assert hasattr(profile, "recent_projects")
+        assert hasattr(profile, "common_workflows")
+        assert hasattr(profile, "custom_prompts")
 
     def test_profile_command_edit(self, profile_manager):
         """Test editing profile via /profile command."""
@@ -139,6 +140,7 @@ class TestUserProfileManagerIntegration:
 
 
 # ========== PlanVisualizer Integration Tests ==========
+
 
 class TestPlanVisualizerIntegration:
     """Tests for PlanVisualizer integration with plan_node - 6 test cases."""
@@ -262,6 +264,7 @@ class TestPlanVisualizerIntegration:
 
 # ========== EnhancedMemoryManager Integration Tests ==========
 
+
 class TestEnhancedMemoryManagerIntegration:
     """Tests for EnhancedMemoryManager integration with SessionManager - 8 test cases."""
 
@@ -351,7 +354,7 @@ class TestEnhancedMemoryManagerIntegration:
 
         # Save and index multiple sessions
         for i, content in enumerate(["Python deployment guide", "Docker best practices"]):
-            session_id = f"session-{i+1}"
+            session_id = f"session-{i + 1}"
             memory_manager._session_manager.save_session(
                 session_id,
                 [{"role": "user", "content": content}],
@@ -470,6 +473,7 @@ class TestEnhancedMemoryManagerIntegration:
 
 
 # ========== End-to-End Integration Tests ==========
+
 
 class TestEndToEndIntegration:
     """End-to-end integration tests - 4 test cases."""

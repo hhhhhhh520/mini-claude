@@ -31,7 +31,9 @@ async def think_node(state: AgentState) -> dict:
         # 检查迭代限制
         max_iter = get_max_iterations(state)
         if iteration >= max_iter:
-            logger.debug("think_node: max iterations reached", iteration=iteration, max_iter=max_iter)
+            logger.debug(
+                "think_node: max iterations reached", iteration=iteration, max_iter=max_iter
+            )
             if span:
                 span.set_attribute("max_iterations_reached", True)
             return {
@@ -54,8 +56,8 @@ async def think_node(state: AgentState) -> dict:
                 "messages": messages,
                 "iteration": 1,
                 "stop_reason": StopReason.CONTINUE,
-                "errors": [],        # 重置错误列表
-                "retry_count": 0,    # 重置重试计数
+                "errors": [],  # 重置错误列表
+                "retry_count": 0,  # 重置重试计数
             }
 
         if span:

@@ -94,7 +94,7 @@ class TestFileLockManager:
     @pytest.fixture
     def temp_file(self):
         """创建临时文件"""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
             f.write("test content")
             yield f.name
         os.unlink(f.name)
@@ -104,19 +104,14 @@ class TestFileLockManager:
         """测试获取和释放锁"""
         # 获取锁
         success, msg = await file_lock_manager.acquire_lock(
-            path=temp_file,
-            agent_id="agent_1",
-            lock_type="write"
+            path=temp_file, agent_id="agent_1", lock_type="write"
         )
 
         assert success
         assert "Lock acquired" in msg
 
         # 释放锁
-        success, msg = await file_lock_manager.release_lock(
-            path=temp_file,
-            agent_id="agent_1"
-        )
+        success, msg = await file_lock_manager.release_lock(path=temp_file, agent_id="agent_1")
 
         assert success
         assert "Lock released" in msg
@@ -128,9 +123,7 @@ class TestFileLockManager:
         await file_lock_manager.acquire_lock(temp_file, "agent_1", "write")
 
         # agent_2 尝试获取锁（应该失败）
-        success, msg = await file_lock_manager.acquire_lock(
-            temp_file, "agent_2", "write"
-        )
+        success, msg = await file_lock_manager.acquire_lock(temp_file, "agent_2", "write")
 
         assert not success
         assert "locked by agent" in msg
@@ -142,14 +135,10 @@ class TestFileLockManager:
     async def test_read_lock_sharing(self, temp_file):
         """测试读锁共享"""
         # agent_1 获取读锁
-        success1, _ = await file_lock_manager.acquire_lock(
-            temp_file, "agent_1", "read"
-        )
+        success1, _ = await file_lock_manager.acquire_lock(temp_file, "agent_1", "read")
 
         # agent_2 也获取读锁（应该成功，读锁可共享）
-        success2, msg = await file_lock_manager.acquire_lock(
-            temp_file, "agent_2", "read"
-        )
+        success2, msg = await file_lock_manager.acquire_lock(temp_file, "agent_2", "read")
 
         assert success1
         assert success2
@@ -186,6 +175,7 @@ class TestSubagentManager:
     @pytest.mark.asyncio
     async def test_spawn_agent(self):
         """测试生成子代理"""
+
         async def dummy_task(progress_callback=None):
             await asyncio.sleep(0.1)
             return "done"
@@ -206,6 +196,7 @@ class TestSubagentManager:
     @pytest.mark.asyncio
     async def test_get_status(self):
         """测试获取状态"""
+
         async def long_task(progress_callback=None):
             await asyncio.sleep(0.5)
             return "done"
@@ -224,9 +215,11 @@ class TestSubagentManager:
     @pytest.mark.asyncio
     async def test_list_agents(self):
         """测试列出代理"""
+
         async def task1(progress_callback=None):
             await asyncio.sleep(0.1)
             return "1"
+
         async def task2(progress_callback=None):
             await asyncio.sleep(0.1)
             return "2"

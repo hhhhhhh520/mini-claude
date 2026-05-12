@@ -23,7 +23,7 @@ class TestRateLimiterFixedWindow:
 
         # Should allow first 5 requests
         for i in range(5):
-            assert limiter.check_limit("user1") is True, f"Request {i+1} should be allowed"
+            assert limiter.check_limit("user1") is True, f"Request {i + 1} should be allowed"
 
         # 6th request should be denied
         assert limiter.check_limit("user1") is False
@@ -87,7 +87,7 @@ class TestRateLimiterSlidingWindow:
 
         # Should allow first 5 requests
         for i in range(5):
-            assert limiter.check_limit("user1") is True, f"Request {i+1} should be allowed"
+            assert limiter.check_limit("user1") is True, f"Request {i + 1} should be allowed"
 
         # 6th request should be denied
         assert limiter.check_limit("user1") is False
@@ -161,7 +161,7 @@ class TestRateLimiterTokenBucket:
 
         # Should allow burst_size requests immediately
         for i in range(3):
-            assert limiter.check_limit("user1") is True, f"Request {i+1} should be allowed"
+            assert limiter.check_limit("user1") is True, f"Request {i + 1} should be allowed"
 
         # Next request should be denied (bucket empty)
         assert limiter.check_limit("user1") is False
@@ -348,10 +348,7 @@ class TestRateLimiterGeneral:
                 errors.append(e)
 
         # Create multiple threads
-        threads = [
-            threading.Thread(target=make_requests, args=("user1", 30))
-            for _ in range(4)
-        ]
+        threads = [threading.Thread(target=make_requests, args=("user1", 30)) for _ in range(4)]
 
         # Start all threads
         for t in threads:

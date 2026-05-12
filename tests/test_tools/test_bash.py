@@ -7,8 +7,12 @@ from pathlib import Path
 
 from mini_claude.tools.bash import RunCommandTool
 from mini_claude.utils.safety import (
-    validate_command, SafetyChecker,
-    PathConfirmationRequired, approve_path, is_path_approved, clear_approved_paths
+    validate_command,
+    SafetyChecker,
+    PathConfirmationRequired,
+    approve_path,
+    is_path_approved,
+    clear_approved_paths,
 )
 
 
@@ -20,6 +24,7 @@ def temp_dir():
 
 
 # ========== RunCommandTool Tests (15个) ==========
+
 
 class TestRunCommandTool:
     """测试命令执行工具 - 15个测试用例"""
@@ -132,6 +137,7 @@ class TestRunCommandTool:
 
 # ========== Safety Validation Tests (15个) ==========
 
+
 class TestSafetyValidation:
     """测试安全验证 - 15个测试用例"""
 
@@ -215,6 +221,7 @@ class TestSafetyValidation:
 
 # ========== SafetyChecker Tests (10个) ==========
 
+
 class TestSafetyChecker:
     """测试安全检查器 - 10个测试用例"""
 
@@ -253,7 +260,9 @@ class TestSafetyChecker:
         """测试保护路径 gcloud"""
         checker = SafetyChecker()
         try:
-            is_safe, reason = checker.check_path("~/.config/gcloud/credentials", require_confirmation=False)
+            is_safe, reason = checker.check_path(
+                "~/.config/gcloud/credentials", require_confirmation=False
+            )
             assert is_safe is False
         except AttributeError:
             pass

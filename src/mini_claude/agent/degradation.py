@@ -22,6 +22,7 @@ logger = get_logger(__name__)
 
 class DegradationType(str, Enum):
     """Types of degradation events."""
+
     MODEL = "model"
     TOOL = "tool"
     STRATEGY = "strategy"
@@ -31,6 +32,7 @@ class DegradationType(str, Enum):
 @dataclass
 class DegradationEvent:
     """Record of a degradation event."""
+
     type: DegradationType
     timestamp: datetime
     from_value: str
@@ -42,6 +44,7 @@ class DegradationEvent:
 @dataclass
 class DegradationHistory:
     """History of all degradation events."""
+
     events: List[DegradationEvent] = field(default_factory=list)
     max_events: int = 100
 
@@ -49,7 +52,7 @@ class DegradationHistory:
         """Add an event to history."""
         self.events.append(event)
         if len(self.events) > self.max_events:
-            self.events = self.events[-self.max_events:]
+            self.events = self.events[-self.max_events :]
 
     def get_recent(self, count: int = 10) -> List[DegradationEvent]:
         """Get recent events."""
@@ -256,7 +259,7 @@ class ExponentialBackoff:
         Returns:
             Delay in seconds
         """
-        delay = self.initial_delay * (self.exponential_base ** attempt)
+        delay = self.initial_delay * (self.exponential_base**attempt)
         delay = min(delay, self.max_delay)
 
         if self.jitter:
@@ -336,10 +339,13 @@ class ToolDegradation:
         config = config or {}
         self.max_failures = config.get("max_failures", 3)
         self.reset_after_seconds = config.get("reset_after_seconds", 600)
-        self.replacements = config.get("replacements", {
-            "web_search": "web_fetch",
-            "run_command": "run_background",
-        })
+        self.replacements = config.get(
+            "replacements",
+            {
+                "web_search": "web_fetch",
+                "run_command": "run_background",
+            },
+        )
 
         self._failure_counts: Dict[str, int] = {}
         self._last_failure_time: Dict[str, float] = {}
@@ -536,9 +542,7 @@ class StrategyDegradation:
         current_level = self.STRATEGY_LEVELS.get(self._current_strategy, 0)
 
         for strategy, level in sorted(
-            self.STRATEGY_LEVELS.items(),
-            key=lambda x: x[1],
-            reverse=True
+            self.STRATEGY_LEVELS.items(), key=lambda x: x[1], reverse=True
         ):
             if level < current_level:
                 return strategy

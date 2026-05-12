@@ -15,6 +15,7 @@ from dotenv import dotenv_values
 @dataclass
 class EnvironmentDiff:
     """Represents a difference between two environment configurations."""
+
     key: str
     base_value: Any
     env_value: Any
@@ -23,6 +24,7 @@ class EnvironmentDiff:
 @dataclass
 class EnvironmentInfo:
     """Information about an environment configuration."""
+
     name: str
     config_file: Path
     exists: bool
@@ -179,11 +181,7 @@ class EnvironmentConfigManager:
         for key, env_value in env_config.items():
             base_value = base_config.get(key)
             if base_value != env_value:
-                diffs.append(EnvironmentDiff(
-                    key=key,
-                    base_value=base_value,
-                    env_value=env_value
-                ))
+                diffs.append(EnvironmentDiff(key=key, base_value=base_value, env_value=env_value))
 
         return diffs
 
@@ -204,7 +202,7 @@ class EnvironmentConfigManager:
             config_file=config_file,
             exists=config_file.exists(),
             config_count=len(config),
-            missing_required=self._check_required_fields(config)
+            missing_required=self._check_required_fields(config),
         )
 
     def list_environments(self) -> List[EnvironmentInfo]:
@@ -345,7 +343,7 @@ TRACING_EXPORTER=otlp
 
 # Alerting configuration
 ALERT_ENABLED=true
-"""
+""",
         }
 
         return templates.get(env, templates["dev"])

@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 @dataclass
 class ToolDefinition:
     """Definition of a tool."""
+
     name: str
     description: str
     parameters: Dict[str, Any]
@@ -94,6 +95,7 @@ class BaseTool(ABC):
             Default implementation delegates to health check module.
         """
         from .health_check import check_tool_health
+
         return await check_tool_health(self.name)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -117,6 +119,7 @@ class ToolRegistry:
         """Get or initialize dependency graph."""
         if self._dependency_graph is None:
             from .dependencies import get_dependency_graph
+
             self._dependency_graph = get_dependency_graph()
         return self._dependency_graph
 
@@ -228,6 +231,7 @@ class ToolRegistry:
         # Check cache first if enabled
         if settings.tool_cache_enabled:
             from .cache import get_tool_cache
+
             cache = get_tool_cache()
             cached_result, hit = cache.get(name, params)
             if hit:
@@ -250,6 +254,7 @@ class ToolRegistry:
                 # Cache successful result if cacheable
                 if settings.tool_cache_enabled and not result.startswith("Error"):
                     from .cache import get_tool_cache
+
                     cache = get_tool_cache()
                     cache.set(name, params, result)
 

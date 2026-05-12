@@ -19,6 +19,7 @@ def load_environment():
 def init_logging():
     """Initialize logging system."""
     from ..utils.logger import init_logging_from_settings
+
     init_logging_from_settings()
 
 
@@ -115,7 +116,9 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool):
 
                     # Add assistant message and tool result
                     messages.append({"role": "assistant", "content": message.content or ""})
-                    messages.append({"role": "user", "content": f"Tool {tool_name} result: {result}"})
+                    messages.append(
+                        {"role": "user", "content": f"Tool {tool_name} result: {result}"}
+                    )
 
                 # Second call to process tool results
                 response = await llm.chat(messages=messages)
@@ -138,13 +141,15 @@ def status(ctx):
     """Show current status."""
     from mini_claude.config.settings import settings
 
-    display.console.print(Panel.fit(
-        f"[bold]Model:[/] {settings.default_model}\n"
-        f"[bold]Workspace:[/] {settings.workspace_root}\n"
-        f"[bold]Max Sub-Agents:[/] {settings.max_sub_agents}\n"
-        f"[bold]Max Iterations:[/] {settings.max_iterations}",
-        title="Status",
-    ))
+    display.console.print(
+        Panel.fit(
+            f"[bold]Model:[/] {settings.default_model}\n"
+            f"[bold]Workspace:[/] {settings.workspace_root}\n"
+            f"[bold]Max Sub-Agents:[/] {settings.max_sub_agents}\n"
+            f"[bold]Max Iterations:[/] {settings.max_iterations}",
+            title="Status",
+        )
+    )
 
 
 @main.command()
@@ -181,37 +186,63 @@ def health(ctx, port: int, output_json: bool):
             from rich.panel import Panel
 
             # Service status
-            display.console.print(Panel.fit(
-                f"[bold]Status:[/] {report.service.status.value}\n"
-                f"[bold]Uptime:[/] {report.service.to_dict()['uptime_human']}\n"
-                f"[bold]Memory:[/] {report.service.memory_usage_mb:.1f} MB\n"
-                f"[bold]CPU:[/] {report.service.cpu_percent:.1f}%",
-                title="Service",
-            ))
+            display.console.print(
+                Panel.fit(
+                    f"[bold]Status:[/] {report.service.status.value}\n"
+                    f"[bold]Uptime:[/] {report.service.to_dict()['uptime_human']}\n"
+                    f"[bold]Memory:[/] {report.service.memory_usage_mb:.1f} MB\n"
+                    f"[bold]CPU:[/] {report.service.cpu_percent:.1f}%",
+                    title="Service",
+                )
+            )
 
             # Model status
             model_status_color = "green" if report.model.status == HealthStatus.HEALTHY else "red"
-            display.console.print(Panel.fit(
-                f"[bold]Status:[/] [{model_status_color}]{report.model.status.value}[/{model_status_color}]\n"
-                f"[bold]Model:[/] {report.model.model_name}\n"
-                f"[bold]Provider:[/] {report.model.provider}" +
-                (f"\n[bold]Response Time:[/] {report.model.response_time_ms:.0f}ms" if report.model.response_time_ms else "") +
-                (f"\n[bold]Error:[/] {report.model.error_message}" if report.model.error_message else ""),
-                title="Model",
-            ))
+            display.console.print(
+                Panel.fit(
+                    f"[bold]Status:[/] [{model_status_color}]{report.model.status.value}[/{model_status_color}]\n"
+                    f"[bold]Model:[/] {report.model.model_name}\n"
+                    f"[bold]Provider:[/] {report.model.provider}"
+                    + (
+                        f"\n[bold]Response Time:[/] {report.model.response_time_ms:.0f}ms"
+                        if report.model.response_time_ms
+                        else ""
+                    )
+                    + (
+                        f"\n[bold]Error:[/] {report.model.error_message}"
+                        if report.model.error_message
+                        else ""
+                    ),
+                    title="Model",
+                )
+            )
 
             # Tools status
-            display.console.print(Panel.fit(
-                f"[bold]Status:[/] {report.tools.status.value}\n"
-                f"[bold]Available:[/] {report.tools.available_tools}/{report.tools.total_tools}\n"
-                f"[bold]Tools:[/] {', '.join(report.tools.tool_names[:5])}" +
-                (f" (+{len(report.tools.tool_names) - 5} more)" if len(report.tools.tool_names) > 5 else ""),
-                title="Tools",
-            ))
+            display.console.print(
+                Panel.fit(
+                    f"[bold]Status:[/] {report.tools.status.value}\n"
+                    f"[bold]Available:[/] {report.tools.available_tools}/{report.tools.total_tools}\n"
+                    f"[bold]Tools:[/] {', '.join(report.tools.tool_names[:5])}"
+                    + (
+                        f" (+{len(report.tools.tool_names) - 5} more)"
+                        if len(report.tools.tool_names) > 5
+                        else ""
+                    ),
+                    title="Tools",
+                )
+            )
 
             # Overall status
-            overall_color = "green" if report.overall_status() == HealthStatus.HEALTHY else "yellow" if report.overall_status() == HealthStatus.DEGRADED else "red"
-            display.console.print(f"\n[bold]Overall Status:[/] [{overall_color}]{report.overall_status().value}[/{overall_color}]")
+            overall_color = (
+                "green"
+                if report.overall_status() == HealthStatus.HEALTHY
+                else "yellow"
+                if report.overall_status() == HealthStatus.DEGRADED
+                else "red"
+            )
+            display.console.print(
+                f"\n[bold]Overall Status:[/] [{overall_color}]{report.overall_status().value}[/{overall_color}]"
+            )
 
         return report
 
@@ -308,12 +339,14 @@ def metrics(ctx, output_json: bool):
 
         # Performance
         perf = summary["performance"]
-        display.console.print(Panel.fit(
-            f"[bold]Avg Duration:[/] {perf['avg_duration_seconds']}s\n"
-            f"[bold]Total Duration:[/] {perf['total_duration_seconds']}s\n"
-            f"[bold]Uptime:[/] {summary['uptime_seconds']:.1f}s",
-            title="Performance",
-        ))
+        display.console.print(
+            Panel.fit(
+                f"[bold]Avg Duration:[/] {perf['avg_duration_seconds']}s\n"
+                f"[bold]Total Duration:[/] {perf['total_duration_seconds']}s\n"
+                f"[bold]Uptime:[/] {summary['uptime_seconds']:.1f}s",
+                title="Performance",
+            )
+        )
 
 
 @main.command()
@@ -356,6 +389,7 @@ def tool_deps(ctx, tool_name: Optional[str], output_json: bool):
 
     if output_json:
         import json
+
         if tool_name:
             info = tool_registry.get_dependency_info(tool_name)
         else:
@@ -394,33 +428,33 @@ def tool_deps(ctx, tool_name: Optional[str], output_json: bool):
         else:
             all_deps_text = "  (no transitive dependencies)"
 
-        display.console.print(Panel.fit(
-            f"[bold]Direct Dependencies:[/]\n{deps_text}\n\n"
-            f"[bold]All Dependencies (transitive):[/]\n{all_deps_text}\n\n"
-            f"[bold]Dependents:[/]\n{dependents_text}",
-            title=f"Tool: {tool_name}",
-        ))
+        display.console.print(
+            Panel.fit(
+                f"[bold]Direct Dependencies:[/]\n{deps_text}\n\n"
+                f"[bold]All Dependencies (transitive):[/]\n{all_deps_text}\n\n"
+                f"[bold]Dependents:[/]\n{dependents_text}",
+                title=f"Tool: {tool_name}",
+            )
+        )
 
         # Availability status
         if available:
             display.console.print("[green]All required dependencies available[/]")
         else:
-            display.console.print(
-                f"[red]Missing required: {missing_required}[/]"
-            )
+            display.console.print(f"[red]Missing required: {missing_required}[/]")
 
         if missing_optional:
-            display.console.print(
-                f"[yellow]Missing optional: {missing_optional}[/]"
-            )
+            display.console.print(f"[yellow]Missing optional: {missing_optional}[/]")
 
     else:
         # Show entire dependency graph
-        display.console.print(Panel.fit(
-            f"[bold]Total Tools with Dependencies:[/] {len(graph._dependencies)}\n"
-            f"[bold]Registered Tools:[/] {len(tool_registry._tools)}",
-            title="Tool Dependency Graph",
-        ))
+        display.console.print(
+            Panel.fit(
+                f"[bold]Total Tools with Dependencies:[/] {len(graph._dependencies)}\n"
+                f"[bold]Registered Tools:[/] {len(tool_registry._tools)}",
+                title="Tool Dependency Graph",
+            )
+        )
 
         # Build tree visualization
         tree = Tree("[bold]Dependencies[/]")
@@ -429,7 +463,9 @@ def tool_deps(ctx, tool_name: Optional[str], output_json: bool):
             tool_node = tree.add(f"[cyan]{tool}[/]")
             for dep in deps:
                 for d in dep.depends_on:
-                    status = "[green]available[/]" if d in tool_registry._tools else "[red]missing[/]"
+                    status = (
+                        "[green]available[/]" if d in tool_registry._tools else "[red]missing[/]"
+                    )
                     optional_marker = "[dim](optional)[/]" if dep.optional else ""
                     tool_node.add(f"{d} [{status}] {optional_marker}")
 
@@ -459,7 +495,9 @@ def tool_deps(ctx, tool_name: Optional[str], output_json: bool):
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--enable", is_flag=True, help="Enable tracing for current session")
 @click.pass_context
-def trace(ctx, limit: int, trace_id: Optional[str], show_tree: bool, output_json: bool, enable: bool):
+def trace(
+    ctx, limit: int, trace_id: Optional[str], show_tree: bool, output_json: bool, enable: bool
+):
     """Show recent OpenTelemetry traces.
 
     Displays trace spans from recent agent executions including:
@@ -495,7 +533,9 @@ def trace(ctx, limit: int, trace_id: Optional[str], show_tree: bool, output_json
             if success:
                 display.console.print("[green]Tracing enabled[/]")
             else:
-                display.console.print("[red]Failed to enable tracing. Check OpenTelemetry installation.[/]")
+                display.console.print(
+                    "[red]Failed to enable tracing. Check OpenTelemetry installation.[/]"
+                )
         else:
             display.console.print("[dim]Tracing already enabled[/]")
         return
@@ -510,12 +550,19 @@ def trace(ctx, limit: int, trace_id: Optional[str], show_tree: bool, output_json
 
         if output_json:
             import json
+
             print(json.dumps(tree_data, indent=2))
             return
 
         def build_tree(data: dict, parent: RichTree) -> None:
             for span in data.get("spans", []):
-                status_color = "green" if span["status"] == "OK" else "red" if span["status"] == "ERROR" else "dim"
+                status_color = (
+                    "green"
+                    if span["status"] == "OK"
+                    else "red"
+                    if span["status"] == "ERROR"
+                    else "dim"
+                )
                 node = parent.add(
                     f"[cyan]{span['name']}[/] [{status_color}]{span['status']}[/{status_color}] ({span['duration_ms']:.1f}ms)"
                 )
@@ -535,11 +582,14 @@ def trace(ctx, limit: int, trace_id: Optional[str], show_tree: bool, output_json
 
     if not traces:
         display.console.print("[dim]No traces available. Run some commands first.[/]")
-        display.console.print("[dim]Tip: Enable tracing with 'mini-claude trace --enable' or set TRACING_ENABLED=true[/]")
+        display.console.print(
+            "[dim]Tip: Enable tracing with 'mini-claude trace --enable' or set TRACING_ENABLED=true[/]"
+        )
         return
 
     if output_json:
         import json
+
         print(json.dumps(traces, indent=2))
         return
 
@@ -576,7 +626,9 @@ def trace(ctx, limit: int, trace_id: Optional[str], show_tree: bool, output_json
     manager = get_tracing_manager()
     status = "enabled" if manager.enabled else "disabled"
     status_color = "green" if manager.enabled else "yellow"
-    display.console.print(f"\n[dim]Tracing: [{status_color}]{status}[/{status_color}] | Exporter: {settings.tracing_exporter}[/]")
+    display.console.print(
+        f"\n[dim]Tracing: [{status_color}]{status}[/{status_color}] | Exporter: {settings.tracing_exporter}[/]"
+    )
 
 
 if __name__ == "__main__":

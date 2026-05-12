@@ -318,10 +318,7 @@ class HealthChecker:
             status = HealthStatus.HEALTHY
 
         # Build unavailable tools list (unhealthy status)
-        unavailable = [
-            r.tool_name for r in summary.tool_results
-            if r.status.value == "unhealthy"
-        ]
+        unavailable = [r.tool_name for r in summary.tool_results if r.status.value == "unhealthy"]
 
         return ToolHealth(
             status=status,
@@ -377,6 +374,7 @@ def get_health_checker() -> HealthChecker:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._health_checker.is_initialized():
                 _health_checker = ctx.health_checker
@@ -395,6 +393,7 @@ def reset_health_checker() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._health_checker.reset()
     except ImportError:

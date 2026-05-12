@@ -63,6 +63,7 @@ class TestAlert:
     def test_alert_auto_id_generation(self):
         """Test that alert ID is auto-generated and unique."""
         import time
+
         alert1 = Alert(
             level=AlertLevel.WARNING,
             message="Test alert",
@@ -456,6 +457,7 @@ class TestAlertManager:
     def test_check_alerts_disabled(self, manager, monkeypatch):
         """Test checking alerts when disabled."""
         from mini_claude.config.settings import Settings
+
         test_settings = Settings(alert_enabled=False)
         monkeypatch.setattr("mini_claude.monitoring.alerts.settings", test_settings)
 
@@ -556,6 +558,7 @@ class TestAlertManager:
 
     def test_handler_exception_isolation(self, manager):
         """Test that handler exceptions don't break the system."""
+
         class BrokenHandler(AlertHandler):
             def handle(self, alert):
                 raise RuntimeError("Handler broken!")
@@ -613,6 +616,7 @@ class TestGlobalFunctions:
     def test_check_alerts_global(self, monkeypatch):
         """Test global check_alerts function."""
         from mini_claude.config.settings import Settings
+
         test_settings = Settings(alert_enabled=True)
         monkeypatch.setattr("mini_claude.monitoring.alerts.settings", test_settings)
 
@@ -679,6 +683,7 @@ class TestIntegration:
 
         # Add handlers
         handler_called = []
+
         class TestHandler(AlertHandler):
             def handle(self, alert):
                 handler_called.append(alert)

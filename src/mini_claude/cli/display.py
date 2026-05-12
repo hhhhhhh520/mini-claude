@@ -55,17 +55,21 @@ class SuggestionDisplay:
             lines.append(f"[bold]Quick Command:[/] [cyan]{suggestion.command}[/]")
 
         if suggestion.doc_link:
-            lines.append(f"[bold]Documentation:[/] [link={suggestion.doc_link}]{suggestion.doc_link}[/]")
+            lines.append(
+                f"[bold]Documentation:[/] [link={suggestion.doc_link}]{suggestion.doc_link}[/]"
+            )
 
         content = "\n".join(lines)
 
         # Create panel with priority-based styling
-        self.console.print(Panel(
-            content,
-            title=f"[bold {color}]💡 {suggestion.title}[/]",
-            border_style=color,
-            padding=(1, 2),
-        ))
+        self.console.print(
+            Panel(
+                content,
+                title=f"[bold {color}]💡 {suggestion.title}[/]",
+                border_style=color,
+                padding=(1, 2),
+            )
+        )
 
     def show_suggestions(self, suggestions: List, title: str = "Suggestions") -> None:
         """Display multiple suggestions.
@@ -97,12 +101,14 @@ class AgentDisplay:
 
     def welcome(self):
         """Display welcome message."""
-        self.console.print(Panel.fit(
-            "[bold blue]Mini Claude Code[/]\n"
-            "[dim]A multi-agent CLI assistant[/]\n\n"
-            "[dim]Type your request or /help for commands[/]",
-            border_style="blue",
-        ))
+        self.console.print(
+            Panel.fit(
+                "[bold blue]Mini Claude Code[/]\n"
+                "[dim]A multi-agent CLI assistant[/]\n\n"
+                "[dim]Type your request or /help for commands[/]",
+                border_style="blue",
+            )
+        )
 
     def user_message(self, message: str):
         """Display user message."""
@@ -161,7 +167,9 @@ class AgentDisplay:
     def show_tool_result(self, result: str, success: bool = True):
         """Display tool result."""
         color = "green" if success else "red"
-        self.console.print(f"[dim {color}]Result: {result[:200]}{'...' if len(result) > 200 else ''}[/]")
+        self.console.print(
+            f"[dim {color}]Result: {result[:200]}{'...' if len(result) > 200 else ''}[/]"
+        )
 
     def show_info(self, message: str):
         """Display informational message."""
@@ -194,7 +202,7 @@ class AgentDisplay:
                 "pending": "[dim]Pending[/]",
             }.get(status, status)
 
-            table.add_row(agent_id, status_style, f"{progress*100:.0f}%")
+            table.add_row(agent_id, status_style, f"{progress * 100:.0f}%")
 
         self.console.print(table)
 
@@ -218,11 +226,13 @@ class AgentDisplay:
     def confirm(self, message: str) -> bool:
         """Ask for user confirmation."""
         from rich.prompt import Confirm
+
         return Confirm.ask(message)
 
     def prompt(self, message: str = "> ") -> str:
         """Prompt for user input."""
         from rich.prompt import Prompt
+
         return Prompt.ask(message)
 
     def show_suggestion(self, suggestion) -> None:

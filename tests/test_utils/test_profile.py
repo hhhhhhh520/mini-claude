@@ -24,6 +24,7 @@ def profile_manager(temp_profile_path):
 
 # ========== UserProfile Dataclass Tests ==========
 
+
 class TestUserProfile:
     """Tests for UserProfile dataclass - 8 test cases."""
 
@@ -125,6 +126,7 @@ class TestUserProfile:
 
 
 # ========== UserProfileManager Tests ==========
+
 
 class TestUserProfileManager:
     """Tests for UserProfileManager - 20 test cases."""
@@ -327,6 +329,7 @@ class TestUserProfileManager:
 
 
 # ========== Concurrent Access Tests ==========
+
 
 class TestConcurrentAccess:
     """Tests for concurrent access protection - 5 test cases."""

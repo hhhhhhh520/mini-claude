@@ -14,6 +14,7 @@ logger = get_logger("mini_claude.config.watcher")
 @dataclass
 class WatcherState:
     """State of the config watcher."""
+
     enabled: bool = False
     watching: bool = False
     last_mtime: float = 0.0
@@ -222,6 +223,7 @@ def get_config_watcher(
     if _watcher is None:
         if settings is None:
             from mini_claude.config.settings import settings as default_settings
+
             settings = default_settings
         _watcher = ConfigFileWatcher(
             settings=settings,

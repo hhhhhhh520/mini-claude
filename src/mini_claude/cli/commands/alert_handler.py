@@ -58,6 +58,7 @@ class AlertCommandHandler(CommandHandler):
     def _check_alerts(self, ctx: CommandContext) -> CommandResult:
         """Trigger manual alert check."""
         from ...monitoring.metrics import get_metrics_collector
+
         collector = get_metrics_collector()
         alerts = collector.check_alerts()
 

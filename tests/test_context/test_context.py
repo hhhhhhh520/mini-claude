@@ -114,6 +114,7 @@ class TestApplicationContext:
 
         # Access should create instance of correct type
         from mini_claude.monitoring.metrics import MetricsCollector
+
         instance = ctx.metrics_collector
         assert isinstance(instance, MetricsCollector)
 
@@ -206,6 +207,7 @@ class TestProviderIntegration:
         ctx = get_context()
 
         from mini_claude.monitoring.metrics import MetricsCollector
+
         instance = ctx.metrics_collector
         assert isinstance(instance, MetricsCollector)
 
@@ -215,6 +217,7 @@ class TestProviderIntegration:
         ctx = get_context()
 
         from mini_claude.utils.token_manager import TokenCounter
+
         instance = ctx.token_counter
         assert isinstance(instance, TokenCounter)
 

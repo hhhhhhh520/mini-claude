@@ -69,10 +69,7 @@ class RunCommandTool(BaseTool):
             )
 
             try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout
-                )
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
             except asyncio.TimeoutError:
                 process.kill()
                 return f"Error: Command timed out after {timeout} seconds"

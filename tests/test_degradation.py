@@ -19,15 +19,18 @@ from mini_claude.agent.degradation import (
 # ModelDegradation Tests
 # =============================================================================
 
+
 class TestModelDegradation:
     """Tests for ModelDegradation class."""
 
     def test_initial_state(self):
         """Test initial state is correct."""
-        degr = ModelDegradation({
-            "primary": "deepseek-chat",
-            "fallbacks": ["gpt-4o-mini", "claude-3-haiku"],
-        })
+        degr = ModelDegradation(
+            {
+                "primary": "deepseek-chat",
+                "fallbacks": ["gpt-4o-mini", "claude-3-haiku"],
+            }
+        )
 
         assert degr.get_current_model() == "deepseek-chat"
         assert degr.get_model_chain() == ["deepseek-chat", "gpt-4o-mini", "claude-3-haiku"]
@@ -41,11 +44,13 @@ class TestModelDegradation:
 
     def test_record_failure_degrades(self):
         """Test that recording failures triggers degradation."""
-        degr = ModelDegradation({
-            "primary": "deepseek-chat",
-            "fallbacks": ["gpt-4o-mini"],
-            "max_failures": 2,
-        })
+        degr = ModelDegradation(
+            {
+                "primary": "deepseek-chat",
+                "fallbacks": ["gpt-4o-mini"],
+                "max_failures": 2,
+            }
+        )
 
         # First failure - no degradation yet
         model = degr.record_failure("deepseek-chat", "API timeout")
@@ -63,11 +68,13 @@ class TestModelDegradation:
 
     def test_no_more_fallbacks(self):
         """Test behavior when no more fallbacks available."""
-        degr = ModelDegradation({
-            "primary": "deepseek-chat",
-            "fallbacks": ["gpt-4o-mini"],
-            "max_failures": 1,
-        })
+        degr = ModelDegradation(
+            {
+                "primary": "deepseek-chat",
+                "fallbacks": ["gpt-4o-mini"],
+                "max_failures": 1,
+            }
+        )
 
         # Degrade to fallback
         degr.record_failure("deepseek-chat", "Error")
@@ -79,11 +86,13 @@ class TestModelDegradation:
 
     def test_record_success(self):
         """Test that success resets failure count."""
-        degr = ModelDegradation({
-            "primary": "deepseek-chat",
-            "fallbacks": ["gpt-4o-mini"],
-            "max_failures": 2,
-        })
+        degr = ModelDegradation(
+            {
+                "primary": "deepseek-chat",
+                "fallbacks": ["gpt-4o-mini"],
+                "max_failures": 2,
+            }
+        )
 
         degr.record_failure("deepseek-chat", "Error")
         degr.record_success("deepseek-chat")
@@ -94,11 +103,13 @@ class TestModelDegradation:
 
     def test_manual_reset(self):
         """Test manual reset to primary."""
-        degr = ModelDegradation({
-            "primary": "deepseek-chat",
-            "fallbacks": ["gpt-4o-mini"],
-            "max_failures": 1,
-        })
+        degr = ModelDegradation(
+            {
+                "primary": "deepseek-chat",
+                "fallbacks": ["gpt-4o-mini"],
+                "max_failures": 1,
+            }
+        )
 
         degr.record_failure("deepseek-chat", "Error")
         assert degr.get_current_model() == "gpt-4o-mini"
@@ -108,18 +119,21 @@ class TestModelDegradation:
 
     def test_auto_reset(self):
         """Test auto-reset after timeout."""
-        degr = ModelDegradation({
-            "primary": "deepseek-chat",
-            "fallbacks": ["gpt-4o-mini"],
-            "max_failures": 1,
-            "reset_after_seconds": 0.1,  # 100ms for testing
-        })
+        degr = ModelDegradation(
+            {
+                "primary": "deepseek-chat",
+                "fallbacks": ["gpt-4o-mini"],
+                "max_failures": 1,
+                "reset_after_seconds": 0.1,  # 100ms for testing
+            }
+        )
 
         degr.record_failure("deepseek-chat", "Error")
         assert degr.get_current_model() == "gpt-4o-mini"
 
         # Wait for auto-reset
         import time
+
         time.sleep(0.15)
 
         assert degr.get_current_model() == "deepseek-chat"
@@ -128,6 +142,7 @@ class TestModelDegradation:
 # =============================================================================
 # ExponentialBackoff Tests
 # =============================================================================
+
 
 class TestExponentialBackoff:
     """Tests for ExponentialBackoff class."""
@@ -141,12 +156,14 @@ class TestExponentialBackoff:
 
     def test_calculate_delay(self):
         """Test delay calculation."""
-        backoff = ExponentialBackoff({
-            "initial_delay": 1.0,
-            "max_delay": 30.0,
-            "exponential_base": 2,
-            "jitter": False,
-        })
+        backoff = ExponentialBackoff(
+            {
+                "initial_delay": 1.0,
+                "max_delay": 30.0,
+                "exponential_base": 2,
+                "jitter": False,
+            }
+        )
 
         assert backoff.calculate_delay(0) == 1.0
         assert backoff.calculate_delay(1) == 2.0
@@ -155,10 +172,12 @@ class TestExponentialBackoff:
 
     def test_calculate_delay_with_jitter(self):
         """Test delay calculation with jitter."""
-        backoff = ExponentialBackoff({
-            "initial_delay": 1.0,
-            "jitter": True,
-        })
+        backoff = ExponentialBackoff(
+            {
+                "initial_delay": 1.0,
+                "jitter": True,
+            }
+        )
 
         # With jitter, delay should be between 0.5x and 1.5x
         for _ in range(10):
@@ -168,11 +187,13 @@ class TestExponentialBackoff:
     @pytest.mark.asyncio
     async def test_wait(self):
         """Test async wait."""
-        backoff = ExponentialBackoff({
-            "max_retries": 2,
-            "initial_delay": 0.01,  # Fast for testing
-            "jitter": False,
-        })
+        backoff = ExponentialBackoff(
+            {
+                "max_retries": 2,
+                "initial_delay": 0.01,  # Fast for testing
+                "jitter": False,
+            }
+        )
 
         delay = await backoff.wait()
         assert delay == 0.01
@@ -185,10 +206,12 @@ class TestExponentialBackoff:
     @pytest.mark.asyncio
     async def test_wait_exceeds_max_retries(self):
         """Test that wait raises error after max retries."""
-        backoff = ExponentialBackoff({
-            "max_retries": 1,
-            "initial_delay": 0.01,
-        })
+        backoff = ExponentialBackoff(
+            {
+                "max_retries": 1,
+                "initial_delay": 0.01,
+            }
+        )
 
         # First wait (attempt 0)
         await backoff.wait()
@@ -222,6 +245,7 @@ class TestExponentialBackoff:
 # =============================================================================
 # ToolDegradation Tests
 # =============================================================================
+
 
 class TestToolDegradation:
     """Tests for ToolDegradation class."""
@@ -257,11 +281,13 @@ class TestToolDegradation:
 
     def test_get_replacement(self):
         """Test tool replacement."""
-        degr = ToolDegradation({
-            "replacements": {
-                "web_search": "web_fetch",
+        degr = ToolDegradation(
+            {
+                "replacements": {
+                    "web_search": "web_fetch",
+                }
             }
-        })
+        )
 
         assert degr.get_replacement("web_search") == "web_fetch"
         assert degr.get_replacement("unknown_tool") is None
@@ -303,15 +329,18 @@ class TestToolDegradation:
 
     def test_auto_reset(self):
         """Test auto-reset after timeout."""
-        degr = ToolDegradation({
-            "max_failures": 1,
-            "reset_after_seconds": 0.1,
-        })
+        degr = ToolDegradation(
+            {
+                "max_failures": 1,
+                "reset_after_seconds": 0.1,
+            }
+        )
 
         degr.record_failure("web_search", "Error")
         assert degr.should_skip("web_search") is True
 
         import time
+
         time.sleep(0.15)
 
         assert degr.should_skip("web_search") is False
@@ -320,6 +349,7 @@ class TestToolDegradation:
 # =============================================================================
 # StrategyDegradation Tests
 # =============================================================================
+
 
 class TestStrategyDegradation:
     """Tests for StrategyDegradation class."""
@@ -332,10 +362,12 @@ class TestStrategyDegradation:
 
     def test_record_failure_degrades(self):
         """Test that failures trigger strategy degradation."""
-        degr = StrategyDegradation({
-            "initial_strategy": "reflexion",
-            "max_failures": 1,
-        })
+        degr = StrategyDegradation(
+            {
+                "initial_strategy": "reflexion",
+                "max_failures": 1,
+            }
+        )
 
         assert degr.get_current_strategy() == "reflexion"
 
@@ -344,10 +376,12 @@ class TestStrategyDegradation:
 
     def test_degrade_to_simple(self):
         """Test degradation chain: reflexion -> react -> simple."""
-        degr = StrategyDegradation({
-            "initial_strategy": "reflexion",
-            "max_failures": 1,
-        })
+        degr = StrategyDegradation(
+            {
+                "initial_strategy": "reflexion",
+                "max_failures": 1,
+            }
+        )
 
         degr.record_failure("reflexion", "Error")
         assert degr.get_current_strategy() == "react"
@@ -361,10 +395,12 @@ class TestStrategyDegradation:
 
     def test_record_success(self):
         """Test success resets failure count."""
-        degr = StrategyDegradation({
-            "initial_strategy": "reflexion",
-            "max_failures": 2,
-        })
+        degr = StrategyDegradation(
+            {
+                "initial_strategy": "reflexion",
+                "max_failures": 2,
+            }
+        )
 
         degr.record_failure("reflexion", "Error")
         degr.record_success("reflexion")
@@ -374,10 +410,12 @@ class TestStrategyDegradation:
 
     def test_reset(self):
         """Test manual reset."""
-        degr = StrategyDegradation({
-            "initial_strategy": "reflexion",
-            "max_failures": 1,
-        })
+        degr = StrategyDegradation(
+            {
+                "initial_strategy": "reflexion",
+                "max_failures": 1,
+            }
+        )
 
         degr.record_failure("reflexion", "Error")
         assert degr.get_current_strategy() == "react"
@@ -390,17 +428,20 @@ class TestStrategyDegradation:
 # DegradationManager Tests
 # =============================================================================
 
+
 class TestDegradationManager:
     """Tests for DegradationManager class."""
 
     def test_initial_state(self):
         """Test initial state."""
-        manager = DegradationManager({
-            "model": {"primary": "deepseek-chat"},
-            "backoff": {"max_retries": 3},
-            "tool": {"max_failures": 3},
-            "strategy": {"initial_strategy": "react"},
-        })
+        manager = DegradationManager(
+            {
+                "model": {"primary": "deepseek-chat"},
+                "backoff": {"max_retries": 3},
+                "tool": {"max_failures": 3},
+                "strategy": {"initial_strategy": "react"},
+            }
+        )
 
         status = manager.get_status()
 
@@ -417,10 +458,16 @@ class TestDegradationManager:
 
     def test_reset_all(self):
         """Test resetting all strategies."""
-        manager = DegradationManager({
-            "model": {"primary": "deepseek-chat", "fallbacks": ["gpt-4o-mini"], "max_failures": 1},
-            "strategy": {"initial_strategy": "reflexion", "max_failures": 1},
-        })
+        manager = DegradationManager(
+            {
+                "model": {
+                    "primary": "deepseek-chat",
+                    "fallbacks": ["gpt-4o-mini"],
+                    "max_failures": 1,
+                },
+                "strategy": {"initial_strategy": "reflexion", "max_failures": 1},
+            }
+        )
 
         # Degrade model and strategy
         manager.model.record_failure("deepseek-chat", "Error")
@@ -436,10 +483,16 @@ class TestDegradationManager:
 
     def test_get_history(self):
         """Test getting combined history."""
-        manager = DegradationManager({
-            "model": {"primary": "deepseek-chat", "fallbacks": ["gpt-4o-mini"], "max_failures": 1},
-            "tool": {"max_failures": 1},
-        })
+        manager = DegradationManager(
+            {
+                "model": {
+                    "primary": "deepseek-chat",
+                    "fallbacks": ["gpt-4o-mini"],
+                    "max_failures": 1,
+                },
+                "tool": {"max_failures": 1},
+            }
+        )
 
         # Create some events
         manager.model.record_failure("deepseek-chat", "Error")
@@ -459,6 +512,7 @@ class TestDegradationManager:
 # DegradationHistory Tests
 # =============================================================================
 
+
 class TestDegradationHistory:
     """Tests for DegradationHistory class."""
 
@@ -467,13 +521,15 @@ class TestDegradationHistory:
         history = DegradationHistory(max_events=5)
 
         for i in range(10):
-            history.add(DegradationEvent(
-                type=DegradationType.MODEL,
-                timestamp=datetime.now(),
-                from_value=f"model_{i}",
-                to_value=f"model_{i+1}",
-                reason="test",
-            ))
+            history.add(
+                DegradationEvent(
+                    type=DegradationType.MODEL,
+                    timestamp=datetime.now(),
+                    from_value=f"model_{i}",
+                    to_value=f"model_{i + 1}",
+                    reason="test",
+                )
+            )
 
         assert len(history.events) == 5  # Max 5 events
         assert history.events[0].from_value == "model_5"  # Oldest kept
@@ -483,13 +539,15 @@ class TestDegradationHistory:
         history = DegradationHistory()
 
         for i in range(5):
-            history.add(DegradationEvent(
-                type=DegradationType.MODEL,
-                timestamp=datetime.now(),
-                from_value=f"model_{i}",
-                to_value=f"model_{i+1}",
-                reason="test",
-            ))
+            history.add(
+                DegradationEvent(
+                    type=DegradationType.MODEL,
+                    timestamp=datetime.now(),
+                    from_value=f"model_{i}",
+                    to_value=f"model_{i + 1}",
+                    reason="test",
+                )
+            )
 
         recent = history.get_recent(3)
         assert len(recent) == 3
@@ -499,27 +557,33 @@ class TestDegradationHistory:
         """Test filtering by type."""
         history = DegradationHistory()
 
-        history.add(DegradationEvent(
-            type=DegradationType.MODEL,
-            timestamp=datetime.now(),
-            from_value="a",
-            to_value="b",
-            reason="test",
-        ))
-        history.add(DegradationEvent(
-            type=DegradationType.TOOL,
-            timestamp=datetime.now(),
-            from_value="c",
-            to_value="d",
-            reason="test",
-        ))
-        history.add(DegradationEvent(
-            type=DegradationType.MODEL,
-            timestamp=datetime.now(),
-            from_value="e",
-            to_value="f",
-            reason="test",
-        ))
+        history.add(
+            DegradationEvent(
+                type=DegradationType.MODEL,
+                timestamp=datetime.now(),
+                from_value="a",
+                to_value="b",
+                reason="test",
+            )
+        )
+        history.add(
+            DegradationEvent(
+                type=DegradationType.TOOL,
+                timestamp=datetime.now(),
+                from_value="c",
+                to_value="d",
+                reason="test",
+            )
+        )
+        history.add(
+            DegradationEvent(
+                type=DegradationType.MODEL,
+                timestamp=datetime.now(),
+                from_value="e",
+                to_value="f",
+                reason="test",
+            )
+        )
 
         model_events = history.get_by_type(DegradationType.MODEL)
         assert len(model_events) == 2
@@ -532,26 +596,29 @@ class TestDegradationHistory:
 # Integration Tests
 # =============================================================================
 
+
 class TestIntegration:
     """Integration tests for degradation strategies."""
 
     @pytest.mark.asyncio
     async def test_full_degradation_flow(self):
         """Test complete degradation flow."""
-        manager = DegradationManager({
-            "model": {
-                "primary": "deepseek-chat",
-                "fallbacks": ["gpt-4o-mini"],
-                "max_failures": 1,
-            },
-            "backoff": {
-                "max_retries": 1,
-                "initial_delay": 0.01,
-            },
-            "tool": {
-                "max_failures": 1,
-            },
-        })
+        manager = DegradationManager(
+            {
+                "model": {
+                    "primary": "deepseek-chat",
+                    "fallbacks": ["gpt-4o-mini"],
+                    "max_failures": 1,
+                },
+                "backoff": {
+                    "max_retries": 1,
+                    "initial_delay": 0.01,
+                },
+                "tool": {
+                    "max_failures": 1,
+                },
+            }
+        )
 
         # Simulate model failure
         manager.model.record_failure("deepseek-chat", "API timeout")

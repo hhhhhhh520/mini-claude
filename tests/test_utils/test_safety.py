@@ -67,7 +67,9 @@ class TestSensitivePatterns:
 
     def test_detect_jwt_token(self):
         """Test detection of JWT token."""
-        result = check_sensitive_input("jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U")
+        result = check_sensitive_input(
+            "jwt eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+        )
         assert result["detected"] is True
         assert "token" in result["patterns"]
 
@@ -79,7 +81,9 @@ class TestSensitivePatterns:
 
     def test_detect_postgresql_connection_string(self):
         """Test detection of PostgreSQL connection string with password."""
-        result = check_sensitive_input("postgresql://admin:secretpass@db.example.com:5432/production")
+        result = check_sensitive_input(
+            "postgresql://admin:secretpass@db.example.com:5432/production"
+        )
         assert result["detected"] is True
         assert "connection_string" in result["patterns"]
 
@@ -482,6 +486,7 @@ class TestValidateCommandWhitelist:
 # SUB-003: Command Whitelist Security Tests
 # =============================================================================
 
+
 class TestUnicodeBypassAttacks:
     """Test Unicode bypass attack vectors - STRIDE: Tampering/Spoofing."""
 
@@ -505,7 +510,7 @@ class TestUnicodeBypassAttacks:
         test_input = "lś"  # 'ls' + combining acute accent
         normalized = _normalize_command(test_input)
         # After NFC normalization, combining char should be combined
-        expected = unicodedata.normalize('NFC', test_input)
+        expected = unicodedata.normalize("NFC", test_input)
         assert normalized == expected
 
     def test_unicode_whitespace_variants(self):
@@ -640,7 +645,7 @@ class TestBacktickInjection:
 
     def test_backtick_nested_in_echo(self):
         """Backtick nested in echo command."""
-        malicious = "echo \"Current user: `whoami`\""
+        malicious = 'echo "Current user: `whoami`"'
         is_safe, reason = validate_command_v2(malicious)
         assert is_safe is False
 

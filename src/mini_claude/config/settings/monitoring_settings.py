@@ -41,12 +41,14 @@ class MonitoringSettings(BaseSettings):
     tool_cache_enabled: bool = Field(default=True)
     tool_cache_ttl_seconds: int = Field(default=300)
     tool_cache_max_size: int = Field(default=100)
-    tool_cache_tools: List[str] = Field(default=[
-        "read_file",
-        "list_dir",
-        "search_files",
-        "search_content",
-    ])
+    tool_cache_tools: List[str] = Field(
+        default=[
+            "read_file",
+            "list_dir",
+            "search_files",
+            "search_content",
+        ]
+    )
 
     # Tracing settings (OpenTelemetry)
     tracing_enabled: bool = Field(default=False)

@@ -11,6 +11,7 @@ from mini_claude.config.settings import settings
 
 class AgentStatus(Enum):
     """Status of a sub-agent."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -20,6 +21,7 @@ class AgentStatus(Enum):
 @dataclass
 class SubAgentResult:
     """Result from a sub-agent execution."""
+
     agent_id: str
     status: AgentStatus
     output: Any = None
@@ -40,13 +42,7 @@ class SubAgentManager:
         self.progress_queue: asyncio.Queue = asyncio.Queue()
         self.semaphore = asyncio.Semaphore(self.max_concurrent)
 
-    async def spawn(
-        self,
-        agent_id: str,
-        task: Callable,
-        *args,
-        **kwargs
-    ) -> str:
+    async def spawn(self, agent_id: str, task: Callable, *args, **kwargs) -> str:
         """Spawn a single sub-agent."""
         if agent_id in self.agents:
             raise ValueError(f"Agent {agent_id} already exists")
@@ -62,9 +58,7 @@ class SubAgentManager:
                 self.results[agent_id].status = AgentStatus.RUNNING
                 try:
                     result = await task(
-                        *args,
-                        progress_callback=self._make_callback(agent_id),
-                        **kwargs
+                        *args, progress_callback=self._make_callback(agent_id), **kwargs
                     )
                     self.results[agent_id].status = AgentStatus.COMPLETED
                     self.results[agent_id].output = result
@@ -79,10 +73,7 @@ class SubAgentManager:
         self.agents[agent_id] = asyncio.create_task(wrapped_task())
         return agent_id
 
-    async def spawn_parallel(
-        self,
-        tasks: List[tuple]
-    ) -> List[str]:
+    async def spawn_parallel(self, tasks: List[tuple]) -> List[str]:
         """Spawn multiple sub-agents in parallel.
 
         Args:
@@ -131,18 +122,17 @@ class SubAgentManager:
 
     def _make_callback(self, agent_id: str) -> Callable:
         """Create a progress callback for an agent."""
+
         async def callback(progress: float, message: str = ""):
             self.results[agent_id].progress = progress
             await self.progress_queue.put((agent_id, progress, message))
+
         return callback
 
     async def get_progress_update(self, timeout: float = 0.1) -> Optional[tuple]:
         """Get the next progress update (non-blocking)."""
         try:
-            return await asyncio.wait_for(
-                self.progress_queue.get(),
-                timeout=timeout
-            )
+            return await asyncio.wait_for(self.progress_queue.get(), timeout=timeout)
         except asyncio.TimeoutError:
             return None
 

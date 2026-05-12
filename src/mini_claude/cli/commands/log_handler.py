@@ -19,6 +19,7 @@ class LogCommandHandler(CommandHandler):
         args = ctx.args.strip()
 
         from ...utils.logger import get_execution_log_exporter
+
         exporter = get_execution_log_exporter()
 
         # Parse arguments

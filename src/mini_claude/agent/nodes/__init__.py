@@ -47,9 +47,11 @@ from ._shared import llm_provider
 # ROUTER FUNCTION (保留兼容)
 # =============================================================================
 
+
 def should_continue_router(state) -> bool:
     """路由函数：判断是否继续（保留兼容旧代码）"""
     from ..state import StopReason
+
     stop_reason = state.get("stop_reason", StopReason.CONTINUE)
     return stop_reason == StopReason.CONTINUE
 

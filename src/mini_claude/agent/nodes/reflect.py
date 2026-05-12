@@ -45,7 +45,7 @@ async def reflect_node(state: AgentState) -> dict:
         # 从消息中提取上下文信息
         file_count = 0
         for msg in messages:
-            if hasattr(msg, 'name') and msg.name == 'write_file':
+            if hasattr(msg, "name") and msg.name == "write_file":
                 file_count += 1
 
         context = {
@@ -79,28 +79,34 @@ async def reflect_node(state: AgentState) -> dict:
 
         for msg in messages:
             # AI 消息中的工具调用
-            if isinstance(msg, AIMessage) and hasattr(msg, 'tool_calls') and msg.tool_calls:
+            if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
                 for tc in msg.tool_calls:
                     # ToolCall 对象有 name, args, id 属性
-                    if hasattr(tc, 'name'):
-                        tool_calls.append({
-                            "name": tc.name,
-                            "args": tc.args if hasattr(tc, 'args') else {},
-                        })
+                    if hasattr(tc, "name"):
+                        tool_calls.append(
+                            {
+                                "name": tc.name,
+                                "args": tc.args if hasattr(tc, "args") else {},
+                            }
+                        )
                     elif isinstance(tc, dict):
-                        tool_calls.append({
-                            "name": tc.get("name", "unknown"),
-                            "args": tc.get("args", {}),
-                        })
+                        tool_calls.append(
+                            {
+                                "name": tc.get("name", "unknown"),
+                                "args": tc.get("args", {}),
+                            }
+                        )
             # Human 消息中的工具结果
-            if isinstance(msg, HumanMessage) and hasattr(msg, 'name') and msg.name:
+            if isinstance(msg, HumanMessage) and hasattr(msg, "name") and msg.name:
                 content = msg.content or ""
                 is_success = "error" not in content.lower() and "失败" not in content
-                tool_results.append({
-                    "name": msg.name,
-                    "success": is_success,
-                    "content_preview": content[:200] if len(content) > 200 else content,
-                })
+                tool_results.append(
+                    {
+                        "name": msg.name,
+                        "success": is_success,
+                        "content_preview": content[:200] if len(content) > 200 else content,
+                    }
+                )
 
         # 4. 使用 LLM 生成反思内容
         reflection_prompt = f"""分析以下任务执行过程，总结经验和教训。
@@ -110,13 +116,13 @@ async def reflect_node(state: AgentState) -> dict:
 复杂度分析：
 - 等级：{complexity.level.value}
 - 得分：{complexity.score}
-- 因素：{', '.join(complexity.factors)}
+- 因素：{", ".join(complexity.factors)}
 
 工具调用历史：
-{json.dumps(tool_calls, ensure_ascii=False, indent=2) if tool_calls else '无工具调用'}
+{json.dumps(tool_calls, ensure_ascii=False, indent=2) if tool_calls else "无工具调用"}
 
 工具执行结果：
-{json.dumps(tool_results, ensure_ascii=False, indent=2) if tool_results else '无工具结果'}
+{json.dumps(tool_results, ensure_ascii=False, indent=2) if tool_results else "无工具结果"}
 
 请分析并回答以下三个部分：
 
@@ -144,6 +150,7 @@ async def reflect_node(state: AgentState) -> dict:
 
         try:
             from ._shared import llm_provider
+
             response = await llm_provider.chat(
                 messages=[{"role": "user", "content": reflection_prompt}],
                 temperature=0.3,
@@ -153,7 +160,8 @@ async def reflect_node(state: AgentState) -> dict:
             # 解析 JSON 响应
             # 尝试提取 JSON 块
             import re
-            json_match = re.search(r'\{[\s\S]*\}', content)
+
+            json_match = re.search(r"\{[\s\S]*\}", content)
             if json_match:
                 reflection_data = json.loads(json_match.group())
             else:

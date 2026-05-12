@@ -194,6 +194,7 @@ class TestStateTransitions:
 # Extended Agent Flow Tests (SUB-008)
 # =============================================================================
 
+
 class TestExtendedAgentFlow:
     """扩展的 Agent 流程测试 - 完整状态机路径"""
 
@@ -244,7 +245,10 @@ class TestExtendedAgentFlow:
         # 添加工具调用结果
         state["messages"] = [
             state["messages"][0],  # 用户消息
-            AIMessage(content="", tool_calls=[{"name": "read_file", "args": {"path": "test.py"}, "id": "tc1"}]),
+            AIMessage(
+                content="",
+                tool_calls=[{"name": "read_file", "args": {"path": "test.py"}, "id": "tc1"}],
+            ),
             HumanMessage(content="Tool read_file result: print('hello')", name="read_file"),
         ]
 
@@ -289,12 +293,14 @@ class TestExtendedAgentFlow:
         # 创建复杂任务状态
         state = create_initial_state("开发一个完整的 REST API 项目，包含用户认证、数据库连接和测试")
         state["iteration"] = 3
-        state["messages"].extend([
-            AIMessage(content="I'll create a REST API project"),
-            HumanMessage(content="Tool write_file result: Created main.py", name="write_file"),
-            AIMessage(content="File created successfully"),
-            HumanMessage(content="Tool write_file result: Created auth.py", name="write_file"),
-        ])
+        state["messages"].extend(
+            [
+                AIMessage(content="I'll create a REST API project"),
+                HumanMessage(content="Tool write_file result: Created main.py", name="write_file"),
+                AIMessage(content="File created successfully"),
+                HumanMessage(content="Tool write_file result: Created auth.py", name="write_file"),
+            ]
+        )
 
         # 执行 reflect_node
         try:
@@ -448,6 +454,7 @@ class TestSubagentFlow:
 
         # 获取最大迭代次数
         from mini_claude.agent.state import get_max_iterations
+
         max_iter = get_max_iterations(state)
 
         # 子代理应该有更低的限制
@@ -459,10 +466,12 @@ class TestSubagentFlow:
         """测试子代理写入操作后自动完成"""
         # 子代理写入文件后应该停止
         state = create_initial_state("创建文件", is_subagent=True)
-        state["messages"].extend([
-            AIMessage(content=""),
-            HumanMessage(content="Tool write_file result: Success", name="write_file"),
-        ])
+        state["messages"].extend(
+            [
+                AIMessage(content=""),
+                HumanMessage(content="Tool write_file result: Success", name="write_file"),
+            ]
+        )
 
         # 执行 observe_node
         result = await observe_node(state)

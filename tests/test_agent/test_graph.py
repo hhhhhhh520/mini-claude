@@ -9,6 +9,7 @@ from mini_claude.agent.nodes import think_node, should_continue_router
 
 # ========== AgentState Tests (15个) ==========
 
+
 class TestAgentStateCreation:
     """测试 AgentState 创建 - 15个测试用例"""
 
@@ -97,6 +98,7 @@ class TestAgentStateCreation:
 
 
 # ========== Router Tests (10个) ==========
+
 
 class TestShouldContinueRouter:
     """测试路由器 - 10个测试用例"""
@@ -266,6 +268,7 @@ class TestShouldContinueRouter:
 
 # ========== Think Node Tests (10个) ==========
 
+
 class TestThinkNode:
     """测试思考节点 - 10个测试用例"""
 
@@ -348,6 +351,7 @@ class TestThinkNode:
 
 
 # ========== State Transition Tests (15个) ==========
+
 
 class TestStateTransitions:
     """测试状态转换 - 15个测试用例"""

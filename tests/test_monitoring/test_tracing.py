@@ -332,7 +332,7 @@ class TestTracingManager:
 
     def test_setup_without_opentelemetry(self):
         """Test setup when OpenTelemetry is not available."""
-        with patch('mini_claude.monitoring.tracing._tracing_available', False):
+        with patch("mini_claude.monitoring.tracing._tracing_available", False):
             manager = TracingManager()
             result = manager.setup()
             assert result is False
@@ -343,11 +343,11 @@ class TestTracingManager:
         manager = TracingManager()
 
         # Mock OpenTelemetry availability
-        with patch('mini_claude.monitoring.tracing._tracing_available', True):
-            with patch('mini_claude.monitoring.tracing.TracerProvider'):
-                with patch('mini_claude.monitoring.tracing.Resource'):
-                    with patch('mini_claude.monitoring.tracing.trace'):
-                        with patch('mini_claude.monitoring.tracing.SimpleSpanProcessor'):
+        with patch("mini_claude.monitoring.tracing._tracing_available", True):
+            with patch("mini_claude.monitoring.tracing.TracerProvider"):
+                with patch("mini_claude.monitoring.tracing.Resource"):
+                    with patch("mini_claude.monitoring.tracing.trace"):
+                        with patch("mini_claude.monitoring.tracing.SimpleSpanProcessor"):
                             manager.setup(
                                 service_name="test-service",
                                 exporter_type="console",
@@ -428,11 +428,14 @@ class TestConvenienceFunctions:
 
     def test_trace_tool_call_sanitizes_params(self):
         """Test that trace_tool_call sanitizes sensitive params."""
-        with trace_tool_call("write_file", {
-            "path": "/test.txt",
-            "content": "secret data",
-            "password": "secret123",
-        }):
+        with trace_tool_call(
+            "write_file",
+            {
+                "path": "/test.txt",
+                "content": "secret data",
+                "password": "secret123",
+            },
+        ):
             pass
 
     def test_trace_llm_call(self):
@@ -452,17 +455,20 @@ class TestConvenienceFunctions:
 
     def test_traced_decorator_async(self):
         """Test traced decorator with async function."""
+
         @traced("my_operation")
         async def my_async_func():
             return "result"
 
         # Just verify decorator doesn't break the function
         import asyncio
+
         result = asyncio.run(my_async_func())
         assert result == "result"
 
     def test_traced_decorator_sync(self):
         """Test traced decorator with sync function."""
+
         @traced("my_operation")
         def my_sync_func():
             return "result"
@@ -472,11 +478,13 @@ class TestConvenienceFunctions:
 
     def test_traced_decorator_with_name(self):
         """Test traced decorator with custom name."""
+
         @traced("custom_name")
         async def my_func():
             return "result"
 
         import asyncio
+
         result = asyncio.run(my_func())
         assert result == "result"
 

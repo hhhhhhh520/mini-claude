@@ -74,8 +74,8 @@ class Settings(
 
             if errors:
                 raise ValueError(
-                    "Production environment security validation failed:\n" +
-                    "\n".join(f"  - {e}" for e in errors)
+                    "Production environment security validation failed:\n"
+                    + "\n".join(f"  - {e}" for e in errors)
                 )
 
         return self
@@ -86,6 +86,7 @@ class Settings(
         # token_warn_ratio should be less than token_budget_ratio
         if self.token_warn_ratio >= self.token_budget_ratio:
             import logging
+
             logging.getLogger(__name__).warning(
                 f"token_warn_ratio ({self.token_warn_ratio}) should be less than "
                 f"token_budget_ratio ({self.token_budget_ratio})"
@@ -95,6 +96,7 @@ class Settings(
         if self.environment.lower() == "prod":
             if self.alert_enabled and not self.alert_webhook_url:
                 import logging
+
                 logging.getLogger(__name__).warning(
                     "Production environment should have alert_webhook_url configured"
                 )
@@ -108,6 +110,7 @@ class Settings(
             ValidationResult containing all warnings and errors
         """
         from ..validation import validate_configuration
+
         return validate_configuration(self)
 
     def reload(self, env_file: Optional[str] = None) -> "ConfigReloadResult":
@@ -243,9 +246,13 @@ class Settings(
 
             if isinstance(old_value, list) and isinstance(new_value, list):
                 if old_value != new_value:
-                    changes.append(ConfigChange(key=actual_key, old_value=old_value, new_value=new_value))
+                    changes.append(
+                        ConfigChange(key=actual_key, old_value=old_value, new_value=new_value)
+                    )
             elif old_value != new_value:
-                changes.append(ConfigChange(key=actual_key, old_value=old_value, new_value=new_value))
+                changes.append(
+                    ConfigChange(key=actual_key, old_value=old_value, new_value=new_value)
+                )
 
         return changes
 
@@ -300,9 +307,8 @@ def _notify_config_callbacks(result: ConfigReloadResult) -> None:
                 callback(result)
             except Exception as e:
                 import logging
-                logging.getLogger("mini_claude.config").warning(
-                    f"Config callback failed: {e}"
-                )
+
+                logging.getLogger("mini_claude.config").warning(f"Config callback failed: {e}")
 
 
 def clear_config_callbacks() -> None:

@@ -98,7 +98,9 @@ class TestExtractSubagentResult:
             AIMessage(content="", tool_calls=[{"id": "1", "name": "tool", "args": {}}]),
             HumanMessage(content="Tool result", name="tool"),
             # This AI message has tool_calls, should be skipped
-            AIMessage(content="Should be skipped", tool_calls=[{"id": "2", "name": "another", "args": {}}]),
+            AIMessage(
+                content="Should be skipped", tool_calls=[{"id": "2", "name": "another", "args": {}}]
+            ),
         ]
         result = self.tool._extract_subagent_result(messages)
         assert "Tool result" in result
@@ -136,6 +138,7 @@ class TestSubagentModeIntegration:
     def test_subagent_mode_flag_exists(self):
         """Test that subagent mode flag can be imported."""
         from mini_claude.tools import set_subagent_mode, is_subagent_mode
+
         assert callable(set_subagent_mode)
         assert callable(is_subagent_mode)
 
@@ -147,6 +150,7 @@ class TestSubagentModeIntegration:
             set_subagent_mode,
             is_subagent_mode,
         )
+
         assert callable(set_current_agent)
         assert callable(get_current_agent)
         assert callable(set_subagent_mode)

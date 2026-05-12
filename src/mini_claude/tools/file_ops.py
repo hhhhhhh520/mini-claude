@@ -105,8 +105,7 @@ class ReadFileTool(BaseTool):
         checker = SafetyChecker()
         # Sub-agents cannot request path confirmation - directly reject if outside workspace
         is_valid, reason = checker.check_file_read(
-            path,
-            require_confirmation=not is_subagent_mode()
+            path, require_confirmation=not is_subagent_mode()
         )
         if not is_valid:
             return f"Error: {reason}"
@@ -122,9 +121,9 @@ class ReadFileTool(BaseTool):
                 lines = f.readlines()
 
             if start_line is not None:
-                lines = lines[start_line - 1:]
+                lines = lines[start_line - 1 :]
             if end_line is not None:
-                lines = lines[:end_line - (start_line or 1) + 1]
+                lines = lines[: end_line - (start_line or 1) + 1]
 
             content = "".join(lines)
             return truncate_content(content)
@@ -202,8 +201,7 @@ class WriteFileTool(BaseTool):
         checker = SafetyChecker()
         # Sub-agents cannot request path confirmation - directly reject if outside workspace
         is_valid, reason = checker.check_file_write(
-            path,
-            require_confirmation=not is_subagent_mode()
+            path, require_confirmation=not is_subagent_mode()
         )
         if not is_valid:
             return f"Error: {reason}"
@@ -282,8 +280,7 @@ class EditFileTool(BaseTool):
         checker = SafetyChecker()
         # Sub-agents cannot request path confirmation - directly reject if outside workspace
         is_valid, reason = checker.check_file_read(
-            path,
-            require_confirmation=not is_subagent_mode()
+            path, require_confirmation=not is_subagent_mode()
         )
         if not is_valid:
             return f"Error: {reason}"
@@ -298,7 +295,9 @@ class EditFileTool(BaseTool):
         has_conflict, conflict_details = await file_lock_manager.check_conflict(path, agent_id)
         if has_conflict:
             await file_lock_manager.release_lock(path, agent_id)
-            return f"Error: Conflict detected - {conflict_details}\nUse 'force_edit' to force apply."
+            return (
+                f"Error: Conflict detected - {conflict_details}\nUse 'force_edit' to force apply."
+            )
 
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -307,13 +306,15 @@ class EditFileTool(BaseTool):
             if old_text not in content:
                 # Generate detailed error message
                 preview_length = 200
-                content_preview = content[:preview_length] if len(content) > preview_length else content
+                content_preview = (
+                    content[:preview_length] if len(content) > preview_length else content
+                )
                 old_text_preview = old_text[:100] if len(old_text) > 100 else old_text
 
                 return (
                     f"Error: Text not found in file.\n\n"
                     f"File path: {path}\n"
-                    f"Expected text (preview): \"{old_text_preview}\"\n\n"
+                    f'Expected text (preview): "{old_text_preview}"\n\n'
                     f"Current file content (preview):\n"
                     f"---BEGIN---\n{content_preview}\n---END---\n\n"
                     f"Suggestion: Use read_file tool to get the latest content before editing."

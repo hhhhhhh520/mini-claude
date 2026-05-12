@@ -53,6 +53,7 @@ try:
     # Try to import OTLP exporter
     try:
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter  # noqa: F401
+
         _otlp_available = True
     except ImportError:
         _otlp_available = False
@@ -60,12 +61,15 @@ try:
     _tracing_available = True
 except ImportError:
     _tracing_available = False
-    logger.warning("OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk")
+    logger.warning(
+        "OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk"
+    )
 
 
 # =============================================================================
 # Custom Exporters
 # =============================================================================
+
 
 class ConsoleSpanExporter:
     """Console exporter for debugging - prints spans to stdout."""
@@ -89,20 +93,23 @@ class ConsoleSpanExporter:
         """
         for span in spans:
             span_dict = {
-                "trace_id": format(span.context.trace_id, '032x'),
-                "span_id": format(span.context.span_id, '016x'),
-                "parent_span_id": format(span.parent.span_id, '016x') if span.parent else None,
+                "trace_id": format(span.context.trace_id, "032x"),
+                "span_id": format(span.context.span_id, "016x"),
+                "parent_span_id": format(span.parent.span_id, "016x") if span.parent else None,
                 "name": span.name,
                 "start_time": span.start_time,
                 "end_time": span.end_time,
-                "duration_ms": (span.end_time - span.start_time) // 1_000_000 if span.end_time else 0,
+                "duration_ms": (span.end_time - span.start_time) // 1_000_000
+                if span.end_time
+                else 0,
                 "attributes": dict(span.attributes) if span.attributes else {},
-                "status": span.status.status_code.name if hasattr(span, 'status') else "UNSET",
+                "status": span.status.status_code.name if hasattr(span, "status") else "UNSET",
             }
             self._logger.info(f"[TRACE] {json.dumps(span_dict, default=str)}")
 
         if _tracing_available:
             from opentelemetry.sdk.trace.export import SpanExportResult
+
             return SpanExportResult.SUCCESS
         return True
 
@@ -131,15 +138,17 @@ class FileSpanExporter:
         """
         for span in spans:
             span_dict = {
-                "trace_id": format(span.context.trace_id, '032x'),
-                "span_id": format(span.context.span_id, '016x'),
-                "parent_span_id": format(span.parent.span_id, '016x') if span.parent else None,
+                "trace_id": format(span.context.trace_id, "032x"),
+                "span_id": format(span.context.span_id, "016x"),
+                "parent_span_id": format(span.parent.span_id, "016x") if span.parent else None,
                 "name": span.name,
                 "start_time": span.start_time,
                 "end_time": span.end_time,
-                "duration_ms": (span.end_time - span.start_time) // 1_000_000 if span.end_time else 0,
+                "duration_ms": (span.end_time - span.start_time) // 1_000_000
+                if span.end_time
+                else 0,
                 "attributes": dict(span.attributes) if span.attributes else {},
-                "status": span.status.status_code.name if hasattr(span, 'status') else "UNSET",
+                "status": span.status.status_code.name if hasattr(span, "status") else "UNSET",
                 "events": [
                     {
                         "name": event.name,
@@ -156,16 +165,22 @@ class FileSpanExporter:
 
         if _tracing_available:
             from opentelemetry.sdk.trace.export import SpanExportResult
+
             return SpanExportResult.SUCCESS
         return True
 
     def _write_spans(self):
         """Write spans to file."""
-        with open(self._file_path, 'w', encoding='utf-8') as f:
-            json.dump({
-                "spans": self._spans,
-                "exported_at": datetime.now().isoformat(),
-            }, f, indent=2, default=str)
+        with open(self._file_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "spans": self._spans,
+                    "exported_at": datetime.now().isoformat(),
+                },
+                f,
+                indent=2,
+                default=str,
+            )
 
     def get_spans(self) -> List[Dict]:
         """Get all exported spans."""
@@ -181,9 +196,11 @@ class FileSpanExporter:
 # Trace Storage (for CLI access)
 # =============================================================================
 
+
 @dataclass
 class TraceRecord:
     """A record of a traced operation."""
+
     trace_id: str
     span_id: str
     parent_span_id: Optional[str]
@@ -213,7 +230,7 @@ class TraceStorage:
         """Add a span to storage."""
         self._traces.append(span)
         if len(self._traces) > self._max_traces:
-            self._traces = self._traces[-self._max_traces:]
+            self._traces = self._traces[-self._max_traces :]
 
     def get_recent_traces(self, limit: int = 10) -> List[TraceRecord]:
         """Get recent traces."""
@@ -252,6 +269,7 @@ def get_trace_storage() -> TraceStorage:
 # =============================================================================
 # Tracing Manager
 # =============================================================================
+
 
 class TracingManager:
     """Manages OpenTelemetry tracing configuration and lifecycle.
@@ -331,10 +349,12 @@ class TracingManager:
 
         try:
             # Create resource
-            resource = Resource.create({
-                "service.name": service_name,
-                "service.version": "1.0.0",
-            })
+            resource = Resource.create(
+                {
+                    "service.name": service_name,
+                    "service.version": "1.0.0",
+                }
+            )
 
             # Create tracer provider
             self._tracer_provider = TracerProvider(resource=resource)
@@ -406,10 +426,13 @@ class TracingManager:
 
         elif exporter_type == "otlp":
             if not _otlp_available:
-                logger.warning("OTLP exporter not available. Install: pip install opentelemetry-exporter-otlp")
+                logger.warning(
+                    "OTLP exporter not available. Install: pip install opentelemetry-exporter-otlp"
+                )
                 return None
 
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
             return OTLPSpanExporter(endpoint=otlp_endpoint or "http://localhost:4317")
 
         else:
@@ -454,9 +477,9 @@ class TracingManager:
                     span.set_attribute(key, value)
 
             # Store in trace storage
-            trace_id = format(span.context.trace_id, '032x')
-            span_id = format(span.context.span_id, '016x')
-            parent_span_id = format(span.parent.span_id, '016x') if span.parent else None
+            trace_id = format(span.context.trace_id, "032x")
+            span_id = format(span.context.span_id, "016x")
+            parent_span_id = format(span.parent.span_id, "016x") if span.parent else None
 
             record = TraceRecord(
                 trace_id=trace_id,
@@ -479,7 +502,9 @@ class TracingManager:
                 raise
             finally:
                 record.end_time = span.end_time
-                record.duration_ms = (span.end_time - span.start_time) // 1_000_000 if span.end_time else 0
+                record.duration_ms = (
+                    (span.end_time - span.start_time) // 1_000_000 if span.end_time else 0
+                )
                 _trace_storage.add_span(record)
 
     def record_exception(self, span: Any, exception: Exception):
@@ -494,6 +519,7 @@ class TracingManager:
 
         if _tracing_available:
             from opentelemetry.trace import Status, StatusCode
+
             span.set_status(Status(StatusCode.ERROR, str(exception)))
             span.record_exception(exception)
 
@@ -544,6 +570,7 @@ def get_tracing_manager() -> TracingManager:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._tracing_manager.is_initialized():
                 _tracing_manager = ctx.tracing_manager
@@ -574,6 +601,7 @@ def reset_tracing_manager():
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._tracing_manager.reset()
     except ImportError:
@@ -583,6 +611,7 @@ def reset_tracing_manager():
 # =============================================================================
 # Convenience Functions
 # =============================================================================
+
 
 def start_span(name: str, attributes: Optional[Dict[str, Any]] = None):
     """Start a span using the global tracing manager.
@@ -615,6 +644,7 @@ def traced(
         async def my_function():
             pass
     """
+
     def decorator(func: Callable) -> Callable:
         span_name = name or func.__name__
 
@@ -639,6 +669,7 @@ def traced(
                 return result
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
@@ -732,6 +763,7 @@ def trace_subagent(task: str, agent_id: Optional[str] = None):
 # CLI Support Functions
 # =============================================================================
 
+
 def get_recent_traces(limit: int = 10) -> List[Dict[str, Any]]:
     """Get recent traces for CLI display.
 
@@ -784,11 +816,7 @@ def get_trace_tree(trace_id: Optional[str] = None) -> Dict[str, Any]:
     root_spans = [t for t in traces if t.parent_span_id is None]
 
     def build_tree(span: TraceRecord) -> Dict[str, Any]:
-        children = [
-            build_tree(s)
-            for s in traces
-            if s.parent_span_id == span.span_id
-        ]
+        children = [build_tree(s) for s in traces if s.parent_span_id == span.span_id]
         return {
             "name": span.name,
             "duration_ms": span.duration_ms,

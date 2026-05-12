@@ -13,12 +13,13 @@ ExecutionPlanType = Dict[str, Any]  # Serialized form for TypedDict compatibilit
 
 class StopReason(Enum):
     """停止原因枚举 - 统一控制流判断"""
-    CONTINUE = "continue"              # 继续执行
-    TASK_COMPLETE = "task_complete"    # 任务完成
+
+    CONTINUE = "continue"  # 继续执行
+    TASK_COMPLETE = "task_complete"  # 任务完成
     MAX_ITERATIONS = "max_iterations"  # 达到迭代上限
-    ERROR = "error"                    # 发生错误
-    IDLE_LOOP = "idle_loop"            # 空转循环（无工具调用）
-    USER_CANCEL = "user_cancel"        # 用户取消
+    ERROR = "error"  # 发生错误
+    IDLE_LOOP = "idle_loop"  # 空转循环（无工具调用）
+    USER_CANCEL = "user_cancel"  # 用户取消
     WAITING_CONFIRMATION = "waiting_confirmation"  # 等待用户确认（路径/命令等）
 
 
@@ -35,6 +36,7 @@ class ExecutionState:
         created_at: 创建时间
         updated_at: 更新时间
     """
+
     current_node: str = ""
     iteration_count: int = 0
     last_error: Optional[str] = None
@@ -106,34 +108,34 @@ class AgentState(TypedDict):
     messages: Annotated[List[BaseMessage], add]  # 对话历史，自动累加
 
     # 任务追踪
-    current_task: str                           # 当前任务
-    iteration: int                              # 当前迭代次数
+    current_task: str  # 当前任务
+    iteration: int  # 当前迭代次数
 
     # 控制流 - 使用枚举替代布尔值
-    stop_reason: StopReason                     # 停止原因
-    thread_id: str                              # 会话ID
+    stop_reason: StopReason  # 停止原因
+    thread_id: str  # 会话ID
 
     # 子代理（可选）
-    sub_agents: Dict[str, str]                  # agent_id -> status
-    sub_agent_results: Dict[str, Any]           # agent_id -> result
-    is_subagent: bool                           # 是否为子代理
-    allowed_tools: Optional[List[str]]          # 允许的工具
+    sub_agents: Dict[str, str]  # agent_id -> status
+    sub_agent_results: Dict[str, Any]  # agent_id -> result
+    is_subagent: bool  # 是否为子代理
+    allowed_tools: Optional[List[str]]  # 允许的工具
 
     # 错误处理（可选）
-    errors: List[str]                           # 错误列表
-    retry_count: int                            # 重试次数
+    errors: List[str]  # 错误列表
+    retry_count: int  # 重试次数
 
     # 用户确认（可选）
-    pending_confirmation_path: Optional[str]    # 待确认的路径
+    pending_confirmation_path: Optional[str]  # 待确认的路径
 
     # 反思节点（可选）
-    reflection_notes: List[str]                 # 反思笔记
-    lessons_learned: List[str]                  # 经验教训
-    improvement_suggestions: List[str]          # 改进建议
+    reflection_notes: List[str]  # 反思笔记
+    lessons_learned: List[str]  # 经验教训
+    improvement_suggestions: List[str]  # 改进建议
 
     # 执行计划（可选）
-    execution_plan: Optional[ExecutionPlanType] # 当前执行计划（序列化形式）
-    current_step_index: int                     # 当前执行的步骤索引
+    execution_plan: Optional[ExecutionPlanType]  # 当前执行计划（序列化形式）
+    current_step_index: int  # 当前执行的步骤索引
 
 
 def create_initial_state(
@@ -141,7 +143,7 @@ def create_initial_state(
     history: Optional[List[BaseMessage]] = None,
     thread_id: str = "default",
     is_subagent: bool = False,
-    allowed_tools: Optional[List[str]] = None
+    allowed_tools: Optional[List[str]] = None,
 ) -> AgentState:
     """创建初始状态
 
@@ -185,6 +187,7 @@ def create_initial_state(
 def get_max_iterations(state: AgentState) -> int:
     """获取最大迭代次数（子代理使用更小的限制）"""
     from mini_claude.config.settings import settings
+
     if state.get("is_subagent", False):
         return settings.max_subagent_iterations
     return settings.max_iterations

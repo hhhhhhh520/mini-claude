@@ -93,6 +93,7 @@ class ConfigCommandHandler(CommandHandler):
             )
 
         from ...config.watcher import get_config_watcher
+
         watcher = get_config_watcher(settings)
 
         if watcher.start():

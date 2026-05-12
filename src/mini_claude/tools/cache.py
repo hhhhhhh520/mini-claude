@@ -270,10 +270,7 @@ class ToolCache:
             self._stats.total_invalidations += count
             return count
 
-        keys_to_remove = [
-            key for key in self._cache
-            if key.startswith(f"{tool_name}:")
-        ]
+        keys_to_remove = [key for key in self._cache if key.startswith(f"{tool_name}:")]
 
         for key in keys_to_remove:
             del self._cache[key]
@@ -319,14 +316,16 @@ class ToolCache:
 
         for key, entry in self._cache.items():
             ttl_remaining = max(0, entry.expires_at - current_time)
-            entries.append({
-                "key": key,
-                "tool_name": entry.tool_name,
-                "created_at": entry.created_at,
-                "ttl_remaining": round(ttl_remaining, 1),
-                "hit_count": entry.hit_count,
-                "has_file_tracking": entry.file_mtime is not None,
-            })
+            entries.append(
+                {
+                    "key": key,
+                    "tool_name": entry.tool_name,
+                    "created_at": entry.created_at,
+                    "ttl_remaining": round(ttl_remaining, 1),
+                    "hit_count": entry.hit_count,
+                    "has_file_tracking": entry.file_mtime is not None,
+                }
+            )
 
         return entries
 
@@ -338,8 +337,7 @@ class ToolCache:
         """
         current_time = time.time()
         expired_keys = [
-            key for key, entry in self._cache.items()
-            if current_time > entry.expires_at
+            key for key, entry in self._cache.items() if current_time > entry.expires_at
         ]
 
         for key in expired_keys:
@@ -368,11 +366,13 @@ def get_tool_cache() -> ToolCache:
         # Try to use ApplicationContext first
         try:
             from mini_claude.context import get_context
+
             ctx = get_context()
             if ctx._tool_cache.is_initialized():
                 _cache_instance = ctx.tool_cache
             else:
                 from mini_claude.config.settings import settings
+
                 _cache_instance = ToolCache(
                     ttl_seconds=settings.tool_cache_ttl_seconds,
                     max_size=settings.tool_cache_max_size,
@@ -381,6 +381,7 @@ def get_tool_cache() -> ToolCache:
                 ctx.tool_cache = _cache_instance
         except ImportError:
             from mini_claude.config.settings import settings
+
             _cache_instance = ToolCache(
                 ttl_seconds=settings.tool_cache_ttl_seconds,
                 max_size=settings.tool_cache_max_size,
@@ -400,6 +401,7 @@ def reset_tool_cache() -> None:
     # Also reset in context
     try:
         from mini_claude.context import get_context
+
         ctx = get_context()
         ctx._tool_cache.reset()
     except ImportError:
