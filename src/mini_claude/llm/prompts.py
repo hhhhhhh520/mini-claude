@@ -433,7 +433,8 @@ def get_system_prompt(provider: ModelProvider) -> str:
     even for long-running REPL sessions that span midnight.
     """
     now = datetime.now(timezone.utc)
-    today_str = now.strftime("%Y年%m月%d日 (%A)")
+    # Use ASCII format to avoid encoding issues on Windows
+    today_str = now.strftime("%Y-%m-%d (%A)")
     prompt = BASE_PROMPT.replace("{DATE_PLACEHOLDER}", today_str)
 
     if provider == ModelProvider.CLAUDE:
