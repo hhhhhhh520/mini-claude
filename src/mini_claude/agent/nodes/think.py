@@ -47,6 +47,35 @@ async def think_node(state: AgentState) -> dict:
             system_prompt = get_system_prompt(provider)
             messages = [SystemMessage(content=system_prompt)] + messages
 
+            # Inject skills as a dedicated system message right before user input
+            # Smaller models pay more attention to recent context
+            try:
+                from mini_claude.skills.registry import get_skill_registry
+
+                registry = get_skill_registry()
+                skills = [s for s in registry.list_skills() if s.model_invocable]
+                if skills:
+                    parts = [
+                        "IMPORTANT: You have the following skills available. "
+                        "A skill is a set of specialized instructions you should follow "
+                        "when the user's request matches. DO NOT search for skills on disk — "
+                        "they are already loaded here:\n"
+                    ]
+                    for skill in skills:
+                        parts.append(f"--- Skill: {skill.name} ---")
+                        if skill.description:
+                            parts.append(f"Trigger: {skill.description}")
+                        if skill.body:
+                            parts.append(skill.body)
+                        parts.append("")
+                    parts.append(
+                        "To use a skill, tell the user you are following it and apply its instructions. "
+                        "You can also suggest the user type /skill <name> to explicitly activate one."
+                    )
+                    messages.insert(1, SystemMessage(content="\n".join(parts)))
+            except Exception:
+                pass
+
             if span:
                 span.set_attribute("first_iteration", True)
                 span.set_attribute("model_provider", provider.value)

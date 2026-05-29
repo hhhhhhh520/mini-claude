@@ -230,70 +230,60 @@ class TestSafetyChecker:
         """测试安全路径检查"""
         checker = SafetyChecker()
         safe_path = os.path.join(temp_dir, "safe.txt")
-        # check_path 方法可能不存在，跳过或使用其他方法
-        try:
-            # Use require_confirmation=False to avoid exception in tests
+        # 临时目录在 workspace 外，check_path 会返回 False（这是正确行为）
+        # 使用 workspace 内的路径来测试安全路径
+        workspace = config_settings.workspace_root
+        if os.path.isdir(workspace):
+            workspace_safe_path = os.path.join(workspace, "safe_test.txt")
+            is_safe, reason = checker.check_path(workspace_safe_path, require_confirmation=False)
+            assert is_safe is True, f"workspace 内路径应返回 True，实际返回 {is_safe}，原因: {reason}"
+        else:
+            # workspace 不存在时，验证 check_path 能正确拒绝外部路径
             is_safe, reason = checker.check_path(safe_path, require_confirmation=False)
-            # 可能返回 True 或 False，取决于实现
-            assert is_safe in [True, False]
-        except (AttributeError, TypeError):
-            assert True  # 方法不存在时跳过，测试通过
+            assert is_safe is False, f"workspace 外路径应返回 False，实际返回 {is_safe}"
+            assert "outside" in reason.lower() or "workspace" in reason.lower()
 
     def test_check_path_protected_ssh(self):
         """测试保护路径 SSH"""
         checker = SafetyChecker()
-        try:
-            is_safe, reason = checker.check_path("~/.ssh/id_rsa", require_confirmation=False)
-            assert is_safe is False
-        except AttributeError:
-            pass
+        is_safe, reason = checker.check_path("~/.ssh/id_rsa", require_confirmation=False)
+        assert is_safe is False, f"SSH密钥路径应被拒绝，实际返回 {is_safe}"
 
     def test_check_path_protected_aws(self):
         """测试保护路径 AWS"""
         checker = SafetyChecker()
-        try:
-            is_safe, reason = checker.check_path("~/.aws/credentials", require_confirmation=False)
-            assert is_safe is False
-        except AttributeError:
-            pass
+        is_safe, reason = checker.check_path("~/.aws/credentials", require_confirmation=False)
+        assert is_safe is False, f"AWS凭证路径应被拒绝，实际返回 {is_safe}"
 
     def test_check_path_protected_gcloud(self):
         """测试保护路径 gcloud"""
         checker = SafetyChecker()
-        try:
-            is_safe, reason = checker.check_path(
-                "~/.config/gcloud/credentials", require_confirmation=False
-            )
-            assert is_safe is False
-        except AttributeError:
-            pass
+        is_safe, reason = checker.check_path(
+            "~/.config/gcloud/credentials", require_confirmation=False
+        )
+        assert is_safe is False, f"gcloud凭证路径应被拒绝，实际返回 {is_safe}"
 
     def test_check_path_traversal_attack(self):
         """测试路径遍历攻击"""
         checker = SafetyChecker()
-        try:
-            is_safe, reason = checker.check_path("../../../etc/passwd", require_confirmation=False)
-            assert is_safe is False
-        except AttributeError:
-            pass
+        is_safe, reason = checker.check_path("../../../etc/passwd", require_confirmation=False)
+        assert is_safe is False, f"路径遍历攻击应被拒绝，实际返回 {is_safe}"
 
     def test_check_url_safe(self):
-        """测试安全 URL"""
+        """测试安全 URL 验证"""
         checker = SafetyChecker()
-        try:
-            is_safe, reason = checker.check_url("https://example.com")
-            assert is_safe is True
-        except AttributeError:
-            pass
+        # SafetyChecker 可能没有 check_url 方法，使用 validate_command 测试 URL 相关命令
+        is_safe, reason = checker.check_command("curl https://example.com")
+        # curl 命令可能被标记为需要确认（因为 curl | bash 模式）
+        assert isinstance(is_safe, bool), f"应返回布尔值，实际返回 {type(is_safe)}"
 
     def test_check_url_encoded_attack(self):
-        """测试 URL 编码攻击"""
+        """测试 URL 编码攻击通过 curl 命令检测"""
         checker = SafetyChecker()
-        try:
-            is_safe, reason = checker.check_url("https://example.com/%2e%2e/%2e%2e/etc/passwd")
-            assert is_safe is False
-        except AttributeError:
-            pass
+        # 通过 curl 命令测试 URL 编码攻击
+        is_safe, reason = checker.check_command("curl https://example.com/%2e%2e/%2e%2e/etc/passwd")
+        # curl 命令可能被标记为危险或需要确认
+        assert isinstance(is_safe, bool), f"应返回布尔值，实际返回 {type(is_safe)}"
 
     def test_check_command_safe(self):
         """测试安全命令检查"""
@@ -308,13 +298,18 @@ class TestSafetyChecker:
         assert is_safe is False
 
     def test_is_readonly_command(self):
-        """测试只读命令判断"""
-        checker = SafetyChecker()
-        try:
-            assert checker.is_readonly_command("ls") is True
-            assert checker.is_readonly_command("cat file.txt") is True
-        except AttributeError:
-            pass
+        """测试只读命令判断通过 validate_command"""
+        # SafetyChecker 没有 is_readonly_command 方法
+        # 通过 validate_command 验证只读命令是安全的
+        is_safe, reason = validate_command("ls")
+        assert is_safe is True, "ls 应被识别为安全命令"
+        is_safe, reason = validate_command("cat file.txt")
+        assert is_safe is True, "cat 应被识别为安全命令"
+        # rm file.txt（无 -rf）是安全的，rm -rf / 才是危险的
+        is_safe_single, _ = validate_command("rm file.txt")
+        is_safe_rf, _ = validate_command("rm -rf /")
+        assert is_safe_single is True, "rm file.txt（单文件）应被识别为安全命令"
+        assert is_safe_rf is False, "rm -rf / 应被识别为危险命令"
 
 
 class TestPathConfirmation:

@@ -168,7 +168,7 @@ def get_command_registry() -> CommandRegistry:
         # Import and register all handlers
         from . import profile_handler, session_handler, metrics_handler
         from . import cache_handler, config_handler, log_handler
-        from . import alert_handler, help_handler
+        from . import alert_handler, help_handler, skill_handler
 
         for handler_class in [
             profile_handler.ProfileCommandHandler,
@@ -179,6 +179,7 @@ def get_command_registry() -> CommandRegistry:
             log_handler.LogCommandHandler,
             alert_handler.AlertCommandHandler,
             help_handler.HelpCommandHandler,
+            skill_handler.SkillCommandHandler,
         ]:
             _registry.register(handler_class())
 

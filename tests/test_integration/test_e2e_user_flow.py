@@ -461,18 +461,14 @@ class TestTokenBudgetManagement:
             }
 
         # Summarize
-        try:
-            summarized, summary_text = await token_counter.summarize_messages(
-                messages,
-                llm_chat_func=mock_llm,
-            )
+        summarized, summary_text = await token_counter.summarize_messages(
+            messages,
+            llm_chat_func=mock_llm,
+        )
 
-            # Should have summary or fall back to truncation
-            assert summarized is not None
-            # summary_text may be None if summarization not triggered
-        except Exception:
-            # Summarization may not be implemented or configured
-            pass
+        # Should have summary or fall back to truncation
+        assert summarized is not None
+        assert len(summarized) < len(messages), "摘要后消息数量应少于原始消息"
 
 
 # =============================================================================
@@ -593,15 +589,11 @@ class TestE2ERealAPI:
 
         # Call real LLM
         messages = [{"role": "user", "content": "Say 'hello world' and nothing else"}]
-        try:
-            response = await runner.call_llm(messages, temperature=0)
+        response = await runner.call_llm(messages, temperature=0)
 
-            # Verify response
-            assert "choices" in response
-            assert response["choices"][0]["message"]["content"] is not None
-
-        except Exception as e:
-            pytest.skip(f"LLM call failed: {e}")
+        # Verify response
+        assert "choices" in response
+        assert response["choices"][0]["message"]["content"] is not None
 
     @pytest.mark.e2e
     @pytest.mark.asyncio
@@ -619,25 +611,20 @@ class TestE2ERealAPI:
         # Create simple task
         state = create_initial_state("Say 'test complete' and nothing else")
 
-        try:
-            # Execute with limited recursion
-            result = await graph.ainvoke(
-                state,
-                {"recursion_limit": 10},
-            )
+        # Execute with limited recursion
+        result = await graph.ainvoke(
+            state,
+            {"recursion_limit": 10},
+        )
 
-            # Verify execution completed
-            assert "messages" in result
-            assert len(result["messages"]) > 0
+        # Verify execution completed
+        assert "messages" in result
+        assert len(result["messages"]) > 0
 
-            # Check stop reason
-            stop_reason = result.get("stop_reason")
-            assert stop_reason in [
-                StopReason.TASK_COMPLETE,
-                StopReason.CONTINUE,
-                StopReason.MAX_ITERATIONS,
-            ]
-
-        except Exception as e:
-            # Real API calls may fail for various reasons
-            pytest.skip(f"Graph execution failed: {e}")
+        # Check stop reason
+        stop_reason = result.get("stop_reason")
+        assert stop_reason in [
+            StopReason.TASK_COMPLETE,
+            StopReason.CONTINUE,
+            StopReason.MAX_ITERATIONS,
+        ]

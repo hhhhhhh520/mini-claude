@@ -30,6 +30,7 @@ from .config_handler import ConfigCommandHandler
 from .log_handler import LogCommandHandler
 from .alert_handler import AlertCommandHandler
 from .help_handler import HelpCommandHandler
+from .skill_handler import SkillCommandHandler
 
 __all__ = [
     # Base classes
@@ -48,4 +49,5 @@ __all__ = [
     "LogCommandHandler",
     "AlertCommandHandler",
     "HelpCommandHandler",
+    "SkillCommandHandler",
 ]

@@ -409,6 +409,19 @@ async def _execute_tools(
             tool_name, tool_args, degr_manager, metrics_collector, trace_tool_call, new_messages
         )
 
+        # Display tool result to user so they can see what happened
+        if new_messages:
+            last_msg = new_messages[-1]
+            content = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
+            if content and not state_update:
+                from ...cli.display import display
+
+                # Strip the "Tool xxx result: " prefix for cleaner display
+                display_text = content
+                if display_text.startswith(f"Tool {tool_name} result: "):
+                    display_text = display_text[len(f"Tool {tool_name} result: "):]
+                display.show_tool_result(display_text[:500])
+
         # Check if tool execution failed
         if state_update and state_update.get("stop_reason") == "error":
             step_success = False

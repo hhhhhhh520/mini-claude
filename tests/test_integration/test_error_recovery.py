@@ -303,7 +303,9 @@ class TestExtendedErrorRecovery:
 
         # Verify suggestion generated - Suggestion has title, description, actions
         assert suggestion is not None
-        assert suggestion.title is not None or suggestion.description is not None
+        assert suggestion.title is not None, "建议标题不应为 None"
+        assert suggestion.description is not None, "建议描述不应为 None"
+        assert len(suggestion.title) > 0, "建议标题不应为空字符串"
 
     @pytest.mark.asyncio
     async def test_graceful_degradation_flow(self):
@@ -347,14 +349,10 @@ class TestNetworkErrorRecovery:
         with patch("mini_claude.agent.nodes.llm_provider") as mock_provider:
             mock_provider.chat = AsyncMock(side_effect=ConnectionError("Network error"))
 
-            # act_node 应该处理连接错误
-            try:
-                result = await act_node(state)
-                # 应该返回错误状态
-                assert result["stop_reason"] == StopReason.ERROR
-            except Exception:
-                # 某些情况下可能抛出异常
-                pass
+            # act_node 应该处理连接错误并返回错误状态
+            result = await act_node(state)
+            assert result["stop_reason"] == StopReason.ERROR, \
+                f"连接错误时应返回 ERROR 状态，实际返回 {result.get('stop_reason')}"
 
     @pytest.mark.asyncio
     async def test_llm_timeout_recovery(self):
@@ -368,13 +366,10 @@ class TestNetworkErrorRecovery:
         with patch("mini_claude.agent.nodes.llm_provider") as mock_provider:
             mock_provider.chat = slow_response
 
-            # 应该超时或返回错误
-            try:
-                result = await asyncio.wait_for(act_node(state), timeout=1.0)
-                if result.get("stop_reason") == StopReason.ERROR:
-                    pass  # Expected
-            except asyncio.TimeoutError:
-                pass  # Expected timeout
+            # 应该超时或返回错误状态
+            result = await asyncio.wait_for(act_node(state), timeout=2.0)
+            assert result.get("stop_reason") == StopReason.ERROR, \
+                f"超时时应返回 ERROR 状态，实际返回 {result.get('stop_reason')}"
 
 
 class TestFileSystemErrorRecovery:

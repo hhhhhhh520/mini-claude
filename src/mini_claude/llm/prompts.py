@@ -168,6 +168,11 @@ FEATURE_VERSIONS: Dict[str, Dict[str, Any]] = {
         "features": ["save", "load", "resume"],
         "description": "Session persistence and restoration",
     },
+    "skills_system": {
+        "version": "1.0",
+        "features": ["load", "invoke", "auto_match"],
+        "description": "Skill loading from markdown files, slash command invocation, and automatic description matching",
+    },
 }
 
 
@@ -191,6 +196,7 @@ def get_feature_summary(include_version: bool = True, include_features: bool = T
         "agent_collaboration": "Agent Collaboration",
         "token_management": "Token Management",
         "session_management": "Session Management",
+        "skills_system": "Skills System",
     }
 
     # Feature display names for sub-items
@@ -212,6 +218,8 @@ def get_feature_summary(include_version: bool = True, include_features: bool = T
         "save": "Save/Load",
         "load": "Load",
         "resume": "Resume",
+        "invoke": "Invoke",
+        "auto_match": "Auto Match",
     }
 
     for key, info in FEATURE_VERSIONS.items():
@@ -270,6 +278,11 @@ def get_feature_list_markdown() -> str:
             ("save", "Save/Load", "Persist and restore conversation sessions"),
             ("resume", "Resume", "Continue from previous conversation states"),
         ],
+        "skills_system": [
+            ("load", "Load Skills", "Discover and load skills from ~/.mini-claude/skills/"),
+            ("invoke", "Invoke Skills", "Use /skill <name> to invoke a loaded skill"),
+            ("auto_match", "Auto Match", "Automatically match skills by description"),
+        ],
     }
 
     display_names = {
@@ -279,6 +292,7 @@ def get_feature_list_markdown() -> str:
         "agent_collaboration": "Agent Collaboration",
         "token_management": "Token Management",
         "session_management": "Session Management",
+        "skills_system": "Skills System",
     }
 
     for key, info in FEATURE_VERSIONS.items():
@@ -343,6 +357,8 @@ I am Mini Claude Code, an intelligent programming assistant designed to help dev
 
 {get_feature_list_markdown()}
 
+{{SKILLS_PLACEHOLDER}}
+
 ### CLI Commands
 Users can interact with the CLI using these commands. When appropriate, inform users about these:
 
@@ -358,6 +374,8 @@ Users can interact with the CLI using these commands. When appropriate, inform u
 | `/sessions` | List all saved sessions |
 | `/clear` | Clear the screen |
 | `/exit` | Exit the program |
+| `/skills` | List all available skills |
+| `/skill <name> [args]` | Invoke a skill by name |
 
 ## IMPORTANT: You MUST use tools to accomplish tasks. NEVER output shell commands or code blocks for execution.
 
@@ -436,6 +454,16 @@ def get_system_prompt(provider: ModelProvider) -> str:
     # Use ASCII format to avoid encoding issues on Windows
     today_str = now.strftime("%Y-%m-%d (%A)")
     prompt = BASE_PROMPT.replace("{DATE_PLACEHOLDER}", today_str)
+
+    # Inject available skills into the placeholder
+    try:
+        from mini_claude.skills.registry import get_skill_registry
+
+        registry = get_skill_registry()
+        skill_prompt = registry.get_skill_prompt()
+        prompt = prompt.replace("{SKILLS_PLACEHOLDER}", skill_prompt)
+    except Exception:
+        prompt = prompt.replace("{SKILLS_PLACEHOLDER}", "")
 
     if provider == ModelProvider.CLAUDE:
         # Claude prefers XML-style instructions

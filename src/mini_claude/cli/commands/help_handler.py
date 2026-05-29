@@ -80,7 +80,9 @@ class HelpCommandHandler(CommandHandler):
 /cache - View or manage tool cache
 /export-log [format] [path] - Export execution log (json/markdown/html)
 /reload-config - Reload configuration from .env file
-/config-watch [start|stop|status] - Manage config file watching"""
+/config-watch [start|stop|status] - Manage config file watching
+/skills - List all available skills
+/skill <name> [args] - Invoke a skill"""
 
         ctx.display.console.print(Panel.fit(help_text, title="Help"))
         return CommandResult(handled=True)

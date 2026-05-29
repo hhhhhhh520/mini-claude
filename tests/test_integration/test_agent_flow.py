@@ -146,15 +146,9 @@ class TestCompletionCheck:
         ]
 
         # 执行 check_completion_node
-        # 注意：这个测试会调用 LLM，在无 LLM 环境下可能失败
-        # 这里主要测试流程是否正确运行
-        try:
-            result = await check_completion_node(state)
-            # 如果 LLM 可用，验证返回结果
-            assert result["stop_reason"] in [StopReason.CONTINUE, StopReason.TASK_COMPLETE]
-        except Exception:
-            # LLM 不可用时，跳过测试
-            pytest.skip("LLM not available for completion check")
+        result = await check_completion_node(state)
+        # 如果 LLM 可用，验证返回结果
+        assert result["stop_reason"] in [StopReason.CONTINUE, StopReason.TASK_COMPLETE]
 
 
 class TestStateTransitions:
@@ -303,14 +297,13 @@ class TestExtendedAgentFlow:
         )
 
         # 执行 reflect_node
-        try:
-            result = await reflect_node(state)
-            # Reflect node 可能返回空结果（如果任务不够复杂）
-            # 或者返回反思结果
-            assert isinstance(result, dict)
-        except Exception:
-            # LLM 可能不可用
-            pytest.skip("LLM not available for reflect_node")
+        result = await reflect_node(state)
+        # Reflect node 应返回反思结果
+        assert isinstance(result, dict)
+        # reflect_node 可能返回 messages/stop_reason 或 improvement_suggestions/lessons_learned
+        valid_keys = {"messages", "stop_reason", "improvement_suggestions", "lessons_learned", "reflection_notes"}
+        assert any(k in result for k in valid_keys), \
+            f"reflect_node 应返回有效结果，实际返回的 key: {set(result.keys())}"
 
     @pytest.mark.asyncio
     async def test_check_completion_variations(self):
@@ -336,12 +329,9 @@ class TestExtendedAgentFlow:
             AIMessage(content="文件已成功创建"),
         ]
 
-        try:
-            result2 = await check_completion_node(state2)
-            # 可能是 CONTINUE 或 TASK_COMPLETE
-            assert result2["stop_reason"] in [StopReason.CONTINUE, StopReason.TASK_COMPLETE]
-        except Exception:
-            pytest.skip("LLM not available for completion check")
+        result2 = await check_completion_node(state2)
+        # 有工具结果和 AI 回复，应该是 CONTINUE 或 TASK_COMPLETE
+        assert result2["stop_reason"] in [StopReason.CONTINUE, StopReason.TASK_COMPLETE]
 
 
 class TestGraphRouting:

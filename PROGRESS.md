@@ -1,13 +1,13 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-05-12 (Windows CI 修复完成)
+> 最后更新: 2026-05-13 (Skills系统)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
 **技术选型**: LangGraph + LiteLLM + Rich + Prompt Toolkit
 **目标**: 构建一个迷你版Claude Code，支持多Agent并发处理
-**当前状态**: ✅ 核心功能完成，1158 测试通过
+**当前状态**: ✅ 核心功能完成，1733 测试通过
 
 ## 当前进度
 
@@ -64,6 +64,8 @@
 | **CI修复** | Windows 8.3短名称路径问题（realpath→abspath） | 2026-05-12 |
 | **CI修复** | 测试mock问题（patch→直接修改settings） | 2026-05-12 |
 | **CI修复** | Windows编码问题（Unicode测试用ASCII替代） | 2026-05-12 |
+| **Bug修复** | 流式输出重复显示（streaming时response打印两次） | 2026-05-13 |
+| **新功能** | Skills系统（skill加载/注册/调用/自动匹配） | 2026-05-13 |
 
 ### ⏳ 进行中
 
@@ -74,6 +76,44 @@
 | SUB-010 | P0安全修复验证 | 待SUB-003/SUB-009完成 |
 | 验收省 | verifier Agent静态验收 | 待SUB-010完成 |
 | QA验收 | qa_verifier Agent端到端测试 | 待验收省通过 |
+
+### 2026-05-13 Skills系统实现
+
+**新增文件**:
+- `src/mini_claude/skills/__init__.py` — 包导出
+- `src/mini_claude/skills/models.py` — Skill数据类 + YAML前言解析
+- `src/mini_claude/skills/loader.py` — 目录扫描 + 文件加载
+- `src/mini_claude/skills/registry.py` — SkillRegistry单例（加载/查找/提示词生成）
+- `src/mini_claude/cli/commands/skill_handler.py` — /skill和/skills命令处理器
+- `tests/test_skills/test_models.py` — 模型测试（15个）
+- `tests/test_skills/test_loader.py` — 加载器测试（10个）
+- `tests/test_skills/test_registry.py` — 注册表测试（12个）
+- `tests/test_cli/test_skill_handler.py` — 命令处理器测试（10个）
+
+**修改文件**:
+- `src/mini_claude/cli/commands/base.py` — 注册SkillCommandHandler
+- `src/mini_claude/cli/commands/__init__.py` — 导出新处理器
+- `src/mini_claude/cli/commands/help_handler.py` — 帮助文本添加skill命令
+- `src/mini_claude/llm/prompts.py` — 系统提示词注入skill列表 + 功能版本追踪
+- `src/mini_claude/cli/repl.py` — 启动时加载skill + 注入激活的skill内容
+
+**功能说明**:
+- Skill格式：YAML前言 + Markdown正文（兼容Claude Code SKILL.md格式）
+- 目录位置：`~/.mini-claude/skills/<name>/SKILL.md`（用户级）+ `<workspace>/skills/`（项目级）
+- 调用方式：`/skill <name> [args]` 手动调用 + LLM根据description自动匹配
+- 测试：47个新测试全部通过，总测试1733个
+
+### 2026-05-13 流式输出重复显示修复
+
+**问题描述**: REPL 中 LLM 响应被打印两次——`_streaming_llm_call` 通过 `display.stream_token()` 流式输出后，`repl.py` 又调用 `display.agent_message()` 重复打印。
+
+**根因**: `act.py:_streaming_llm_call` 实时流式打印响应，`repl.py:171` 无条件调用 `agent_message()` 再打印一次。`display.end_stream()` 注释已写"Don't re-render"但 repl.py 未遵守。
+
+**修复**:
+- `src/mini_claude/cli/display.py` — 新增 `_streamed` 标志，`start_stream()` 设置为 True
+- `src/mini_claude/cli/repl.py` — 每轮重置 `_streamed=False`，仅在未流式输出时调用 `agent_message`
+
+**测试**: CLI 测试 61 个全部通过
 
 ### 2026-05-12 Windows CI 修复完成
 

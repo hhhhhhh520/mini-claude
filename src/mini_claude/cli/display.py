@@ -97,6 +97,7 @@ class AgentDisplay:
         self.console = Console()
         self._streaming_text = ""
         self._is_streaming = False
+        self._streamed = False  # Whether streaming output was used in current turn
         self._suggestion_display = SuggestionDisplay(self.console)
 
     def welcome(self):
@@ -127,6 +128,7 @@ class AgentDisplay:
         """Start streaming output."""
         self._streaming_text = ""
         self._is_streaming = True
+        self._streamed = True
         self.console.print("\n[bold blue]Assistant:[/] ", end="")
 
     def stream_token(self, token: str):

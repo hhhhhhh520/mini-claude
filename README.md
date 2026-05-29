@@ -10,7 +10,8 @@
 - **多模型支持**：Claude / OpenAI / Gemini / DeepSeek / Ollama
 - **混合CLI模式**：REPL交互 + 命令行参数
 - **安全设计**：命令白名单、路径验证、用户确认机制
-- **高测试覆盖**：1497个测试用例
+- **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
+- **高测试覆盖**：1733个测试用例
 
 ## 安装
 
@@ -202,13 +203,14 @@ Lock Layer (file_lock.py - 并发控制)
 ```
 mini-claude/
 ├── src/mini_claude/
-│   ├── cli/          # CLI入口
-│   ├── agent/        # Agent核心（LangGraph）
-│   ├── tools/        # 工具层
-│   ├── llm/          # LLM抽象层
-│   ├── config/       # 配置管理
+│   ├── cli/          # CLI入口 + 命令处理器
+│   ├── agent/        # Agent核心（LangGraph状态机）
+│   ├── tools/        # 工具层（18个工具）
+│   ├── skills/       # Skills系统（加载/注册/调用）
+│   ├── llm/          # LLM抽象层 + 系统提示词
+│   ├── config/       # Pydantic配置管理
 │   └── utils/        # 工具函数（含file_lock）
-└── tests/            # 单元测试
+└── tests/            # 单元测试（1733个）
 ```
 
 ## License

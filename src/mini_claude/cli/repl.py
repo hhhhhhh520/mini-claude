@@ -72,6 +72,8 @@ class REPLSession:
         self._profile_manager: Optional[UserProfileManager] = None
         self._profile: Optional[UserProfile] = None
         self._execution_state = None
+        self._active_skill = None
+        self._active_skill_args = ""
 
     def _get_profile_manager(self) -> UserProfileManager:
         """Get or create profile manager."""
@@ -105,6 +107,27 @@ class REPLSession:
             multiline=False,
         )
         self._load_profile()
+        self._load_skills()
+
+    def _load_skills(self):
+        """Load skills from configured directories."""
+        from ..skills.registry import get_skill_registry
+        from mini_claude.config.settings import settings
+
+        registry = get_skill_registry()
+        try:
+            from pathlib import Path
+
+            user_dir = Path.home() / ".mini-claude" / "skills"
+            project_dir = None
+            if settings.workspace_root:
+                project_dir = Path(settings.workspace_root) / "skills"
+
+            count = registry.load(user_skills_dir=user_dir, project_skills_dir=project_dir)
+            if count > 0:
+                logger.debug(f"Loaded {count} skills")
+        except Exception as e:
+            logger.debug(f"Skills loading failed: {e}")
 
     def manage_history(self, messages: list, max_messages: int = 50) -> list:
         """Manage message history based on token count."""
@@ -150,13 +173,26 @@ class REPLSession:
                         self.pending_confirmation_path = None
                         user_input = "请继续执行之前的任务"
 
+                # Inject active skill if set
+                effective_input = user_input
+                if self._active_skill is not None:
+                    skill = self._active_skill
+                    args = self._active_skill_args
+                    skill_context = f"\n\n[Skill: {skill.name}]\n{skill.body}\n[/Skill]"
+                    if args:
+                        skill_context += f"\n\nUser arguments: {args}"
+                    effective_input = f"{user_input}{skill_context}"
+                    self._active_skill = None
+                    self._active_skill_args = ""
+
                 # Process with LangGraph
                 display.user_message(user_input)
+                display._streamed = False  # Reset streaming flag each turn
                 display.show_thinking()
 
                 try:
                     history_messages = self._build_history_messages()
-                    initial_state = create_initial_state(user_input, history_messages)
+                    initial_state = create_initial_state(effective_input, history_messages)
 
                     result = await graph.ainvoke(
                         initial_state,
@@ -168,7 +204,8 @@ class REPLSession:
 
                     self._process_result(result)
 
-                    display.agent_message(self._get_response_text(result))
+                    if not display._streamed:
+                        display.agent_message(self._get_response_text(result))
 
                     if settings.auto_save_enabled:
                         self._auto_save_session(settings)
