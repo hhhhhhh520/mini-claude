@@ -279,6 +279,7 @@ class TestExtendedAgentFlow:
         assert state["iteration"] == 3
 
     @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_reflect_node_integration(self):
         """测试 Reflect 节点集成"""
         from mini_claude.agent.nodes import reflect_node
