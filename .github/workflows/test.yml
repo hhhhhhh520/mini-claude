@@ -28,6 +28,10 @@ on:
           - full
           - coverage
 
+permissions:
+  contents: read
+  issues: write
+
 env:
   PYTHON_VERSION: '3.10'
 

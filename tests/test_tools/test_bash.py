@@ -236,7 +236,9 @@ class TestSafetyChecker:
         if os.path.isdir(workspace):
             workspace_safe_path = os.path.join(workspace, "safe_test.txt")
             is_safe, reason = checker.check_path(workspace_safe_path, require_confirmation=False)
-            assert is_safe is True, f"workspace 内路径应返回 True，实际返回 {is_safe}，原因: {reason}"
+            assert is_safe is True, (
+                f"workspace 内路径应返回 True，实际返回 {is_safe}，原因: {reason}"
+            )
         else:
             # workspace 不存在时，验证 check_path 能正确拒绝外部路径
             is_safe, reason = checker.check_path(safe_path, require_confirmation=False)

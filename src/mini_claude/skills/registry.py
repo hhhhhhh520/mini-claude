@@ -75,7 +75,9 @@ class SkillRegistry:
 
         lines = ["## Available Skills\n"]
         lines.append("You have the following specialized skills loaded. ")
-        lines.append("When a user's request matches a skill's description, follow its instructions. ")
+        lines.append(
+            "When a user's request matches a skill's description, follow its instructions. "
+        )
         lines.append("You can also use `/skill <name>` to explicitly activate a skill.\n")
 
         for skill in self._skills.values():

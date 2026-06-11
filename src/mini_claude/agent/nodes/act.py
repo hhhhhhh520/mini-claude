@@ -419,7 +419,7 @@ async def _execute_tools(
                 # Strip the "Tool xxx result: " prefix for cleaner display
                 display_text = content
                 if display_text.startswith(f"Tool {tool_name} result: "):
-                    display_text = display_text[len(f"Tool {tool_name} result: "):]
+                    display_text = display_text[len(f"Tool {tool_name} result: ") :]
                 display.show_tool_result(display_text[:500])
 
         # Check if tool execution failed

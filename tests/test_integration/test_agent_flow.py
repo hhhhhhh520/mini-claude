@@ -301,9 +301,16 @@ class TestExtendedAgentFlow:
         # Reflect node 应返回反思结果
         assert isinstance(result, dict)
         # reflect_node 可能返回 messages/stop_reason 或 improvement_suggestions/lessons_learned
-        valid_keys = {"messages", "stop_reason", "improvement_suggestions", "lessons_learned", "reflection_notes"}
-        assert any(k in result for k in valid_keys), \
+        valid_keys = {
+            "messages",
+            "stop_reason",
+            "improvement_suggestions",
+            "lessons_learned",
+            "reflection_notes",
+        }
+        assert any(k in result for k in valid_keys), (
             f"reflect_node 应返回有效结果，实际返回的 key: {set(result.keys())}"
+        )
 
     @pytest.mark.asyncio
     async def test_check_completion_variations(self):

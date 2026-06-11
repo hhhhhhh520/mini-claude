@@ -351,8 +351,9 @@ class TestNetworkErrorRecovery:
 
             # act_node 应该处理连接错误并返回错误状态
             result = await act_node(state)
-            assert result["stop_reason"] == StopReason.ERROR, \
+            assert result["stop_reason"] == StopReason.ERROR, (
                 f"连接错误时应返回 ERROR 状态，实际返回 {result.get('stop_reason')}"
+            )
 
     @pytest.mark.asyncio
     async def test_llm_timeout_recovery(self):
@@ -368,8 +369,9 @@ class TestNetworkErrorRecovery:
 
             # 应该超时或返回错误状态
             result = await asyncio.wait_for(act_node(state), timeout=2.0)
-            assert result.get("stop_reason") == StopReason.ERROR, \
+            assert result.get("stop_reason") == StopReason.ERROR, (
                 f"超时时应返回 ERROR 状态，实际返回 {result.get('stop_reason')}"
+            )
 
 
 class TestFileSystemErrorRecovery:

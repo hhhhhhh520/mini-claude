@@ -1,7 +1,6 @@
 """Tests for skill discovery and loading."""
 
 import pytest
-from pathlib import Path
 
 from mini_claude.skills.loader import discover_skills, load_skills_from_dir, load_skill_from_file
 

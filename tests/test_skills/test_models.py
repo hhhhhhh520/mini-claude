@@ -1,6 +1,5 @@
 """Tests for Skill data model and frontmatter parsing."""
 
-import pytest
 from pathlib import Path
 
 from mini_claude.skills.models import Skill, parse_skill_file, parse_skill_text

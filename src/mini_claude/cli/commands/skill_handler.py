@@ -5,7 +5,6 @@ Commands:
     /skill <name> [args] - Invoke a skill by name
 """
 
-from rich.panel import Panel
 from rich.table import Table
 
 from .base import CommandHandler, CommandContext, CommandResult
@@ -91,7 +90,4 @@ class SkillCommandHandler(CommandHandler):
 
     def get_help_text(self) -> str:
         """Get help text for skill commands."""
-        return (
-            "/skills - List all available skills\n"
-            "/skill <name> [args] - Invoke a skill by name"
-        )
+        return "/skills - List all available skills\n/skill <name> [args] - Invoke a skill by name"

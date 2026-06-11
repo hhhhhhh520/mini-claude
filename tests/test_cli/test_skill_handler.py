@@ -1,10 +1,10 @@
 """Tests for SkillCommandHandler."""
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 from mini_claude.cli.commands.skill_handler import SkillCommandHandler
-from mini_claude.cli.commands.base import CommandContext, CommandResult
+from mini_claude.cli.commands.base import CommandContext
 from mini_claude.skills.models import Skill
 from mini_claude.skills.registry import SkillRegistry
 from pathlib import Path
