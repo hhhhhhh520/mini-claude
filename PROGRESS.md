@@ -1,13 +1,13 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-05-13 (Skills系统)
+> 最后更新: 2026-06-18 (Code Review修复)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
 **技术选型**: LangGraph + LiteLLM + Rich + Prompt Toolkit
 **目标**: 构建一个迷你版Claude Code，支持多Agent并发处理
-**当前状态**: ✅ 核心功能完成，1733 测试通过
+**当前状态**: ✅ 核心功能完成，1734 测试通过
 
 ## 当前进度
 
@@ -102,6 +102,30 @@
 - 目录位置：`~/.mini-claude/skills/<name>/SKILL.md`（用户级）+ `<workspace>/skills/`（项目级）
 - 调用方式：`/skill <name> [args]` 手动调用 + LLM根据description自动匹配
 - 测试：47个新测试全部通过，总测试1733个
+
+### 2026-06-18 Code Review 修复（7项）
+
+**触发**: 对 test_monitoring 和 test_cli 模块的 4 个测试文件进行 code review，发现 7 个问题。
+
+**修复内容**:
+
+| # | 严重度 | 文件 | 问题 | 修复 |
+|---|--------|------|------|------|
+| 1 | 🔴 | test_alerts.py | mock patch 路径错误（局部导入 urllib 无法被模块级 patch 解析） | 改为 `patch("urllib.request.urlopen")` |
+| 2 | 🔴 | test_tracing.py | test_error_recording 断言被 `if traces:` 包裹，tracing 默认关闭时永不执行 | mock enabled=True + 提供 mock tracer，断言真实执行 |
+| 3 | 🟡 | providers.py | tracing_enabled=True 时 setup() 返回值被丢弃，失败静默 | 检查返回值，失败打 warning log |
+| 4 | 🟡 | test.yml | coverage job 无 -m 过滤，integration 测试在每次 PR 都跑 | 加 `-m "not integration"` |
+| 5 | 🟡 | test_alerts.py | webhook mock 只验证调用次数，不验证 body/headers/URL | 补充 Content-Type + body + URL 断言 |
+| 6 | 🟢 | test_tracing.py | isinstance(result, bool) 接受 False，不验证实际初始化 | 加后置条件：成功时验证 _enabled/_tracer |
+| 7 | 🟢 | test_tracing.py | assert len(traces)==0 硬编码默认值假设 | 显式检查 manager._enabled |
+
+**修改文件**:
+- `tests/test_monitoring/test_alerts.py` — mock 路径 + 断言加强 + 新增 test_webhook_handler_serialization_error
+- `tests/test_monitoring/test_tracing.py` — 错误记录测试重写 + setup 后置条件 + 消除硬编码
+- `src/mini_claude/context/providers.py` — setup() 返回值检查
+- `.github/workflows/test.yml` — coverage job 加 -m 过滤
+
+**测试**: 1734 测试通过（+1 新增），4 个预存失败（test_error_recovery + test_health，非本次引入）
 
 ### 2026-05-13 流式输出重复显示修复
 
