@@ -362,9 +362,13 @@ class TestTracingManager:
                     service_name="test-service",
                     exporter_type="console",
                 )
-                # Setup should return True when tracing is available
-                # or False if mock setup is incomplete (both acceptable)
+                # Setup should return bool; if True, verify post-conditions
                 assert isinstance(result, bool), "setup() should return a boolean"
+                if result:
+                    assert manager._enabled is True, "setup() returned True but _enabled is False"
+                    assert manager._tracer is not None, "setup() returned True but _tracer is None"
+                else:
+                    assert manager._enabled is False, "setup() returned False but _enabled is True"
 
     def test_shutdown(self):
         """Test shutdown."""
@@ -580,28 +584,45 @@ class TestIntegration:
                 pass
 
         traces = storage.get_recent_traces(limit=10)
-        # Tracing is not enabled by default in tests, so no spans should be stored
-        # If tracing were enabled, we'd assert len(traces) > 0
-        assert len(traces) == 0, "Tracing should not be enabled by default in tests"
+        # Verify tracing is disabled (not relying on default value assumption)
+        manager = get_tracing_manager()
+        assert manager._enabled is False, "Test assumes tracing is disabled"
+        assert len(traces) == 0, "No spans should be stored when tracing is disabled"
 
     def test_error_recording(self):
-        """Test that errors are recorded in spans."""
+        """Test that errors are recorded in spans with ERROR status."""
         storage = get_trace_storage()
+        storage.clear()
 
-        # This test verifies the error handling path works
-        # Actual error recording depends on OpenTelemetry availability
+        # Mock the tracing manager to be enabled with a fake tracer
+        manager = get_tracing_manager()
+
+        # Create a mock span with proper context attributes
+        mock_span = MagicMock()
+        mock_span.context.trace_id = 0x1234567890ABCDEF1234567890ABCDEF
+        mock_span.context.span_id = 0x1234567890ABCDEF
+        mock_span.parent = None
+        mock_span.start_time = 1000000000
+        mock_span.end_time = 2000000000
+
+        mock_tracer = MagicMock()
+        mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
+        mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
+
+        manager._enabled = True
+        manager._tracer = mock_tracer
+
         try:
-            with trace_agent_node("error_test", 1):
+            with manager.start_span("agent.error_test"):
                 raise ValueError("Test error")
         except ValueError:
             pass
 
-        # Verify behavior: if tracing enabled, error span should be recorded with ERROR status
+        # Verify the error span was recorded with ERROR status
         traces = storage.get_recent_traces(limit=10)
-        if traces:
-            error_traces = [t for t in traces if t.name == "agent.error_test"]
-            assert len(error_traces) > 0, "Error trace should be recorded"
-            assert error_traces[0].status == "ERROR", "Error trace should have ERROR status"
+        error_traces = [t for t in traces if t.name == "agent.error_test"]
+        assert len(error_traces) > 0, "Error trace should be recorded in storage"
+        assert error_traces[0].status == "ERROR", "Error trace should have ERROR status"
 
 
 # Run with: pytest tests/test_monitoring/test_tracing.py -v

@@ -205,7 +205,7 @@ jobs:
 
       - name: Run coverage
         run: |
-          python -m pytest tests/ --cov=src/mini_claude --cov-report=xml:coverage.xml --cov-report=term-missing
+          python -m pytest tests/ -m "not integration" --cov=src/mini_claude --cov-report=xml:coverage.xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

@@ -1,5 +1,6 @@
 """Tests for alert system."""
 
+import json
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -376,7 +377,7 @@ class TestAlertHandlers:
         assert "WARNING" in captured.out
 
     def test_webhook_handler_success(self):
-        """Test WebhookHandler sends POST request."""
+        """Test WebhookHandler sends POST request with correct payload."""
         handler = WebhookHandler(webhook_url="http://example.com/webhook", timeout=1.0)
         alert = Alert(
             level=AlertLevel.CRITICAL,
@@ -389,12 +390,36 @@ class TestAlertHandlers:
         mock_response.__enter__ = MagicMock(return_value=mock_response)
         mock_response.__exit__ = MagicMock(return_value=False)
 
-        with patch("mini_claude.monitoring.alerts.urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+        with patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
             handler.handle(alert)
             mock_urlopen.assert_called_once()
-            # Verify the request was made with correct method
-            call_args = mock_urlopen.call_args
-            assert call_args[0][0].method == "POST"
+            # Verify request method, URL, headers, and body
+            request = mock_urlopen.call_args[0][0]
+            assert request.method == "POST"
+            assert request.full_url == "http://example.com/webhook"
+            assert request.get_header("Content-type") == "application/json"
+            body = json.loads(request.data)
+            assert body["alert"]["level"] == "critical"
+            assert body["alert"]["message"] == "Critical alert"
+            assert "timestamp" in body
+
+    def test_webhook_handler_serialization_error(self):
+        """Test that serialization errors are logged, not silently swallowed."""
+        handler = WebhookHandler(webhook_url="http://example.com/webhook", timeout=1.0)
+        alert = Alert(
+            level=AlertLevel.CRITICAL,
+            message="test",
+            rule_name="test_rule",
+        )
+        # Make to_dict return a non-serializable object
+        alert.to_dict = MagicMock(return_value={object()})
+
+        with patch("mini_claude.monitoring.alerts.logger") as mock_logger:
+            handler.handle(alert)
+            # Serialization error should be caught and logged
+            mock_logger.error.assert_called()
+            error_call = mock_logger.error.call_args
+            assert "webhook_alert_error" in error_call[0][0]
 
     def test_webhook_handler_url_error(self):
         """Test WebhookHandler handles URL errors gracefully."""

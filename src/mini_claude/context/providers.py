@@ -167,7 +167,16 @@ def create_tracing_manager() -> "TracingManager":
 
     # Auto-setup if enabled in settings
     if settings.tracing_enabled:
-        instance.setup()
+        success = instance.setup()
+        if not success:
+            logger.warning(
+                "tracing_setup_failed",
+                extra={
+                    "component": "tracing_manager",
+                    "message": "TracingManager.setup() returned False — tracing will be disabled. "
+                    "Check if OpenTelemetry packages are installed.",
+                },
+            )
 
     logger.debug(
         "provider_created",
