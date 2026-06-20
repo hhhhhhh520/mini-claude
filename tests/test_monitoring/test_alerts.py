@@ -1,6 +1,7 @@
 """Tests for alert system."""
 
 import pytest
+from unittest.mock import patch, MagicMock
 
 from mini_claude.monitoring.alerts import (
     AlertLevel,
@@ -376,19 +377,24 @@ class TestAlertHandlers:
 
     def test_webhook_handler_success(self):
         """Test WebhookHandler sends POST request."""
-        # Use a mock server or skip if not available
-        handler = WebhookHandler(webhook_url="http://httpbin.org/post", timeout=1.0)
+        handler = WebhookHandler(webhook_url="http://example.com/webhook", timeout=1.0)
         alert = Alert(
             level=AlertLevel.CRITICAL,
             message="Critical alert",
             rule_name="test_rule",
         )
 
-        # Try to send - may fail in offline environment
-        try:
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.__enter__ = MagicMock(return_value=mock_response)
+        mock_response.__exit__ = MagicMock(return_value=False)
+
+        with patch("mini_claude.monitoring.alerts.urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
             handler.handle(alert)
-        except Exception:
-            pass  # Network errors are acceptable in tests
+            mock_urlopen.assert_called_once()
+            # Verify the request was made with correct method
+            call_args = mock_urlopen.call_args
+            assert call_args[0][0].method == "POST"
 
     def test_webhook_handler_url_error(self):
         """Test WebhookHandler handles URL errors gracefully."""

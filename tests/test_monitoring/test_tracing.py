@@ -358,14 +358,13 @@ class TestTracingManager:
                     "SimpleSpanProcessor": mock_processor,
                 },
             ):
-                # Just verify no exception is raised
-                try:
-                    manager.setup(
-                        service_name="test-service",
-                        exporter_type="console",
-                    )
-                except Exception:
-                    pass  # Mock setup may not be complete, that's OK
+                result = manager.setup(
+                    service_name="test-service",
+                    exporter_type="console",
+                )
+                # Setup should return True when tracing is available
+                # or False if mock setup is incomplete (both acceptable)
+                assert isinstance(result, bool), "setup() should return a boolean"
 
     def test_shutdown(self):
         """Test shutdown."""
@@ -581,12 +580,13 @@ class TestIntegration:
                 pass
 
         traces = storage.get_recent_traces(limit=10)
-        # Should have recorded spans
-        assert len(traces) >= 0  # Depends on whether tracing is enabled
+        # Tracing is not enabled by default in tests, so no spans should be stored
+        # If tracing were enabled, we'd assert len(traces) > 0
+        assert len(traces) == 0, "Tracing should not be enabled by default in tests"
 
     def test_error_recording(self):
         """Test that errors are recorded in spans."""
-        get_trace_storage()
+        storage = get_trace_storage()
 
         # This test verifies the error handling path works
         # Actual error recording depends on OpenTelemetry availability
@@ -596,7 +596,12 @@ class TestIntegration:
         except ValueError:
             pass
 
-        # Just verify no crash occurred
+        # Verify behavior: if tracing enabled, error span should be recorded with ERROR status
+        traces = storage.get_recent_traces(limit=10)
+        if traces:
+            error_traces = [t for t in traces if t.name == "agent.error_test"]
+            assert len(error_traces) > 0, "Error trace should be recorded"
+            assert error_traces[0].status == "ERROR", "Error trace should have ERROR status"
 
 
 # Run with: pytest tests/test_monitoring/test_tracing.py -v

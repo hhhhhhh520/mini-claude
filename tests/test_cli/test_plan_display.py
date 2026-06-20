@@ -433,5 +433,5 @@ class TestEmptyPlan:
         visualizer.display_plan(plan, complexity, format=DisplayFormat.LIST)
 
         output = visualizer.console.file.getvalue()
-        # Should handle gracefully
-        assert len(output) >= 0
+        # Should produce some output (at minimum a header/footer) even for empty plan
+        assert len(output) > 0, "display_plan should produce output even for empty plan"
