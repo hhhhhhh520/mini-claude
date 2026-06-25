@@ -511,6 +511,7 @@ def create_command_registry() -> "CommandRegistry":
         log_handler,
         alert_handler,
         help_handler,
+        skill_handler,
     )
 
     instance = CommandRegistry()
@@ -525,6 +526,7 @@ def create_command_registry() -> "CommandRegistry":
         log_handler.LogCommandHandler,
         alert_handler.AlertCommandHandler,
         help_handler.HelpCommandHandler,
+        skill_handler.SkillCommandHandler,
     ]:
         instance.register(handler_class())
 

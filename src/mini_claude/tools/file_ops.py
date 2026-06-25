@@ -2,6 +2,8 @@
 
 import os
 import glob as glob_module
+import tempfile
+import contextvars
 from typing import Dict, Any
 
 from .base import BaseTool, register_tool
@@ -9,22 +11,44 @@ from ..utils.safety import SafetyChecker, truncate_content
 from ..utils.file_lock import file_lock_manager
 
 
-# Current agent ID (set by agent context)
-_current_agent_id: str = "main"
+def _atomic_write(path: str, content: str) -> None:
+    """Write file atomically using temp+rename pattern.
 
-# Sub-agent mode flag (set when spawning sub-agents)
-_is_subagent_mode: bool = False
+    This prevents file corruption if the process crashes mid-write.
+    """
+    dir_name = os.path.dirname(path) or "."
+    fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp_path, path)  # 原子操作
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+# Current agent ID (set by agent context) - uses contextvars for asyncio-safe isolation
+_current_agent_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "current_agent_id", default="main"
+)
+
+# Sub-agent mode flag (set when spawning sub-agents) - uses contextvars for asyncio-safe isolation
+_is_subagent_mode: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "is_subagent_mode", default=False
+)
 
 
 def set_current_agent(agent_id: str) -> None:
     """Set the current agent ID for lock ownership."""
-    global _current_agent_id
-    _current_agent_id = agent_id
+    _current_agent_id.set(agent_id)
 
 
 def get_current_agent() -> str:
     """Get the current agent ID."""
-    return _current_agent_id
+    return _current_agent_id.get()
 
 
 def set_subagent_mode(is_subagent: bool) -> None:
@@ -34,13 +58,12 @@ def set_subagent_mode(is_subagent: bool) -> None:
     Paths outside workspace will be directly rejected instead of
     waiting for confirmation.
     """
-    global _is_subagent_mode
-    _is_subagent_mode = is_subagent
+    _is_subagent_mode.set(is_subagent)
 
 
 def is_subagent_mode() -> bool:
     """Check if current agent is a sub-agent."""
-    return _is_subagent_mode
+    return _is_subagent_mode.get()
 
 
 class ReadFileTool(BaseTool):
@@ -224,8 +247,7 @@ class WriteFileTool(BaseTool):
             if parent:
                 os.makedirs(parent, exist_ok=True)
 
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content)
+            _atomic_write(path, content)
 
             # Update version tracking
             await file_lock_manager.update_version(path, agent_id)
@@ -279,7 +301,7 @@ class EditFileTool(BaseTool):
 
         checker = SafetyChecker()
         # Sub-agents cannot request path confirmation - directly reject if outside workspace
-        is_valid, reason = checker.check_file_read(
+        is_valid, reason = checker.check_file_write(
             path, require_confirmation=not is_subagent_mode()
         )
         if not is_valid:
@@ -322,8 +344,7 @@ class EditFileTool(BaseTool):
 
             new_content = content.replace(old_text, new_text, 1)
 
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(new_content)
+            _atomic_write(path, new_content)
 
             # Update version tracking
             await file_lock_manager.update_version(path, agent_id)
@@ -598,19 +619,21 @@ class ForceWriteTool(BaseTool):
 
         agent_id = get_current_agent()
 
-        # Force acquire lock (release any existing lock)
+        # Force release any existing lock (regardless of owner)
         if file_lock_manager.get_lock_info(path):
-            await file_lock_manager.release_lock(path, agent_id)
+            await file_lock_manager.force_release(path)
 
-        await file_lock_manager.acquire_lock(path, agent_id, "write")
+        # Acquire fresh lock
+        success, lock_msg = await file_lock_manager.acquire_lock(path, agent_id, "write")
+        if not success:
+            return f"Error: Could not acquire lock: {lock_msg}"
 
         try:
             parent = os.path.dirname(path)
             if parent:
                 os.makedirs(parent, exist_ok=True)
 
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content)
+            _atomic_write(path, content)
 
             await file_lock_manager.update_version(path, agent_id)
 

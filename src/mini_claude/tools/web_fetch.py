@@ -45,6 +45,24 @@ class WebFetchTool(BaseTool):
     async def execute(self, url: str, max_length: int = 3000) -> str:
         """Fetch and extract content from a URL."""
         try:
+            # URL 安全校验 - 防止 SSRF
+            parsed = urlparse(url)
+            if parsed.scheme not in ("http", "https"):
+                return f"Error: Only HTTP/HTTPS URLs are allowed, got: {parsed.scheme}://"
+            hostname = parsed.hostname or ""
+            if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+                return "Error: Access to localhost is not allowed"
+            if hostname.startswith("169.254."):
+                return "Error: Access to link-local addresses is not allowed"
+            # 检查私有 IP 范围
+            import ipaddress
+            try:
+                ip = ipaddress.ip_address(hostname)
+                if ip.is_private or ip.is_loopback or ip.is_link_local:
+                    return "Error: Access to private/internal addresses is not allowed"
+            except ValueError:
+                pass  # 不是 IP 地址，是域名，允许
+
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

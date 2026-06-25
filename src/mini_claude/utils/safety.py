@@ -153,7 +153,7 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
         "description": "Search text patterns",
     },
     "find": {
-        "allowed_flags": ["-name", "-type", "-size", "-mtime", "-exec"],
+        "allowed_flags": ["-name", "-type", "-size", "-mtime"],
         "allowed_args": -1,  # Complex command, allow multiple args
         "risk_level": "low",
         "description": "Search for files",
@@ -239,13 +239,13 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
     },
     # Development tools
     "python": {
-        "allowed_flags": ["-m", "-c", "-V", "--version", "-u"],
+        "allowed_flags": ["-m", "-V", "--version", "-u"],
         "allowed_args": -1,
         "risk_level": "medium",
         "description": "Python interpreter",
     },
     "python3": {
-        "allowed_flags": ["-m", "-c", "-V", "--version", "-u"],
+        "allowed_flags": ["-m", "-V", "--version", "-u"],
         "allowed_args": -1,
         "risk_level": "medium",
         "description": "Python 3 interpreter",
@@ -281,7 +281,7 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
         "description": "Python 3 package manager",
     },
     "node": {
-        "allowed_flags": ["-e", "-v", "--version"],
+        "allowed_flags": ["-v", "--version"],
         "allowed_args": 1,
         "risk_level": "medium",
         "description": "Node.js runtime",
@@ -849,14 +849,11 @@ def validate_path(
         # First get absolute path
         path_abs = os.path.abspath(path)
 
-        # On Windows, realpath() resolves 8.3 short names (e.g., RUNNER~1 -> runneradmin)
-        # which can cause false positive symlink detection in CI environments.
-        # Use abspath for comparison on Windows to avoid this issue.
-        if os.name == "nt":
-            path_real = path_abs
-        else:
-            # On Unix, resolve symlinks using realpath
-            path_real = os.path.realpath(path_abs)
+        # Use pathlib.resolve() which correctly handles both symlinks and
+        # Windows 8.3 short names (e.g., RUNNER~1 -> runneradmin) without
+        # the false positives that os.path.realpath() can cause on Windows.
+        from pathlib import Path
+        path_real = str(Path(path_abs).resolve())
 
         # Check if resolved path is different (symlink detected)
         if path_real != path_abs:

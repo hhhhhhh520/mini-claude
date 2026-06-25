@@ -104,10 +104,11 @@ class TestRunCommandTool:
 
     @pytest.mark.asyncio
     async def test_run_python_command(self, temp_dir):
-        """测试 Python 命令"""
+        """测试 Python 命令 - python -c 已被安全策略阻止"""
         tool = RunCommandTool()
+        # python -c 允许任意代码执行，已被白名单移除
         result = await tool.execute(command='python -c "print(1+1)"')
-        assert "2" in result
+        assert "Error" in result and "Flag not allowed" in result
 
     @pytest.mark.asyncio
     async def test_run_command_empty(self, temp_dir):

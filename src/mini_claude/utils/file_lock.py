@@ -201,6 +201,15 @@ class FileLockManager:
                 del self._locks[path]
             return len(to_release)
 
+    async def force_release(self, path: str) -> Tuple[bool, str]:
+        """Force release a lock regardless of owner. Use with caution."""
+        async with self._lock:
+            norm_path = self._normalize_path(path)
+            if norm_path in self._locks:
+                del self._locks[norm_path]
+                return True, "Lock force-released"
+            return True, "No lock to release"
+
 
 # Global file lock manager
 file_lock_manager = FileLockManager()

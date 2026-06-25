@@ -218,12 +218,15 @@ async def act_node(state: AgentState) -> dict:
 
         except Exception as e:
             logger.error("act_node EXCEPTION", exc_info=True, error=str(e))
-            request_duration = time.time() - request_start_time
-            metrics_collector.record_request_end(
-                success=False,
-                duration=request_duration,
-                error_type=type(e).__name__,
-            )
+            try:
+                request_duration = time.time() - request_start_time
+                metrics_collector.record_request_end(
+                    success=False,
+                    duration=request_duration,
+                    error_type=type(e).__name__,
+                )
+            except (NameError, UnboundLocalError):
+                pass  # metrics 初始化就失败了，无法记录
             if span:
                 span.set_attribute("error", str(e))
             return {
@@ -423,7 +426,7 @@ async def _execute_tools(
                 display.show_tool_result(display_text[:500])
 
         # Check if tool execution failed
-        if state_update and state_update.get("stop_reason") == "error":
+        if state_update and state_update.get("stop_reason") == StopReason.ERROR:
             step_success = False
 
         if state_update:
