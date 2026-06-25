@@ -172,6 +172,9 @@ class HealthChecker:
         self.model_name = model_name or settings.default_model
         self.start_time = time.time()
         self._last_model_check: Optional[ModelHealth] = None
+        self._model_health_cache: Optional[ModelHealth] = None
+        self._model_health_cache_time: float = 0
+        self._MODEL_HEALTH_CACHE_TTL: float = 60  # seconds
 
     def get_uptime(self) -> float:
         """Get service uptime in seconds."""
@@ -214,9 +217,16 @@ class HealthChecker:
     async def check_model_health(self) -> ModelHealth:
         """Check LLM model health by making a simple test call.
 
+        Uses a 60-second cache to avoid repeated API calls during frequent probes.
+
         Returns:
             ModelHealth with connection status.
         """
+        # Check cache first
+        now = time.time()
+        if self._model_health_cache and (now - self._model_health_cache_time) < self._MODEL_HEALTH_CACHE_TTL:
+            return self._model_health_cache
+
         from mini_claude.llm.provider import LLMProvider
 
         provider = settings.get_model_provider(self.model_name)
@@ -237,7 +247,7 @@ class HealthChecker:
 
             # Check if we got a valid response
             if response and response.choices:
-                return ModelHealth(
+                result = ModelHealth(
                     status=HealthStatus.HEALTHY,
                     model_name=self.model_name,
                     provider=provider.value,
@@ -245,7 +255,7 @@ class HealthChecker:
                     last_check_time=time.time(),
                 )
             else:
-                return ModelHealth(
+                result = ModelHealth(
                     status=HealthStatus.UNHEALTHY,
                     model_name=self.model_name,
                     provider=provider.value,
@@ -259,13 +269,18 @@ class HealthChecker:
             if len(error_msg) > 200:
                 error_msg = error_msg[:200] + "..."
 
-            return ModelHealth(
+            result = ModelHealth(
                 status=HealthStatus.UNHEALTHY,
                 model_name=self.model_name,
                 provider=provider.value,
                 error_message=error_msg,
                 last_check_time=time.time(),
             )
+
+        # Update cache
+        self._model_health_cache = result
+        self._model_health_cache_time = time.time()
+        return result
 
     def check_tools_health(self) -> ToolHealth:
         """Check tools registry health.
@@ -327,6 +342,31 @@ class HealthChecker:
             tool_names=[r.tool_name for r in summary.tool_results],
             unavailable_tools=unavailable,
             tool_health_details=summary.to_dict(),
+        )
+
+    async def check_liveness(self) -> HealthReport:
+        """Check liveness - only verifies process is alive, no LLM call.
+
+        Suitable for K8s liveness probes (/livez).
+        """
+        service_task = asyncio.create_task(asyncio.to_thread(self.check_service_health))
+        tools_task = asyncio.create_task(asyncio.to_thread(self.check_tools_health))
+
+        service_health, tools_health = await asyncio.gather(service_task, tools_task)
+
+        # For liveness, model is always HEALTHY if process is alive
+        model_health = ModelHealth(
+            status=HealthStatus.HEALTHY,
+            model_name=self.model_name,
+            provider="N/A",
+            last_check_time=time.time(),
+        )
+
+        return HealthReport(
+            service=service_health,
+            model=model_health,
+            tools=tools_health,
+            timestamp=time.time(),
         )
 
     async def check_health(self, detailed_tools: bool = False) -> HealthReport:

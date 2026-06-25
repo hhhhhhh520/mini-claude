@@ -18,6 +18,17 @@ logger = get_logger("mini_claude.tools.agent_spawn")
 class SpawnAgentTool(BaseTool):
     """Spawn a sub-agent for parallel execution."""
 
+    # CRITICAL: Sub-agents cannot spawn more agents (prevent infinite recursion)
+    ALLOWED_TOOLS = [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_dir",
+        "search_files",
+        "search_content",
+        "web_search",
+    ]
+
     @property
     def name(self) -> str:
         return "spawn_agent"
@@ -143,15 +154,7 @@ class SpawnAgentTool(BaseTool):
 
                 # CRITICAL: Mark as subagent and limit allowed tools
                 # Sub-agents cannot spawn more agents (prevent infinite recursion)
-                subagent_allowed_tools = [
-                    "read_file",
-                    "write_file",
-                    "edit_file",
-                    "list_dir",
-                    "search_files",
-                    "search_content",
-                    "web_search",
-                ]
+                subagent_allowed_tools = self.ALLOWED_TOOLS
 
                 state = create_initial_state(
                     prompt,
@@ -289,6 +292,17 @@ class GetResultTool(BaseTool):
 class SpawnParallelTool(BaseTool):
     """Spawn multiple agents in parallel."""
 
+    # CRITICAL: Sub-agents cannot spawn more agents (prevent infinite recursion)
+    ALLOWED_TOOLS = [
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_dir",
+        "search_files",
+        "search_content",
+        "web_search",
+    ]
+
     @property
     def name(self) -> str:
         return "spawn_parallel"
@@ -361,18 +375,8 @@ class SpawnParallelTool(BaseTool):
         try:
             graph = build_agent_graph_no_checkpoint()
 
-            subagent_allowed_tools = [
-                "read_file",
-                "write_file",
-                "edit_file",
-                "list_dir",
-                "search_files",
-                "search_content",
-                "web_search",
-            ]
-
             state = create_initial_state(
-                task, thread_id=agent_id, is_subagent=True, allowed_tools=subagent_allowed_tools
+                task, thread_id=agent_id, is_subagent=True, allowed_tools=self.ALLOWED_TOOLS
             )
 
             task_start = time.time()

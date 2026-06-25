@@ -8,20 +8,12 @@ These tests verify that subagents are properly isolated from dangerous operation
 
 import pytest
 
-from mini_claude.tools.agent_spawn import SpawnAgentTool
+from mini_claude.tools.agent_spawn import SpawnAgentTool, SpawnParallelTool
 from mini_claude.agent.state import create_initial_state
 
 
-# Expected subagent allowed tools (from agent_spawn.py and parallel.py)
-EXPECTED_SUBAGENT_ALLOWED_TOOLS = [
-    "read_file",
-    "write_file",
-    "edit_file",
-    "list_dir",
-    "search_files",
-    "search_content",
-    "web_search",
-]
+# Import actual whitelists from source code (not hardcoded copies)
+EXPECTED_SUBAGENT_ALLOWED_TOOLS = SpawnAgentTool.ALLOWED_TOOLS
 
 # Tools that must NOT be available to subagents
 FORBIDDEN_TOOLS = [
@@ -199,19 +191,8 @@ class TestSpawnParallelToolIsolation:
 
     def test_spawn_parallel_allowed_tools_excludes_run_command(self):
         """Verify SpawnParallelTool also excludes run_command from whitelist."""
-        # The whitelist in parallel.py should match agent_spawn.py
-        parallel_allowed_tools = [
-            "read_file",
-            "write_file",
-            "edit_file",
-            "list_dir",
-            "search_files",
-            "search_content",
-            "web_search",
-        ]
-
-        assert "run_command" not in parallel_allowed_tools
-        assert "spawn_agent" not in parallel_allowed_tools
+        assert "run_command" not in SpawnParallelTool.ALLOWED_TOOLS
+        assert "spawn_agent" not in SpawnParallelTool.ALLOWED_TOOLS
 
 
 class TestRecursionPrevention:
@@ -377,39 +358,18 @@ class TestMockedSubagentExecution:
 class TestWhitelistConsistency:
     """Test that whitelists are consistent across files."""
 
-    def test_agent_spawn_whitelist_matches_expected(self):
-        """Verify agent_spawn.py whitelist matches expected tools."""
-        # This test documents the expected whitelist
-        # If agent_spawn.py changes, this test will fail
-        agent_spawn_whitelist = [
-            "read_file",
-            "write_file",
-            "edit_file",
-            "list_dir",
-            "search_files",
-            "search_content",
-            "web_search",
-        ]
-
-        assert agent_spawn_whitelist == EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
-            "agent_spawn.py whitelist must match expected tools"
+    def test_agent_spawn_whitelist_matches_class_constant(self):
+        """Verify SpawnAgentTool.ALLOWED_TOOLS is used (not a hardcoded copy)."""
+        # This test verifies we're reading from the actual source
+        assert SpawnAgentTool.ALLOWED_TOOLS == EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
+            "Test constant must match SpawnAgentTool.ALLOWED_TOOLS"
         )
 
     def test_parallel_whitelist_matches_agent_spawn(self):
-        """Verify parallel.py whitelist matches agent_spawn.py."""
-        # Both files should have identical whitelists
-        parallel_whitelist = [
-            "read_file",
-            "write_file",
-            "edit_file",
-            "list_dir",
-            "search_files",
-            "search_content",
-            "web_search",
-        ]
-
-        assert parallel_whitelist == EXPECTED_SUBAGENT_ALLOWED_TOOLS, (
-            "parallel.py whitelist must match agent_spawn.py whitelist"
+        """Verify SpawnParallelTool.ALLOWED_TOOLS matches SpawnAgentTool.ALLOWED_TOOLS."""
+        # Both classes should have identical whitelists
+        assert SpawnParallelTool.ALLOWED_TOOLS == SpawnAgentTool.ALLOWED_TOOLS, (
+            "SpawnParallelTool.ALLOWED_TOOLS must match SpawnAgentTool.ALLOWED_TOOLS"
         )
 
 

@@ -45,15 +45,9 @@ class HelpCommandHandler(CommandHandler):
             return CommandResult(handled=True)
 
         if cmd == "/model":
-            model = ctx.args.strip()
-            if model:
-                return CommandResult(
-                    handled=True,
-                    message=f"[dim]Model switched to: {model}[/]",
-                )
             return CommandResult(
                 handled=True,
-                message="[dim]Usage: /model <name>[/]",
+                message="[dim]Model switching is not supported. Configure via .env file (DEFAULT_MODEL=...)[/]",
             )
 
         return CommandResult(handled=False)
@@ -64,7 +58,7 @@ class HelpCommandHandler(CommandHandler):
 /help - Show this help
 /exit, /quit, /q - Exit REPL
 /clear - Clear screen
-/model <name> - Switch model
+/model - Show model info (configure via .env)
 /status - Show session status (including token usage)
 /tokens - Show detailed token usage
 /metrics - Show Prometheus metrics

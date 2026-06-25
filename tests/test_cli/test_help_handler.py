@@ -138,7 +138,7 @@ class TestHelpCommandHandler:
 
         result = await self.handler.handle(ctx)
         assert result.handled is True
-        assert "gpt-4" in result.message
+        assert "not supported" in result.message
 
     @pytest.mark.asyncio
     async def test_model_command_no_arg(self):
@@ -157,7 +157,7 @@ class TestHelpCommandHandler:
 
         result = await self.handler.handle(ctx)
         assert result.handled is True
-        assert "Usage" in result.message
+        assert "not supported" in result.message
 
     def test_get_help_text(self):
         """Test get_help_text returns content."""
