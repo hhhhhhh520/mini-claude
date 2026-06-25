@@ -9,9 +9,9 @@
 - **文件锁机制**：支持多Agent安全并行开发同一项目，自动检测冲突
 - **多模型支持**：Claude / OpenAI / Gemini / DeepSeek / Ollama
 - **混合CLI模式**：REPL交互 + 命令行参数
-- **安全设计**：命令白名单、路径验证、用户确认机制
+- **安全设计**：命令白名单（禁止 `python -c`/`node -e`/`find -exec`）、路径验证、SSRF 防护、原子文件写入
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
-- **高测试覆盖**：1734个测试用例
+- **高测试覆盖**：1729个测试用例，覆盖率 66%
 
 ## 安装
 

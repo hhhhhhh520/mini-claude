@@ -11,6 +11,28 @@
 - 子 Agent 并行执行 + 文件锁机制
 - SQLite 会话持久化 + REPL 交互
 
+## 安全约束
+
+### 命令白名单禁止项
+
+以下命令/flag 已从白名单移除，不可恢复：
+- `python -c` / `python3 -c` — 允许任意代码执行
+- `node -e` — 允许任意代码执行
+- `find -exec` — 允许任意命令执行
+
+### 文件操作安全
+
+- `edit_file` 使用 `check_file_write`（非 `check_file_read`），阻止编辑工作区外文件
+- `web_fetch` 阻断 SSRF：禁止 localhost、私有 IP、link-local、file:// 协议
+- 文件写入使用 temp+rename 原子操作，防止进程崩溃导致文件损坏
+- Windows symlink 检查使用 `pathlib.resolve()`，正确处理 8.3 短名称
+
+### 子代理隔离
+
+- 子代理白名单定义在 `SpawnAgentTool.ALLOWED_TOOLS` 类常量（非硬编码）
+- 子代理模式使用 `contextvars` 实现 asyncio 协程级隔离，无竞态条件
+- 子代理禁止 `run_command`、`spawn_agent`、`spawn_parallel`
+
 ## 问题修复原则（强制）
 
 以下规则不可违反：
