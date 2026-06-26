@@ -1,7 +1,7 @@
 """LangGraph agent graph definition - Refactored version."""
 
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from .state import AgentState
 from .nodes import (
@@ -23,7 +23,7 @@ from .routers import (
 )
 
 
-def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
+def build_agent_graph(checkpointer_path: str = "sessions.db"):
     """Build the main agent graph - 改进版架构
 
     Graph structure (8 nodes):
@@ -105,8 +105,8 @@ def build_agent_graph(checkpointer_path: str = "checkpoints.db"):
     # 重试后回到 act
     graph.add_edge("retry", "act")
 
-    # Enable checkpointer for state persistence
-    checkpointer = MemorySaver()
+    # Enable checkpointer for state persistence (SQLite-backed)
+    checkpointer = AsyncSqliteSaver.from_conn_string(checkpointer_path)
     return graph.compile(checkpointer=checkpointer)
 
 

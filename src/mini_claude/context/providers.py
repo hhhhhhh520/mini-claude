@@ -361,8 +361,10 @@ def create_agent_graph() -> "StateGraph":
         Configured StateGraph.
     """
     from mini_claude.agent.graph import build_agent_graph
+    from mini_claude.config.settings import settings
 
-    instance = build_agent_graph()
+    # Use session_db_path as the checkpoint database path
+    instance = build_agent_graph(checkpointer_path=settings.session_db_path)
     logger.debug("provider_created", extra={"component": "agent_graph"})
     return instance
 
