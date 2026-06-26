@@ -27,11 +27,12 @@ def temp_dir():
 @pytest.fixture
 def mock_workspace(temp_dir):
     """Mock the workspace root to the temp directory."""
-    # Directly modify the settings object's workspace_root
+    # Normalize path to resolve Windows 8.3 short names (RUNNER~1 -> runneradmin)
+    normalized = str(Path(temp_dir).resolve())
     original_workspace = config_settings.workspace_root
-    config_settings.workspace_root = temp_dir
+    config_settings.workspace_root = normalized
     try:
-        yield temp_dir
+        yield normalized
     finally:
         config_settings.workspace_root = original_workspace
 

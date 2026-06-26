@@ -12,6 +12,7 @@ Created for SUB-004: Testing consecutive file modification retry scenarios.
 import pytest
 import os
 import tempfile
+from pathlib import Path
 
 from mini_claude.tools.file_ops import EditFileTool, ReadFileTool, WriteFileTool
 from mini_claude.agent.suggestion import SuggestionEngine, ErrorType
@@ -41,11 +42,12 @@ class TestEditFileRetry:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        # Directly modify the settings object's workspace_root
+        # Normalize path to resolve Windows 8.3 short names (RUNNER~1 -> runneradmin)
+        normalized = str(Path(temp_dir).resolve())
         original_workspace = config_settings.workspace_root
-        config_settings.workspace_root = temp_dir
+        config_settings.workspace_root = normalized
         try:
-            yield temp_dir
+            yield normalized
         finally:
             config_settings.workspace_root = original_workspace
 
@@ -357,11 +359,12 @@ class TestEditFileRetryEdgeCases:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        # Directly modify the settings object's workspace_root
+        # Normalize path to resolve Windows 8.3 short names (RUNNER~1 -> runneradmin)
+        normalized = str(Path(temp_dir).resolve())
         original_workspace = config_settings.workspace_root
-        config_settings.workspace_root = temp_dir
+        config_settings.workspace_root = normalized
         try:
-            yield temp_dir
+            yield normalized
         finally:
             config_settings.workspace_root = original_workspace
 
@@ -488,11 +491,12 @@ class TestEditFileRetryIntegration:
     @pytest.fixture
     def mock_workspace(self, temp_dir):
         """Mock the workspace root to the temp directory."""
-        # Directly modify the settings object's workspace_root
+        # Normalize path to resolve Windows 8.3 short names (RUNNER~1 -> runneradmin)
+        normalized = str(Path(temp_dir).resolve())
         original_workspace = config_settings.workspace_root
-        config_settings.workspace_root = temp_dir
+        config_settings.workspace_root = normalized
         try:
-            yield temp_dir
+            yield normalized
         finally:
             config_settings.workspace_root = original_workspace
 
