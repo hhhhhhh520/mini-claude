@@ -382,16 +382,19 @@ class VectorStore:
         metadata: Dict[str, Any],
     ) -> bool:
         """Add document to FAISS."""
+        import numpy as np
+
         # Check if ID already exists
         if id in self._documents:
-            # FAISS doesn't support updates, need to remove and re-add
-            # For simplicity, we'll just update the document
-            logger.debug(f"Updating existing document: {id}")
-            idx = self._id_map[id]
-            embedding = self._generate_embedding(text)
             # FAISS doesn't support in-place updates for IndexFlatIP
-            # We need to add a new entry and mark the old one as invalid
-            # For simplicity, we just update the metadata
+            # Add new embedding and update id_map to point to it
+            # Old embedding becomes orphan (cleaned up on rebuild)
+            logger.debug(f"Updating existing document: {id}")
+            embedding = self._generate_embedding(text)
+            embedding_array = np.array([embedding], dtype=np.float32)
+            self._backend.add(embedding_array)
+            new_idx = self._backend.ntotal - 1
+            self._id_map[id] = new_idx
             self._documents[id] = Document(id=id, text=text, metadata=metadata)
             self._save_faiss_data()
             return True
