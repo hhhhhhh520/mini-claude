@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-06-25 (代码审查修复)
+> 最后更新: 2026-06-26 (待办修复完成)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -26,6 +26,7 @@
 | Bug修复 | 流式输出重复显示 | 2026-05-13 |
 | 代码审查 | 7项修复（mock路径/死代码/返回值检查/CI过滤/断言加强） | 2026-06-18 |
 | **代码审查** | **14项修复（安全漏洞/逻辑错误/功能缺陷/测试质量）** | **2026-06-25** |
+| **待办修复** | **11项修复（并发安全/数据一致性/LLM健壮性/功能接入）** | **2026-06-26** |
 
 ### ⏳ 进行中
 
@@ -38,9 +39,8 @@
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
-| 中 | FAISS update 空操作 | 向量更新不修改索引，语义搜索会越来越不准 |
-| 中 | coordinator._lock 未使用 | 创建了 Lock 但从未 acquire，并发修改无保护 |
 | 低 | reflect_node 异常吞没 | 非关键节点，但应至少记录 ERROR 级别日志 |
+| 低 | caplog 测试顺序问题 | test_prompts.py 在全量运行时 36 个测试因 logger handler 冲突失败 |
 
 ## 2026-06-25 代码审查修复（14项）
 
@@ -80,6 +80,37 @@
 
 **测试**: 1729 测试通过（302 个直接相关测试），覆盖率 66%
 
+## 2026-06-26 待办修复（11项）
+
+**触发**: 代码审查确认的待办问题清单，经源码验证后逐项修复。
+
+### 并发安全 + 数据一致性（7项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 1 | `agent/coordinator.py` | `_lock` 创建但从未 acquire，并发修改无保护 | 6 个方法加 `async with self._lock` |
+| 2 | `agent/subagent.py` | `progress_queue` 无 maxsize，无限增长 | 改为 `maxsize=100` |
+| 3 | `agent/nodes/_act_helpers.py` | messages/litellm_messages 截断策略不一致 | 统一截断策略，messages 同步 litellm_messages 长度 |
+| 4 | `utils/token_manager.py` | 模型名子串匹配错误（gpt-4o-2024 匹配到 gpt-4） | 改为最长匹配优先 |
+| 5 | `utils/vector_store.py` | FAISS update 不更新索引向量 | 更新时真正添加新向量到索引 |
+| 6 | `tools/file_ops.py` | search_content 无文件大小限制 | 加 1MB 限制 |
+| 7 | `monitoring/health.py` | check_tools_health 永远返回 HEALTHY | 真正检查工具可用性 |
+
+### LLM 健壮性（2项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 8 | `llm/provider.py` | chat() 无重试，429/超时直接抛异常 | 加指数退避重试（3次） |
+| 9 | `llm/provider.py` | chat_stream 静默丢弃 tool_calls | 检测时抛 ValueError |
+| 10 | `utils/token_manager.py` | token 计数不含 tool schema 开销 | 加可选 tools 参数 |
+
+### 功能接入（3项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 11 | `agent/graph.py` | Checkpointer 用 MemorySaver，进程退出丢失状态 | 改用 AsyncSqliteSaver（SQLite 持久化） |
+| 12 | `cli/repl.py` | 启动时不检测/恢复上次会话 | 新增 _check_previous_session + 恢复提示 |
+| 13 | `tools/base.py` | ToolDegradation 未集成到 ToolRegistry | execute() 加降级检查 + 成功/失败记录 |
+
+**测试**: 1058 测试通过，36 个预存 caplog 顺序问题
+
 ## 2026-06-18 Code Review 修复（7项）
 
 **修复**: mock路径错误、断言被条件包裹、setup()返回值丢弃、CI过滤、断言加强
@@ -108,3 +139,7 @@
 | 文件写入 | temp+rename 原子操作 | 防止进程崩溃导致文件损坏 | 2026-06-25 |
 | /model 命令 | 移除，改用 .env 配置 | 动态切换涉及 provider/key/token 复杂依赖 | 2026-06-25 |
 | 健康检查 | 分层：liveness 不调 LLM | K8s 最佳实践，避免频繁探测消耗 token | 2026-06-25 |
+| Checkpointer | AsyncSqliteSaver（SQLite） | 进程退出后状态持久化，/resume 可用 | 2026-06-26 |
+| 会话恢复 | 启动时提示用户 | 不自动恢复（避免 surprise），不静默跳过（避免丢失上下文） | 2026-06-26 |
+| 工具降级 | 集成到 ToolRegistry.execute | 所有调用路径统一受保护，连续失败 3 次自动跳过 | 2026-06-26 |
+| EnhancedMemory | 不集成 | CLI 工具不需要跨会话语义搜索，SessionManager 已够用 | 2026-06-26 |

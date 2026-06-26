@@ -33,6 +33,20 @@
 - 子代理模式使用 `contextvars` 实现 asyncio 协程级隔离，无竞态条件
 - 子代理禁止 `run_command`、`spawn_agent`、`spawn_parallel`
 
+### Checkpoint 与会话
+
+- `graph.py` 使用 `AsyncSqliteSaver`（SQLite 持久化），路径由 `settings.session_db_path` 决定
+- 子代理必须用 `build_agent_graph_no_checkpoint()`（不带 checkpoint），不可用主 graph
+- REPL 启动时检测 SQLite checkpoint，提示用户是否恢复上次会话
+- 不可改回 `MemorySaver` — 进程退出后状态丢失，`/resume` 命令失效
+
+### 工具降级
+
+- `ToolRegistry.execute()` 集成了 `ToolDegradation` — 连续失败 3 次自动跳过工具
+- 工具执行成功/失败会自动记录到降级管理器
+- 10 分钟后自动重置失败计数
+- 修改工具执行逻辑时不可移除降级检查
+
 ## 问题修复原则（强制）
 
 以下规则不可违反：

@@ -10,8 +10,10 @@
 - **多模型支持**：Claude / OpenAI / Gemini / DeepSeek / Ollama
 - **混合CLI模式**：REPL交互 + 命令行参数
 - **安全设计**：命令白名单（禁止 `python -c`/`node -e`/`find -exec`）、路径验证、SSRF 防护、原子文件写入
+- **会话持久化**：SQLite checkpoint + 启动时恢复提示，支持 `/resume` 断点续跑
+- **工具降级**：连续失败 3 次自动跳过工具，10 分钟后自动恢复
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
-- **高测试覆盖**：1729个测试用例，覆盖率 66%
+- **高测试覆盖**：1058个测试用例，覆盖率 66%
 
 ## 安装
 
