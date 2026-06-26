@@ -32,13 +32,18 @@ def route_after_observe(state: AgentState) -> str:
         # 等待用户确认，停止执行
         return "complete"
     else:
-        # 对于复杂任务，先进行反思
+        # 对于复杂任务，先进行反思（结果缓存到 state 避免重复分析）
         from .complexity import TaskComplexityAnalyzer, ComplexityLevel
 
-        current_task = state.get("current_task", "")
-        analyzer = TaskComplexityAnalyzer()
-        complexity = analyzer.analyze(current_task)
-        if complexity.level == ComplexityLevel.COMPLEX:
+        complexity_level = state.get("_complexity_level")
+        if complexity_level is None:
+            current_task = state.get("current_task", "")
+            analyzer = TaskComplexityAnalyzer()
+            complexity = analyzer.analyze(current_task)
+            complexity_level = complexity.level
+            # 缓存到 state（TypedDict 运行时不阻止额外 key）
+            state["_complexity_level"] = complexity_level  # type: ignore[misc]
+        if complexity_level == ComplexityLevel.COMPLEX:
             return "reflect"
         return "continue"
 

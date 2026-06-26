@@ -6,6 +6,41 @@ from typing import Dict, Any
 from .base import BaseTool, register_tool
 from ..utils.safety import validate_command
 
+# Track background processes for cleanup
+_background_processes: Dict[str, asyncio.subprocess.Process] = {}
+
+
+def _cleanup_finished_processes() -> None:
+    """Remove finished processes from tracking dict and consume their pipes."""
+    finished = [
+        tid for tid, proc in _background_processes.items()
+        if proc.returncode is not None
+    ]
+    for tid in finished:
+        proc = _background_processes.pop(tid, None)
+        if proc and proc.returncode is not None:
+            # Consume remaining pipe data to prevent blocking
+            try:
+                proc.stdout and proc.stdout.read_nowait()
+            except (asyncio.LimitOverrunError, ValueError):
+                pass
+            try:
+                proc.stderr and proc.stderr.read_nowait()
+            except (asyncio.LimitOverrunError, ValueError):
+                pass
+
+
+async def cleanup_all_background_processes() -> None:
+    """Kill and clean up all tracked background processes."""
+    for tid, proc in list(_background_processes.items()):
+        if proc.returncode is None:
+            try:
+                proc.kill()
+                await proc.wait()
+            except ProcessLookupError:
+                pass
+    _background_processes.clear()
+
 
 class RunCommandTool(BaseTool):
     """Execute a shell command."""
@@ -124,8 +159,12 @@ class RunBackgroundTool(BaseTool):
                 stderr=asyncio.subprocess.PIPE,
             )
 
-            # Store process for later retrieval
-            task_id = f"task_{id(process)}"
+            # Track process for cleanup
+            task_id = f"task_{process.pid}"
+            _background_processes[task_id] = process
+
+            # Clean up finished processes
+            _cleanup_finished_processes()
 
             return f"Started background task: {task_id}\nPID: {process.pid}"
 

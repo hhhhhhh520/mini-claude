@@ -54,14 +54,28 @@ class WebFetchTool(BaseTool):
                 return "Error: Access to localhost is not allowed"
             if hostname.startswith("169.254."):
                 return "Error: Access to link-local addresses is not allowed"
-            # 检查私有 IP 范围
+            # 去除 IPv6 方括号
+            if hostname.startswith("[") and hostname.endswith("]"):
+                hostname = hostname[1:-1]
+            # 检查私有 IP 范围（含 IPv6 映射地址和十进制 IP）
             import ipaddress
             try:
                 ip = ipaddress.ip_address(hostname)
                 if ip.is_private or ip.is_loopback or ip.is_link_local:
                     return "Error: Access to private/internal addresses is not allowed"
+                # IPv4 映射的 IPv6 地址（如 ::ffff:127.0.0.1）
+                if hasattr(ip, "ipv4_mapped") and ip.ipv4_mapped:
+                    mapped = ip.ipv4_mapped
+                    if mapped.is_private or mapped.is_loopback or mapped.is_link_local:
+                        return "Error: Access to private/internal addresses is not allowed"
             except ValueError:
-                pass  # 不是 IP 地址，是域名，允许
+                # 不是标准 IP，尝试解析十进制 IP（如 2130706433 = 127.0.0.1）
+                try:
+                    ip = ipaddress.ip_address(int(hostname))
+                    if ip.is_private or ip.is_loopback or ip.is_link_local:
+                        return "Error: Access to private/internal addresses is not allowed"
+                except (ValueError, OverflowError):
+                    pass  # 不是 IP 地址，是域名，允许
 
             headers = {
                 "User-Agent": (

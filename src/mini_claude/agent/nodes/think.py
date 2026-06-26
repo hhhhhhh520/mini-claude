@@ -73,8 +73,8 @@ async def think_node(state: AgentState) -> dict:
                         "You can also suggest the user type /skill <name> to explicitly activate one."
                     )
                     messages.insert(1, SystemMessage(content="\n".join(parts)))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("skills injection failed", error=str(e))
 
             if span:
                 span.set_attribute("first_iteration", True)

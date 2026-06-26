@@ -152,15 +152,14 @@ class REPLSession:
                     cursor = await db.execute("SELECT COUNT(*) FROM checkpoints")
                     row = await cursor.fetchone()
                     return row and row[0] > 0
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("session check failed", error=str(e))
         return False
 
     async def run_graph(self):
         """Run REPL with LangGraph state machine."""
         from ..agent.graph import get_agent_graph
         from ..agent.state import create_initial_state
-        from ..llm.prompts import get_system_prompt
         from mini_claude.config.settings import settings
 
         self.running = True
@@ -180,12 +179,10 @@ class REPLSession:
                     # Start fresh - use a new thread_id to avoid loading old checkpoint
                     self.thread_id = f"thread_{int(__import__('time').time())}"
                     display.console.print("[dim]开始新会话[/]")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("session recovery prompt failed", error=str(e))
 
         graph = get_agent_graph()
-        provider = settings.get_model_provider()
-        _ = get_system_prompt(provider)
 
         while self.running:
             try:

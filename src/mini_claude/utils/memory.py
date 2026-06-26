@@ -144,13 +144,13 @@ class MemoryManager:
 
 # Global memory manager (lazy initialization to avoid import-time side effects)
 _memory_manager = None
+memory_manager = None  # Backward compatibility alias, set by get_memory_manager()
+
 
 def get_memory_manager() -> "MemoryManager":
     """Get or create the global memory manager instance."""
-    global _memory_manager
+    global _memory_manager, memory_manager
     if _memory_manager is None:
         _memory_manager = MemoryManager()
+        memory_manager = _memory_manager
     return _memory_manager
-
-# Backward compatibility alias
-memory_manager = None  # Will be set by get_memory_manager() on first access

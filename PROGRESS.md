@@ -1,13 +1,13 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-06-26 (待办修复完成)
+> 最后更新: 2026-06-26 (第三轮代码审查修复完成)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
 **技术选型**: LangGraph + LiteLLM + Rich + Prompt Toolkit
 **目标**: 构建一个迷你版Claude Code，支持多Agent并发处理
-**当前状态**: ✅ 核心功能完成，1729 测试通过，覆盖率 66%
+**当前状态**: ✅ 核心功能完成，1606 测试通过，覆盖率 66%
 
 ## 当前进度
 
@@ -27,6 +27,7 @@
 | 代码审查 | 7项修复（mock路径/死代码/返回值检查/CI过滤/断言加强） | 2026-06-18 |
 | **代码审查** | **14项修复（安全漏洞/逻辑错误/功能缺陷/测试质量）** | **2026-06-25** |
 | **待办修复** | **11项修复（并发安全/数据一致性/LLM健壮性/功能接入）** | **2026-06-26** |
+| **第三轮审查** | **11项修复（测试回归/安全加固/死代码/逻辑错误）** | **2026-06-26** |
 
 ### ⏳ 进行中
 
@@ -41,6 +42,37 @@
 |--------|------|------|
 | 低 | reflect_node 异常吞没 | 非关键节点，但应至少记录 ERROR 级别日志 |
 | 低 | caplog 测试顺序问题 | test_prompts.py 在全量运行时 36 个测试因 logger handler 冲突失败 |
+| 低 | 假测试清理 | ~52 个虚弱测试（弱断言/无断言/验证 Python 机制） |
+| 低 | 无测试覆盖模块 | ~15 个源模块无测试（provider.py, observe.py, web_fetch.py 等） |
+
+## 2026-06-26 第三轮代码审查修复（11项）
+
+**触发**: 深度代码审查（代码质量+安全+测试+架构），3 个 Agent 并行分析，经源码验证确认 11 个真问题。
+
+### P0 测试回归（2项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 1 | `tests/test_stress.py` | coordinator 改 async 后测试未更新，2 个测试因未 await 失败 | fixture 改 async，加 await |
+| 9 | `utils/memory.py` | `get_memory_manager()` 不设置 `memory_manager` 别名 | 别名定义前移，函数内同步赋值 |
+
+### P1 安全 & 可靠性（4项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 2 | `tools/bash.py` | RunBackgroundTool 进程从未跟踪，管道未消费 | 加 `_background_processes` 跟踪 + 清理函数 |
+| 4 | `utils/__init__.py` | `generate_agent_id` 精度只到秒，同秒碰撞 | 加 UUID 后缀 |
+| 5 | `llm/provider.py` | `chat_stream_with_tools` 直接访问 `choices[0]` 无空检查 | 加 `if not chunk.choices` 守卫 |
+| 6 | `cli/repl.py` + `agent/nodes/think.py` | 3 处 `except Exception: pass` 吞没异常 | 改为 `logger.debug` 记录 |
+
+### P2 代码质量（5项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 7 | `utils/profile.py` + `cli/repl.py` | `_async_load`/`_async_save` 从未调用，`get_system_prompt` 结果丢弃 | 删除死代码 |
+| 8 | `agent/routers.py` | 每次迭代重建 TaskComplexityAnalyzer | 缓存复杂度到 state |
+| 10 | `tools/web_fetch.py` | SSRF 不防 IPv6 映射和十进制 IP | 补全检查 |
+| 11 | `agent/nodes/check_completion.py` | `"COMPLETE" in "NOT COMPLETE"` 误判完成 | 改为 `answer.startswith("COMPLETE")` |
+| — | `cli/repl.py` | 删除 `get_system_prompt` 后 `provider` 变量也成死代码 | 一并删除 |
+
+**测试**: 1606 测试通过（修复前 1604 passed + 2 failed），覆盖率 66%
 
 ## 2026-06-25 代码审查修复（14项）
 
@@ -109,7 +141,7 @@
 | 12 | `cli/repl.py` | 启动时不检测/恢复上次会话 | 新增 _check_previous_session + 恢复提示 |
 | 13 | `tools/base.py` | ToolDegradation 未集成到 ToolRegistry | execute() 加降级检查 + 成功/失败记录 |
 
-**测试**: 1058 测试通过，36 个预存 caplog 顺序问题
+**测试**: 1606 测试通过，36 个预存 caplog 顺序问题
 
 ## 2026-06-18 Code Review 修复（7项）
 
@@ -143,3 +175,6 @@
 | 会话恢复 | 启动时提示用户 | 不自动恢复（避免 surprise），不静默跳过（避免丢失上下文） | 2026-06-26 |
 | 工具降级 | 集成到 ToolRegistry.execute | 所有调用路径统一受保护，连续失败 3 次自动跳过 | 2026-06-26 |
 | EnhancedMemory | 不集成 | CLI 工具不需要跨会话语义搜索，SessionManager 已够用 | 2026-06-26 |
+| 同步 HTTP | 不修 | web_fetch/weather/web_search 阻塞事件循环，但单用户 CLI 影响有限 | 2026-06-26 |
+| SSRF 防护 | 补全 IPv6 映射 + 十进制 IP | DNS rebinding 改动大，标记后续优化 | 2026-06-26 |
+| 后台进程跟踪 | PID 基础跟踪 + 清理函数 | 完整生命周期管理改动过大，当前方案够用 | 2026-06-26 |

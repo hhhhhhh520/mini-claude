@@ -31,10 +31,12 @@ def generate_agent_id(prefix: str = "agent") -> str:
         prefix: ID 前缀，如 'agent', 'subagent'
 
     Returns:
-        格式为 '{prefix}_{HHMMSS}' 的唯一 ID
+        格式为 '{prefix}_{HHMMSS}_{short_uuid}' 的唯一 ID
     """
+    import uuid
     timestamp = datetime.now().strftime("%H%M%S")
-    return f"{prefix}_{timestamp}"
+    short_id = uuid.uuid4().hex[:6]
+    return f"{prefix}_{timestamp}_{short_id}"
 
 
 __all__ = [

@@ -83,7 +83,7 @@ async def check_completion_node(state: AgentState) -> dict:
         # 注意：必须先检查 INCOMPLETE，因为 "COMPLETE" in "INCOMPLETE" 为 True
         if answer == "INCOMPLETE" or answer.startswith("INCOMPLETE"):
             return {"stop_reason": StopReason.CONTINUE}
-        elif "COMPLETE" in answer:
+        elif answer == "COMPLETE" or answer.startswith("COMPLETE"):
             return {"stop_reason": StopReason.TASK_COMPLETE}
         else:
             return {"stop_reason": StopReason.CONTINUE}

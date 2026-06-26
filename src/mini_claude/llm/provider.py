@@ -154,6 +154,8 @@ class LLMProvider:
         tool_calls_data = {}  # index -> {id, name, arguments}
 
         async for chunk in response:
+            if not chunk.choices or not chunk.choices[0].delta:
+                continue
             delta = chunk.choices[0].delta
 
             # Stream content

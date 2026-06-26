@@ -133,10 +133,6 @@ class UserProfileManager:
             UserProfile instance
         """
 
-        async def _async_load():
-            async with self._lock:
-                return self._sync_load()
-
         # If profile already cached, return it
         if self._profile is not None:
             return self._profile
@@ -191,10 +187,6 @@ class UserProfileManager:
         Returns:
             True if saved successfully, False on error
         """
-
-        async def _async_save():
-            async with self._lock:
-                return self._sync_save(profile)
 
         self._ensure_dir()
         profile.updated_at = datetime.now().isoformat()

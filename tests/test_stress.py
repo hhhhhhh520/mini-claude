@@ -451,12 +451,12 @@ def clean_subagent_manager():
 
 
 @pytest.fixture
-def clean_coordinator():
+async def clean_coordinator():
     """Create a clean coordinator for each test."""
     coordinator = ParallelCoordinator(max_agents=settings.max_sub_agents)
-    coordinator.clear()
+    await coordinator.clear()
     yield coordinator
-    coordinator.clear()
+    await coordinator.clear()
 
 
 # =============================================================================
@@ -730,7 +730,7 @@ class TestResourceLimits:
         """Test handling of task queue overflow."""
         # Add many tasks
         for i in range(100):
-            clean_coordinator.add_task(
+            await clean_coordinator.add_task(
                 task_id=f"task_{i}",
                 description=f"Task {i}",
                 dependencies=[],
@@ -779,13 +779,13 @@ class TestErrorRecovery:
     async def test_cascading_failure_prevention(self, clean_coordinator):
         """Test that cascading failures are prevented."""
         # Create dependency chain
-        clean_coordinator.add_task("task_a", "A", dependencies=[])
-        clean_coordinator.add_task("task_b", "B", dependencies=["task_a"])
-        clean_coordinator.add_task("task_c", "C", dependencies=["task_b"])
+        await clean_coordinator.add_task("task_a", "A", dependencies=[])
+        await clean_coordinator.add_task("task_b", "B", dependencies=["task_a"])
+        await clean_coordinator.add_task("task_c", "C", dependencies=["task_b"])
 
         # Mark first task as failed
-        clean_coordinator.mark_task_running("task_a")
-        clean_coordinator.mark_task_failed("task_a", "Simulated failure")
+        await clean_coordinator.mark_task_running("task_a")
+        await clean_coordinator.mark_task_failed("task_a", "Simulated failure")
 
         # Dependent tasks should still be pending
         assert clean_coordinator.tasks["task_b"].status == TaskStatus.PENDING
