@@ -37,7 +37,8 @@ class TestEditFileRetry:
     def temp_dir(self):
         """Create a temporary directory for testing."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield tmpdir
+            # Normalize path to resolve Windows 8.3 short names
+            yield str(Path(tmpdir).resolve())
 
     @pytest.fixture
     def mock_workspace(self, temp_dir):
@@ -354,7 +355,8 @@ class TestEditFileRetryEdgeCases:
     def temp_dir(self):
         """Create a temporary directory for testing."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield tmpdir
+            # Normalize path to resolve Windows 8.3 short names
+            yield str(Path(tmpdir).resolve())
 
     @pytest.fixture
     def mock_workspace(self, temp_dir):
@@ -486,7 +488,8 @@ class TestEditFileRetryIntegration:
     def temp_dir(self):
         """Create a temporary directory for testing."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            yield tmpdir
+            # Normalize path to resolve Windows 8.3 short names
+            yield str(Path(tmpdir).resolve())
 
     @pytest.fixture
     def mock_workspace(self, temp_dir):

@@ -21,7 +21,8 @@ from mini_claude.config.settings import settings as config_settings
 def temp_dir():
     """Create a temporary directory for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        yield tmpdir
+        # Normalize path to resolve Windows 8.3 short names
+        yield str(Path(tmpdir).resolve())
 
 
 @pytest.fixture
