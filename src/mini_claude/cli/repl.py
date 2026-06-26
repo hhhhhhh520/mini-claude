@@ -135,6 +135,27 @@ class REPLSession:
 
         return manage_message_history(messages, max_messages, settings.default_model)
 
+    async def _check_previous_session(self) -> bool:
+        """Check if there's a previous session checkpoint in SQLite."""
+        try:
+            import aiosqlite
+            from mini_claude.config.settings import settings
+
+            db_path = settings.session_db_path
+            async with aiosqlite.connect(db_path) as db:
+                # Check if the checkpoints table exists and has data
+                cursor = await db.execute(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='checkpoints'"
+                )
+                row = await cursor.fetchone()
+                if row and row[0] > 0:
+                    cursor = await db.execute("SELECT COUNT(*) FROM checkpoints")
+                    row = await cursor.fetchone()
+                    return row and row[0] > 0
+        except Exception:
+            pass
+        return False
+
     async def run_graph(self):
         """Run REPL with LangGraph state machine."""
         from ..agent.graph import get_agent_graph
@@ -144,6 +165,23 @@ class REPLSession:
 
         self.running = True
         display.welcome()
+
+        # Check for previous session
+        has_previous = await self._check_previous_session()
+        if has_previous:
+            try:
+                choice = await self.session.prompt_async(
+                    "\n发现上次未完成的会话，继续？[Y/n]: ", style=style
+                )
+                if choice.strip().lower() in ('', 'y', 'yes', '是'):
+                    display.console.print("[dim]正在恢复会话...[/]")
+                    # Continue with existing checkpoint - graph will auto-load state
+                else:
+                    # Start fresh - use a new thread_id to avoid loading old checkpoint
+                    self.thread_id = f"thread_{int(__import__('time').time())}"
+                    display.console.print("[dim]开始新会话[/]")
+            except Exception:
+                pass
 
         graph = get_agent_graph()
         provider = settings.get_model_provider()
