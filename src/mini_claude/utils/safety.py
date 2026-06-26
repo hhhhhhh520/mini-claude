@@ -855,11 +855,14 @@ def validate_path(
         from pathlib import Path
 
         path_real = str(Path(path_abs).resolve())
+        workspace_real = str(Path(workspace_abs).resolve())
 
-        # Check if resolved path is different (symlink detected)
+        # Check if resolved path is different (symlink or 8.3 expansion)
         if path_real != path_abs:
-            # Verify the symlink target is still within workspace
-            if not allow_outside and not path_real.startswith(workspace_abs):
+            # Verify the symlink target is still within workspace.
+            # Compare resolved forms to handle Windows 8.3 short names
+            # (RUNNER~1 -> runneradmin) which are NOT actual symlinks.
+            if not allow_outside and not path_real.startswith(workspace_real):
                 return False, f"Symlink points outside workspace: {path} -> {path_real}"
     except Exception as e:
         return False, f"Path resolution error: {e}"

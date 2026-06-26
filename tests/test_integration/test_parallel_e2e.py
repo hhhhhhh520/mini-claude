@@ -22,9 +22,10 @@ class TestParallelCoordination:
         parallel_coordinator.tasks.clear()
         parallel_coordinator.results.clear()
 
-    def test_add_task(self):
+    @pytest.mark.asyncio
+    async def test_add_task(self):
         """测试添加任务"""
-        task = parallel_coordinator.add_task(
+        task = await parallel_coordinator.add_task(
             task_id="test_1",
             description="测试任务1",
             target_files=["file1.py", "file2.py"],
@@ -36,15 +37,16 @@ class TestParallelCoordination:
         assert task.status == TaskStatus.PENDING
         assert len(task.target_files) == 2
 
-    def test_task_dependencies(self):
+    @pytest.mark.asyncio
+    async def test_task_dependencies(self):
         """测试任务依赖"""
         # 添加有依赖关系的任务
-        parallel_coordinator.add_task(
+        await parallel_coordinator.add_task(
             task_id="task_a",
             description="任务A",
             dependencies=[],
         )
-        parallel_coordinator.add_task(
+        await parallel_coordinator.add_task(
             task_id="task_b",
             description="任务B",
             dependencies=["task_a"],
@@ -53,12 +55,13 @@ class TestParallelCoordination:
         # 验证依赖关系
         assert "task_a" in parallel_coordinator.tasks["task_b"].dependencies
 
-    def test_analyze_dependencies(self):
+    @pytest.mark.asyncio
+    async def test_analyze_dependencies(self):
         """测试依赖分析"""
         # 创建依赖图: A -> B -> C
-        parallel_coordinator.add_task("task_a", "A", dependencies=[])
-        parallel_coordinator.add_task("task_b", "B", dependencies=["task_a"])
-        parallel_coordinator.add_task("task_c", "C", dependencies=["task_b"])
+        await parallel_coordinator.add_task("task_a", "A", dependencies=[])
+        await parallel_coordinator.add_task("task_b", "B", dependencies=["task_a"])
+        await parallel_coordinator.add_task("task_c", "C", dependencies=["task_b"])
 
         # 分析依赖
         levels = parallel_coordinator.analyze_dependencies()
@@ -69,10 +72,11 @@ class TestParallelCoordination:
         assert "task_b" in levels["level_1"]  # 第二层
         assert "task_c" in levels["level_2"]  # 第三层
 
-    def test_get_ready_tasks(self):
+    @pytest.mark.asyncio
+    async def test_get_ready_tasks(self):
         """测试获取就绪任务"""
-        parallel_coordinator.add_task("task_a", "A", dependencies=[])
-        parallel_coordinator.add_task("task_b", "B", dependencies=["task_a"])
+        await parallel_coordinator.add_task("task_a", "A", dependencies=[])
+        await parallel_coordinator.add_task("task_b", "B", dependencies=["task_a"])
 
         # 初始状态：只有 task_a 就绪
         ready = parallel_coordinator.get_ready_tasks()
