@@ -12,10 +12,7 @@ _background_processes: Dict[str, asyncio.subprocess.Process] = {}
 
 def _cleanup_finished_processes() -> None:
     """Remove finished processes from tracking dict and consume their pipes."""
-    finished = [
-        tid for tid, proc in _background_processes.items()
-        if proc.returncode is not None
-    ]
+    finished = [tid for tid, proc in _background_processes.items() if proc.returncode is not None]
     for tid in finished:
         proc = _background_processes.pop(tid, None)
         if proc and proc.returncode is not None:

@@ -853,6 +853,7 @@ def validate_path(
         # Windows 8.3 short names (e.g., RUNNER~1 -> runneradmin) without
         # the false positives that os.path.realpath() can cause on Windows.
         from pathlib import Path
+
         path_real = str(Path(path_abs).resolve())
 
         # Check if resolved path is different (symlink detected)

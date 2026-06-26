@@ -224,7 +224,10 @@ class HealthChecker:
         """
         # Check cache first
         now = time.time()
-        if self._model_health_cache and (now - self._model_health_cache_time) < self._MODEL_HEALTH_CACHE_TTL:
+        if (
+            self._model_health_cache
+            and (now - self._model_health_cache_time) < self._MODEL_HEALTH_CACHE_TTL
+        ):
             return self._model_health_cache
 
         from mini_claude.llm.provider import LLMProvider
@@ -295,7 +298,7 @@ class HealthChecker:
         available = 0
         for name in tool_names:
             tool = tool_registry.get(name)
-            if tool and hasattr(tool, 'execute') and callable(getattr(tool, 'execute', None)):
+            if tool and hasattr(tool, "execute") and callable(getattr(tool, "execute", None)):
                 available += 1
 
         # Determine status

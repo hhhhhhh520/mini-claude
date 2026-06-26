@@ -172,7 +172,7 @@ class REPLSession:
                 choice = await self.session.prompt_async(
                     "\n发现上次未完成的会话，继续？[Y/n]: ", style=style
                 )
-                if choice.strip().lower() in ('', 'y', 'yes', '是'):
+                if choice.strip().lower() in ("", "y", "yes", "是"):
                     display.console.print("[dim]正在恢复会话...[/]")
                     # Continue with existing checkpoint - graph will auto-load state
                 else:

@@ -133,7 +133,7 @@ class EnhancedMemoryManager:
     def _load_indexed_sessions(self) -> None:
         """Load the set of already indexed sessions from vector store."""
         try:
-            if hasattr(self.vector_store, '_documents'):
+            if hasattr(self.vector_store, "_documents"):
                 for doc_id in self.vector_store._documents:
                     # Extract session_id from message_id format "session_id:message_idx"
                     session_id = self._parse_message_id(doc_id)[0]

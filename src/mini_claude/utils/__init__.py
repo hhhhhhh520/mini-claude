@@ -34,6 +34,7 @@ def generate_agent_id(prefix: str = "agent") -> str:
         格式为 '{prefix}_{HHMMSS}_{short_uuid}' 的唯一 ID
     """
     import uuid
+
     timestamp = datetime.now().strftime("%H%M%S")
     short_id = uuid.uuid4().hex[:6]
     return f"{prefix}_{timestamp}_{short_id}"

@@ -164,7 +164,11 @@ def _truncate_messages(
             # Keep first (system) + last (recent) to match target length
             keep_first = min(1, target_len)
             keep_last = max(target_len - keep_first, 0)
-            messages = messages[:keep_first] + messages[-keep_last:] if keep_last > 0 else messages[:keep_first]
+            messages = (
+                messages[:keep_first] + messages[-keep_last:]
+                if keep_last > 0
+                else messages[:keep_first]
+            )
     else:
         # No token truncation happened, apply position-based truncation as before
         keep_first = 1  # System message

@@ -59,6 +59,7 @@ class WebFetchTool(BaseTool):
                 hostname = hostname[1:-1]
             # 检查私有 IP 范围（含 IPv6 映射地址和十进制 IP）
             import ipaddress
+
             try:
                 ip = ipaddress.ip_address(hostname)
                 if ip.is_private or ip.is_loopback or ip.is_link_local:

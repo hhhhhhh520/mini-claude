@@ -79,7 +79,7 @@ class LLMProvider:
                 error_str = str(e).lower()
                 # Retry on transient errors: rate limits, timeouts, server errors
                 if any(kw in error_str for kw in ("429", "rate", "timeout", "500", "502", "503")):
-                    wait = 2 ** attempt
+                    wait = 2**attempt
                     await asyncio.sleep(wait)
                 else:
                     raise
@@ -110,7 +110,10 @@ class LLMProvider:
         async for chunk in response:
             if chunk.choices and chunk.choices[0].delta:
                 # Detect tool calls and raise error instead of silently dropping
-                if hasattr(chunk.choices[0].delta, 'tool_calls') and chunk.choices[0].delta.tool_calls:
+                if (
+                    hasattr(chunk.choices[0].delta, "tool_calls")
+                    and chunk.choices[0].delta.tool_calls
+                ):
                     raise ValueError(
                         "chat_stream() does not support tool calls. "
                         "Use chat_stream_with_tools() instead."
