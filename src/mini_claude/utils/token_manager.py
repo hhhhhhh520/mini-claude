@@ -1,5 +1,6 @@
 """Token counting and budget management."""
 
+import json
 from typing import List, Dict, Any, Optional, Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -100,10 +101,19 @@ class TokenCounter:
         if model_lower in MODEL_LIMITS:
             return MODEL_LIMITS[model_lower]
 
-        # Partial match
+        # Partial match - prefer longest match (most specific)
+        best_match = None
+        best_len = 0
         for key, limits in MODEL_LIMITS.items():
-            if key in model_lower or model_lower in key:
-                return limits
+            if key in model_lower and len(key) > best_len:
+                best_match = limits
+                best_len = len(key)
+            elif model_lower in key and len(model_lower) > best_len:
+                best_match = limits
+                best_len = len(model_lower)
+
+        if best_match:
+            return best_match
 
         # Default
         return MODEL_LIMITS["default"]
@@ -200,11 +210,22 @@ class TokenCounter:
 
         return tokens
 
-    def count_messages_tokens(self, messages: List[Dict[str, Any]]) -> int:
-        """Count total tokens in message list."""
+    def count_messages_tokens(
+        self, messages: List[Dict[str, Any]], tools: Optional[List[Dict]] = None
+    ) -> int:
+        """Count total tokens in message list.
+
+        Args:
+            messages: List of message dicts
+            tools: Optional list of tool definitions (included in API request context)
+        """
         total = 3  # Every reply is primed with <im_start>assistant
         for msg in messages:
             total += self.count_message_tokens(msg)
+        # Estimate tool schema overhead (each tool definition ~200-500 tokens)
+        if tools:
+            for tool in tools:
+                total += len(json.dumps(tool)) // 4
         return total
 
     def get_usage_stats(

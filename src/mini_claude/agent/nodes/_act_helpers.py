@@ -149,12 +149,29 @@ def _sync_messages_after_summary(messages: List, litellm_messages: List[Dict]) -
 def _truncate_messages(
     messages: List, litellm_messages: List[Dict], token_counter
 ) -> Tuple[List, List[Dict]]:
-    """Truncate messages to fit within budget."""
+    """Truncate messages to fit within budget.
+
+    Uses token-based truncation for litellm_messages (authoritative),
+    then synchronizes messages to match the same count.
+    """
     truncated = token_counter.truncate_messages(litellm_messages)
-    keep_first = 1  # System message
-    keep_last = 4  # Recent context
-    if len(messages) > keep_first + keep_last:
-        messages = messages[:keep_first] + messages[-keep_last:]
+
+    # Synchronize messages to match truncated litellm_messages length
+    if len(truncated) < len(litellm_messages):
+        # Token truncation removed some messages - sync messages accordingly
+        target_len = len(truncated)
+        if len(messages) > target_len:
+            # Keep first (system) + last (recent) to match target length
+            keep_first = min(1, target_len)
+            keep_last = max(target_len - keep_first, 0)
+            messages = messages[:keep_first] + messages[-keep_last:] if keep_last > 0 else messages[:keep_first]
+    else:
+        # No token truncation happened, apply position-based truncation as before
+        keep_first = 1  # System message
+        keep_last = 4  # Recent context
+        if len(messages) > keep_first + keep_last:
+            messages = messages[:keep_first] + messages[-keep_last:]
+
     return messages, truncated
 
 

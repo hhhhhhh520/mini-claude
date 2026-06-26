@@ -1,5 +1,6 @@
 """LiteLLM provider wrapper."""
 
+import asyncio
 from typing import Optional, List, Dict, Any, AsyncIterator
 
 from litellm import acompletion, completion
@@ -52,7 +53,7 @@ class LLMProvider:
         temperature: float = 0.7,
         max_tokens: int = 4096,
     ) -> Dict[str, Any]:
-        """Send a chat completion request."""
+        """Send a chat completion request with retry on transient errors."""
         model_name = self.get_model_name()
 
         kwargs = {
@@ -67,8 +68,21 @@ class LLMProvider:
         if tool_choice:
             kwargs["tool_choice"] = tool_choice
 
-        response = await acompletion(**kwargs)
-        return response
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = await acompletion(**kwargs)
+                return response
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                error_str = str(e).lower()
+                # Retry on transient errors: rate limits, timeouts, server errors
+                if any(kw in error_str for kw in ("429", "rate", "timeout", "500", "502", "503")):
+                    wait = 2 ** attempt
+                    await asyncio.sleep(wait)
+                else:
+                    raise
 
     async def chat_stream(
         self,
