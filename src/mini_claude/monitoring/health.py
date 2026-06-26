@@ -291,9 +291,12 @@ class HealthChecker:
         tool_names = tool_registry.list_tools()
         total = len(tool_names)
 
-        # All registered tools are considered available
-        # (tool_registry.execute would raise if tool doesn't exist)
-        available = total
+        # Actually check tool availability
+        available = 0
+        for name in tool_names:
+            tool = tool_registry.get(name)
+            if tool and hasattr(tool, 'execute') and callable(getattr(tool, 'execute', None)):
+                available += 1
 
         # Determine status
         if total == 0:

@@ -62,7 +62,7 @@ class PlanParallelTool(BaseTool):
 
     async def execute(self, tasks: List[Dict]) -> str:
         # Clear previous tasks
-        parallel_coordinator.clear()
+        await parallel_coordinator.clear()
 
         # Add tasks
         for task_data in tasks:
@@ -72,7 +72,7 @@ class PlanParallelTool(BaseTool):
             elif task_data.get("priority") == "low":
                 priority = TaskPriority.LOW
 
-            parallel_coordinator.add_task(
+            await parallel_coordinator.add_task(
                 task_id=task_data["id"],
                 description=task_data["description"],
                 target_files=task_data.get("target_files", []),
@@ -231,8 +231,8 @@ class ExecuteParallelTool(BaseTool):
         task = parallel_coordinator.tasks[task_id]
 
         # Assign task
-        parallel_coordinator.assign_task(task_id, agent_id)
-        parallel_coordinator.mark_task_running(task_id)
+        await parallel_coordinator.assign_task(task_id, agent_id)
+        await parallel_coordinator.mark_task_running(task_id)
 
         logger.debug("Task started", task_id=task_id, agent_id=agent_id)
         sys.stdout.write(f"  [{task_id}] Started...\n")
@@ -241,13 +241,13 @@ class ExecuteParallelTool(BaseTool):
         try:
             # Execute via sub-agent
             result = await self._execute_task_via_agent(task, agent_id)
-            parallel_coordinator.mark_task_completed(task_id, result)
+            await parallel_coordinator.mark_task_completed(task_id, result)
             logger.debug("Task completed", task_id=task_id, agent_id=agent_id)
             sys.stdout.write(f"  [{task_id}] ✓ Completed\n")
             sys.stdout.flush()
             return task_id, True, result
         except Exception as e:
-            parallel_coordinator.mark_task_failed(task_id, str(e))
+            await parallel_coordinator.mark_task_failed(task_id, str(e))
             logger.error("Task failed", task_id=task_id, agent_id=agent_id, error=str(e))
             sys.stdout.write(f"  [{task_id}] ✗ Failed: {e}\n")
             sys.stdout.flush()

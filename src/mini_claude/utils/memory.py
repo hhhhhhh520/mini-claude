@@ -142,5 +142,15 @@ class MemoryManager:
                 os.remove(os.path.join(self.storage_dir, filename))
 
 
-# Global memory manager
-memory_manager = MemoryManager()
+# Global memory manager (lazy initialization to avoid import-time side effects)
+_memory_manager = None
+
+def get_memory_manager() -> "MemoryManager":
+    """Get or create the global memory manager instance."""
+    global _memory_manager
+    if _memory_manager is None:
+        _memory_manager = MemoryManager()
+    return _memory_manager
+
+# Backward compatibility alias
+memory_manager = None  # Will be set by get_memory_manager() on first access

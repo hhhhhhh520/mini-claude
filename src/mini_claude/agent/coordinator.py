@@ -82,7 +82,7 @@ class ParallelCoordinator:
             except Exception:
                 pass
 
-    def add_task(
+    async def add_task(
         self,
         task_id: str,
         description: str,
@@ -91,15 +91,16 @@ class ParallelCoordinator:
         priority: TaskPriority = TaskPriority.MEDIUM,
     ) -> DistributedTask:
         """Add a task to the queue."""
-        task = DistributedTask(
-            id=task_id,
-            description=description,
-            target_files=target_files or [],
-            dependencies=dependencies or [],
-            priority=priority,
-        )
-        self.tasks[task_id] = task
-        return task
+        async with self._lock:
+            task = DistributedTask(
+                id=task_id,
+                description=description,
+                target_files=target_files or [],
+                dependencies=dependencies or [],
+                priority=priority,
+            )
+            self.tasks[task_id] = task
+            return task
 
     def analyze_dependencies(self) -> Dict[str, List[str]]:
         """Analyze task dependencies and return execution order.
@@ -163,65 +164,69 @@ class ParallelCoordinator:
         ready.sort(key=lambda t: t.priority.value)
         return ready
 
-    def assign_task(self, task_id: str, agent_id: str) -> bool:
+    async def assign_task(self, task_id: str, agent_id: str) -> bool:
         """Assign a task to an agent."""
-        if task_id not in self.tasks:
-            return False
+        async with self._lock:
+            if task_id not in self.tasks:
+                return False
 
-        task = self.tasks[task_id]
-        if task.status != TaskStatus.PENDING:
-            return False
+            task = self.tasks[task_id]
+            if task.status != TaskStatus.PENDING:
+                return False
 
-        task.status = TaskStatus.ASSIGNED
-        task.assigned_agent = agent_id
+            task.status = TaskStatus.ASSIGNED
+            task.assigned_agent = agent_id
 
-        if agent_id not in self.agents:
-            self.agents[agent_id] = AgentInfo(id=agent_id)
+            if agent_id not in self.agents:
+                self.agents[agent_id] = AgentInfo(id=agent_id)
 
-        self.agents[agent_id].current_task = task_id
-        self.agents[agent_id].status = "busy"
+            self.agents[agent_id].current_task = task_id
+            self.agents[agent_id].status = "busy"
 
-        return True
+            return True
 
-    def mark_task_running(self, task_id: str) -> None:
+    async def mark_task_running(self, task_id: str) -> None:
         """Mark a task as running."""
-        if task_id in self.tasks:
-            self.tasks[task_id].status = TaskStatus.RUNNING
-            self.tasks[task_id].started_at = datetime.now()
+        async with self._lock:
+            if task_id in self.tasks:
+                self.tasks[task_id].status = TaskStatus.RUNNING
+                self.tasks[task_id].started_at = datetime.now()
 
-    def mark_task_completed(self, task_id: str, result: str) -> None:
+    async def mark_task_completed(self, task_id: str, result: str) -> None:
         """Mark a task as completed with result."""
-        if task_id not in self.tasks:
-            return
+        async with self._lock:
+            if task_id not in self.tasks:
+                return
 
-        task = self.tasks[task_id]
-        task.status = TaskStatus.COMPLETED
-        task.result = result
-        task.completed_at = datetime.now()
+            task = self.tasks[task_id]
+            task.status = TaskStatus.COMPLETED
+            task.result = result
+            task.completed_at = datetime.now()
 
-        self.results[task_id] = result
+            self.results[task_id] = result
 
-        # Update agent status
-        if task.assigned_agent and task.assigned_agent in self.agents:
-            agent = self.agents[task.assigned_agent]
-            agent.current_task = None
-            agent.status = "idle"
-            agent.completed_tasks.append(task_id)
+            # Update agent status
+            if task.assigned_agent and task.assigned_agent in self.agents:
+                agent = self.agents[task.assigned_agent]
+                agent.current_task = None
+                agent.status = "idle"
+                agent.completed_tasks.append(task_id)
 
-    def mark_task_failed(self, task_id: str, error: str) -> None:
+    async def mark_task_failed(self, task_id: str, error: str) -> None:
         """Mark a task as failed."""
-        if task_id not in self.tasks:
-            return
+        async with self._lock:
+            if task_id not in self.tasks:
+                return
 
-        task = self.tasks[task_id]
-        task.status = TaskStatus.FAILED
-        task.error = error
-        task.completed_at = datetime.now()
+            task = self.tasks[task_id]
+            task.status = TaskStatus.FAILED
+            task.error = error
+            task.completed_at = datetime.now()
 
-        # Update agent status
-        if task.assigned_agent and task.assigned_agent in self.agents:
-            self.agents[task.assigned_agent].current_task = None
-            self.agents[task.assigned_agent].status = "idle"
+            # Update agent status
+            if task.assigned_agent and task.assigned_agent in self.agents:
+                self.agents[task.assigned_agent].current_task = None
+                self.agents[task.assigned_agent].status = "idle"
 
     def get_status_report(self) -> Dict[str, Any]:
         """Get a comprehensive status report."""
@@ -296,11 +301,12 @@ class ParallelCoordinator:
 
         return "\n".join(lines)
 
-    def clear(self) -> None:
+    async def clear(self) -> None:
         """Clear all tasks and results."""
-        self.tasks.clear()
-        self.agents.clear()
-        self.results.clear()
+        async with self._lock:
+            self.tasks.clear()
+            self.agents.clear()
+            self.results.clear()
 
 
 # Global coordinator

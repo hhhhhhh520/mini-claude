@@ -39,7 +39,7 @@ class SubAgentManager:
         self.max_concurrent = max_concurrent or settings.max_sub_agents
         self.agents: Dict[str, asyncio.Task] = {}
         self.results: Dict[str, SubAgentResult] = {}
-        self.progress_queue: asyncio.Queue = asyncio.Queue()
+        self.progress_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
         self.semaphore = asyncio.Semaphore(self.max_concurrent)
 
     async def spawn(self, agent_id: str, task: Callable, *args, **kwargs) -> str:

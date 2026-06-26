@@ -131,10 +131,15 @@ class EnhancedMemoryManager:
         self._load_indexed_sessions()
 
     def _load_indexed_sessions(self) -> None:
-        """Load the set of already indexed sessions from metadata."""
-        # Check existing documents in vector store to rebuild indexed set
-        # This is done lazily to avoid overhead during initialization
-        pass
+        """Load the set of already indexed sessions from vector store."""
+        try:
+            if hasattr(self.vector_store, '_documents'):
+                for doc_id in self.vector_store._documents:
+                    # Extract session_id from message_id format "session_id:message_idx"
+                    session_id = self._parse_message_id(doc_id)[0]
+                    self._indexed_sessions.add(session_id)
+        except Exception:
+            pass  # First run or empty store is normal
 
     def _generate_message_id(self, session_id: str, message_idx: int) -> str:
         """Generate a unique ID for a message.

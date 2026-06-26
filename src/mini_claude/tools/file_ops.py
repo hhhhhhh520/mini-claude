@@ -513,6 +513,13 @@ class SearchContentTool(BaseTool):
                 if os.path.isdir(full_path):
                     continue
 
+                # Skip large files (>1MB) to prevent memory issues
+                try:
+                    if os.path.getsize(full_path) > 1_000_000:
+                        continue
+                except OSError:
+                    continue
+
                 is_valid, _ = checker.check_file_read(full_path)
                 if not is_valid:
                     continue

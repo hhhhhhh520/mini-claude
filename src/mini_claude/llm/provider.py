@@ -94,8 +94,15 @@ class LLMProvider:
         response = await acompletion(**kwargs)
 
         async for chunk in response:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+            if chunk.choices and chunk.choices[0].delta:
+                # Detect tool calls and raise error instead of silently dropping
+                if hasattr(chunk.choices[0].delta, 'tool_calls') and chunk.choices[0].delta.tool_calls:
+                    raise ValueError(
+                        "chat_stream() does not support tool calls. "
+                        "Use chat_stream_with_tools() instead."
+                    )
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
 
     async def chat_stream_with_tools(
         self,
