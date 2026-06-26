@@ -857,13 +857,15 @@ def validate_path(
         path_real = str(Path(path_abs).resolve())
         workspace_real = str(Path(workspace_abs).resolve())
 
-        # Check if resolved path is different (symlink or 8.3 expansion)
+        # If path resolves to a different location AND is outside workspace,
+        # it's a symlink pointing outside — reject it.
+        # Compare resolved forms to handle Windows 8.3 short names
+        # (RUNNER~1 -> runneradmin) which are NOT actual symlinks.
         if path_real != path_abs:
-            # Verify the symlink target is still within workspace.
-            # Compare resolved forms to handle Windows 8.3 short names
-            # (RUNNER~1 -> runneradmin) which are NOT actual symlinks.
             if not allow_outside and not path_real.startswith(workspace_real):
                 return False, f"Symlink points outside workspace: {path} -> {path_real}"
+        # If path is outside workspace but NOT a symlink, fall through to
+        # the drive letter check below which may raise PathConfirmationRequired.
     except Exception as e:
         return False, f"Path resolution error: {e}"
 
