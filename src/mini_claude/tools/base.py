@@ -198,9 +198,18 @@ class ToolRegistry:
         from ..utils.logger import get_logger, get_audit_logger
         from ..config.settings import settings
         from ..monitoring.tracing import trace_tool_call
+        from ..agent.nodes._shared import get_degradation_manager
 
         logger = get_logger("mini_claude.tools.registry")
         audit = get_audit_logger()
+
+        # Degradation check: skip tool if it has too many recent failures
+        degr_manager = get_degradation_manager()
+        if degr_manager.tool.should_skip(name):
+            replacement = degr_manager.tool.get_replacement(name)
+            if replacement:
+                return f"Error: Tool '{name}' is temporarily disabled. Try '{replacement}' instead."
+            return f"Error: Tool '{name}' is temporarily disabled due to repeated failures."
 
         tool = self.get(name)
         if not tool:
@@ -246,6 +255,9 @@ class ToolRegistry:
                 result = await tool.execute(**params)
                 duration_ms = (time.time() - start_time) * 1000
 
+                # Record success for degradation tracking
+                degr_manager.tool.record_success(name)
+
                 if span:
                     span.set_attribute("tool.duration_ms", duration_ms)
                     span.set_attribute("tool.success", True)
@@ -273,6 +285,9 @@ class ToolRegistry:
 
             except Exception as e:
                 duration_ms = (time.time() - start_time) * 1000
+
+                # Record failure for degradation tracking
+                degr_manager.tool.record_failure(name, str(e))
 
                 if span:
                     span.set_attribute("tool.duration_ms", duration_ms)
