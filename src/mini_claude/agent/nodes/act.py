@@ -14,6 +14,7 @@ from ._shared import (
     convert_tools_to_litellm,
     get_degradation_manager,
     get_metrics_collector,
+    build_system_messages,
     settings,
     trace_agent_node,
     trace_tool_call,
@@ -128,6 +129,11 @@ async def act_node(state: AgentState) -> dict:
         messages, litellm_messages = await handle_token_budget(
             messages, litellm_messages, token_counter
         )
+
+        # 系统提示与 skills 不进受压缩/持久化的对话历史，而是在每次 LLM 调用时前置：
+        # 永远完整（不会被摘要/截断吃掉）、永远在最前、且不参与 add-reducer，
+        # 从根上避免 think 注入系统消息导致的重复与顺序错乱。
+        litellm_messages = build_system_messages() + litellm_messages
 
         try:
             degr_manager = get_degradation_manager()

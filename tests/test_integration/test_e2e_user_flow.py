@@ -436,16 +436,20 @@ class TestTokenBudgetManagement:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_token_summary_generation(self):
-        """Test summarization when budget exceeded."""
+        """Test summarization actually compresses when there is a middle to summarize.
+
+        summarize_messages 保留 keep_first(1) + keep_last(4)，只有中间段 ≥1 条才有的可压；
+        要真正减少消息数，总数需 ≥ keep_first + keep_last + 2 = 7。此前该用例只喂 4 条，
+        命中 `len(messages) <= keep_first + keep_last` 的早退分支原样返回，
+        根本没走到压缩逻辑，属于"没测到被测行为"。
+        """
         token_counter = get_token_counter("deepseek-chat")
         token_counter.strategy = TokenLimitStrategy.SUMMARIZE
 
-        # Create messages
+        # 10 条消息：中间段 = messages[1:-4] = 5 条，足以被摘要成 1 条
         messages = [
-            {"role": "user", "content": "Question 1"},
-            {"role": "assistant", "content": "Answer 1"},
-            {"role": "user", "content": "Question 2"},
-            {"role": "assistant", "content": "Answer 2"},
+            {"role": "user" if i % 2 == 0 else "assistant", "content": f"Turn {i} " + "x" * 40}
+            for i in range(10)
         ]
 
         # Mock LLM for summary
@@ -454,7 +458,7 @@ class TestTokenBudgetManagement:
                 "choices": [
                     {
                         "message": {
-                            "content": "[Summary] User asked two questions.",
+                            "content": "[Summary] User asked several questions.",
                         }
                     }
                 ]
@@ -466,9 +470,17 @@ class TestTokenBudgetManagement:
             llm_chat_func=mock_llm,
         )
 
-        # Should have summary or fall back to truncation
+        # Should have summary AND actually reduce the message count
         assert summarized is not None
+        assert summary_text is not None, "中间段非空时应生成摘要文本"
         assert len(summarized) < len(messages), "摘要后消息数量应少于原始消息"
+        # 压缩结果应保留首条与最近 keep_last 条，并把中间段折叠成 1 条摘要
+        assert len(summarized) == 1 + 1 + 4, (
+            f"应为 首1 + 摘要1 + 尾4 = 6 条，实际 {len(summarized)}"
+        )
+        assert any("[历史对话摘要]" in m.get("content", "") for m in summarized), (
+            "压缩结果应包含摘要消息"
+        )
 
 
 # =============================================================================

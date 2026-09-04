@@ -288,3 +288,84 @@ async def test_repl_exit_path_closes_connections(tmp_path, fake_provider, monkey
 
     assert calls, "run_graph 退出时未关闭 checkpoint 连接（后台 bash 进程同理，别只测一个）"
     assert calls[0] >= 1, f"走到 close 时登记表已空（{calls[0]}），说明图没建或提前被关"
+
+
+@pytest.mark.parametrize("streaming", [True, False], ids=["stream", "non-stream"])
+async def test_graph_does_not_duplicate_user_message(
+    tmp_path, fake_provider, streaming, monkeypatch
+):
+    """reducer 修复的图级证据：跑完一轮，用户消息只出现一次，系统提示不进 state.
+
+    修复前 think 返回「[System]+全量历史」配 add-reducer，用户消息会被复制、
+    SystemMessage 落到 HumanMessage 之后。本用例若回到旧实现会红。
+    """
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    from mini_claude.config.settings import settings
+
+    monkeypatch.setattr(settings, "streaming_enabled", streaming)
+    db = str(tmp_path.resolve() / "ckpt.db")
+    user_text = "unique-dup-check-请只出现一次"
+
+    graph = build_agent_graph(checkpointer_path=db)
+    result = await graph.ainvoke(
+        create_initial_state(user_text, thread_id="t-dup"),
+        {"configurable": {"thread_id": "t-dup"}, "recursion_limit": 50},
+    )
+
+    msgs = result["messages"]
+    human_count = sum(
+        1 for m in msgs if isinstance(m, HumanMessage) and user_text in str(m.content)
+    )
+    assert human_count == 1, (
+        f"用户消息应只出现一次，实际 {human_count} 次：{[str(m.content)[:40] for m in msgs]}"
+    )
+    assert not any(isinstance(m, SystemMessage) for m in msgs), (
+        "系统提示不应进入 state.messages（应在 LLM 调用时前置）"
+    )
+
+
+async def test_system_prompt_prepended_to_llm_call(tmp_path, monkeypatch):
+    """系统提示必须在每次 LLM 调用的第一条（role=system），且不依赖 think 写入 state."""
+    from mini_claude.agent.nodes import _shared
+    from mini_claude.config.settings import settings
+    from mini_claude.utils.safety import get_rate_limiter
+
+    monkeypatch.setattr(settings, "streaming_enabled", False)
+    # 速率限制器是进程级单例，前面的图测试可能已耗尽 "default" 会话配额，旁路之
+    monkeypatch.setattr(get_rate_limiter(), "check_limit", lambda *a, **k: True)
+    db = str(tmp_path.resolve() / "ckpt.db")
+
+    captured_calls = []
+    canned = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="好的", tool_calls=None))],
+        usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+    )
+
+    async def capturing_chat(*args, **kwargs):
+        captured_calls.append(kwargs.get("messages") if "messages" in kwargs else args[0])
+        return canned
+
+    async def capturing_stream(*args, **kwargs):
+        captured_calls.append(kwargs.get("messages") if "messages" in kwargs else args[0])
+        return {"content": "好的", "tool_calls": None}
+
+    monkeypatch.setattr(_shared.llm_provider, "chat", capturing_chat)
+    monkeypatch.setattr(_shared.llm_provider, "chat_stream_with_tools", capturing_stream)
+
+    graph = build_agent_graph(checkpointer_path=db)
+    await graph.ainvoke(
+        create_initial_state("你好", thread_id="t-sys"),
+        {"configurable": {"thread_id": "t-sys"}, "recursion_limit": 50},
+    )
+
+    assert captured_calls, "未捕获到任何 LLM 调用"
+    # 找到带系统提示的那次调用（act 主链路），断言系统提示在最前、用户消息仅一次
+    act_calls = [c for c in captured_calls if c and c[0].get("role") == "system"]
+    assert act_calls, (
+        f"没有任何一次 LLM 调用以 role=system 开头，实际首条 roles="
+        f"{[c[0].get('role') for c in captured_calls if c]}"
+    )
+    msgs = act_calls[0]
+    user_msgs = [m for m in msgs if m.get("role") == "user" and "你好" in str(m.get("content", ""))]
+    assert len(user_msgs) == 1, f"用户消息应只出现一次，实际 {len(user_msgs)}"

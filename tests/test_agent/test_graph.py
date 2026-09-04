@@ -280,11 +280,17 @@ class TestThinkNode:
         assert result["iteration"] == 1
 
     @pytest.mark.asyncio
-    async def test_think_node_adds_system_message(self):
-        """测试添加系统消息"""
+    async def test_think_node_does_not_store_system_message(self):
+        """系统提示改由 act 前置，think 不应再写入 state.messages.
+
+        此前 think 返回「[System]+全量历史」，配 messages 的 add-reducer 会把
+        用户消息复制一份、并把 SystemMessage 放到 HumanMessage 之后。
+        """
         state = create_initial_state("Test task")
         result = await think_node(state)
-        assert any(isinstance(m, SystemMessage) for m in result["messages"])
+        assert not any(isinstance(m, SystemMessage) for m in result["messages"]), (
+            "think 不应把系统提示写入 messages——那会触发 add-reducer 重复"
+        )
 
     @pytest.mark.asyncio
     async def test_think_node_increments_iteration(self):
@@ -295,20 +301,19 @@ class TestThinkNode:
         assert result["iteration"] == 6
 
     @pytest.mark.asyncio
-    async def test_think_node_preserves_messages(self):
-        """测试保留原有消息"""
+    async def test_think_node_returns_empty_messages_delta(self):
+        """think 返回空 messages 增量——不重复、不新增历史（历史由 reducer 持有）."""
         state = create_initial_state("Test task")
-        original_count = len(state["messages"])
         result = await think_node(state)
-        assert len(result["messages"]) > original_count
+        assert result["messages"] == [], f"think 应返回空 messages 增量，实际 {result['messages']}"
 
     @pytest.mark.asyncio
-    async def test_think_node_with_history(self):
-        """测试带历史消息"""
+    async def test_think_node_with_history_returns_empty_delta(self):
+        """带历史时 think 仍返回空 messages 增量."""
         history = [HumanMessage(content="Previous")]
         state = create_initial_state("New", history=history, thread_id="test")
         result = await think_node(state)
-        assert len(result["messages"]) >= 2
+        assert result["messages"] == []
 
     @pytest.mark.asyncio
     async def test_think_node_empty_task(self):

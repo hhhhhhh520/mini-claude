@@ -7,9 +7,10 @@
 **项目地址**: D:\my project\mini-claude
 **技术选型**: LangGraph + LiteLLM + Rich + Prompt Toolkit
 **目标**: 构建一个迷你版Claude Code，支持多Agent并发处理
-**当前状态**: ⚠️ REPL 主链路已于 2026-09-04 修复；收集 1732 = 1687 passed / 5 failed / 40 skipped
-> （5 个失败：3 个 `402 Insufficient Balance` 真实 API 依赖、1 个 `test_token_summary_generation`
-> summarize 真缺陷、1 个 `test_settings` 由本地 gitignored `.env` 覆盖默认模型，与本改动无关。）
+**当前状态**: ⚠️ REPL 主链路已于 2026-09-04 修复；收集 1735 = 1691 passed / 4 failed / 40 skipped
+> （4 个失败：3 个 `402 Insufficient Balance` 真实 API 依赖、1 个 `test_settings` 由本地
+> gitignored `.env` 覆盖默认模型，均与本改动无关。此前的 `test_token_summary_generation`
+> summarize 用例已修复转绿。）
 > 覆盖率暂不可测（`pytest-cov` 未装，详见 2026-09-04 小节）。
 
 > 此前长期记载的「1673 测试通过」「核心功能完成」不成立：`langgraph-checkpoint-sqlite`
@@ -41,6 +42,7 @@
 | **多角度Review** | **8项修复（shell元字符/SSRF重定向/eval正则/模块黑名单/死代码清理/依赖修正/错误脱敏）** | **2026-06-28** |
 | **主链路修复** | **checkpointer 装配错误 + 9 个图级契约测试 + 连接生命周期收尾** | **2026-09-04** |
 | **补齐 06-28 遗漏** | **4 项 ❌：python -m 带点黑名单 / 裸 & 元字符 / observe 信任边界 / 回归脚本悬空引用** | **2026-09-04** |
+| **对话正确性** | **reducer 消息重复 + summarize 用例未触发压缩（两处真逻辑缺陷）** | **2026-09-04** |
 
 ### ⏳ 进行中
 
@@ -156,6 +158,41 @@ T009「REPL 启动」记为「❌ prompt_toolkit 非交互终端崩溃」而放�
 **仍未处理（留待后续）**：❌5 文档数字已在主链路修复时更新；`bash.py:170` 异常回显、
 `SHELL_CHAIN_CHARS` 死常量、可选依赖未落到 extras（ISSUE-012 表内 6/7/8）；
 以及 CI `regression-tests` 的 `continue-on-error: true` 是否保留（政策决定，未擅动）。
+
+## 2026-09-04 对话正确性：reducer 消息重复 + summarize 用例
+
+### Bug 1：think_node 与 messages reducer 冲突（消息重复 / 系统提示错位）
+
+**根因**：`state.py:108` 的 `messages` 是 `Annotated[List[BaseMessage], add]`（累加语义），
+其余节点（act/observe/plan/retry/error_handling）都只返回**增量**。唯独 `think.py` 在
+`iteration==0` 返回「`[SystemMessage] + 全量历史`」的**重排全量列表**。`add`-reducer 把
+`existing + update` 拼接 → 用户消息被复制一份，且 SystemMessage 落到 HumanMessage 之后。
+最小复现：输入 `['HUMAN']` → 输出 `['HUMAN','SYSTEM','HUMAN']`。
+
+**修复**（架构上正确，非表面修补）：系统提示与 skills **不写入** `state["messages"]`，
+改由 act 节点在每次 LLM 调用时前置。这是标准做法——系统提示本就不应进持久化对话历史：
+- `_shared.py` 新增 `build_system_messages()`（系统提示 + skills，LiteLLM 格式）。
+- `think.py` 移除 SystemMessage/skills 注入，`iteration==0` 只重置错误态、返回空 messages 增量。
+- `act.py` 在 `handle_token_budget` 之后、LLM 调用之前 `litellm_messages = build_system_messages() + litellm_messages`
+  ——系统提示永远完整（不被摘要/截断吃掉）、永远在最前、且不参与 add-reducer。
+
+**测试**（先红后绿 + 变异检验）：
+- 改写 4 个假设「think 注入 SystemMessage」的旧测试（`test_graph.py`×3、`test_agent_flow.py`×1）为新契约。
+- `test_graph_checkpoint.py` 新增 2 条图级用例：`跑完一轮用户消息只出现一次且 SystemMessage 不进 state`、
+  `系统提示在 LLM 调用第一条（捕获 chat 入参）`。
+- 变异检验：把 think 改回「返回全量历史」→ 去重用例红（用户消息出现 2 次）。
+
+### Bug 2：summarize 用例未触发压缩（`assert 4 < 4`）
+
+**根因**：`test_token_summary_generation` 只喂 4 条消息，而 `summarize_messages` 保留
+`keep_first(1)+keep_last(4)`，`len<=5` 直接早退原样返回——**根本没走到压缩逻辑**，属
+「没测到被测行为」。压缩逻辑本身没坏：总数 ≥7 时中间段才被摘要、消息数才真正减少。
+
+**修复**：用例改为喂 10 条消息，真正触发压缩，并强化断言（摘要文本非空、`压缩后 == 首1+摘要1+尾4 == 6`、
+含 `[历史对话摘要]` 标记）。变异检验：让摘要不产出摘要消息 → 用例红。
+
+**验证**：`pytest tests/` → **1691 passed / 4 failed / 40 skipped**（收集 1735）。
+4 个失败全部是既有环境/402 问题，无本轮新回归。`ruff check` + `format` 全过，变异无残留。
 
 ## 2026-06-28 多角度 Review 修复（8项）
 

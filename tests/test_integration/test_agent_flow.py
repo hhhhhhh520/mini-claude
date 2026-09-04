@@ -37,7 +37,9 @@ class TestAgentFlow:
         # 验证 think_node 结果
         assert think_result["iteration"] == 1
         assert think_result["stop_reason"] == StopReason.CONTINUE
-        assert len(think_result["messages"]) > 0  # 包含系统提示
+        # 系统提示不再由 think 写入 messages（那会触发 add-reducer 重复），
+        # 改由 act 在 LLM 调用时前置；因此 think 的 messages 增量应为空。
+        assert think_result["messages"] == []
 
         # 更新状态并执行 plan_node
         updated_state = {**state, **think_result}

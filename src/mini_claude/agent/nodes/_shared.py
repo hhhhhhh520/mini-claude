@@ -57,6 +57,49 @@ def get_degradation_manager() -> DegradationManager:
     return _degradation_manager
 
 
+def build_system_messages() -> list:
+    """构造前置给 LLM 的系统消息（LiteLLM 格式）：系统提示 + 可用 skills.
+
+    刻意**不写入** state["messages"]：messages 字段是 `Annotated[List, add]`
+    累加语义，把系统提示塞进去再由 think 返回全量列表，会导致用户消息被复制、
+    SystemMessage 落到 HumanMessage 之后（见 ISSUE：reducer 消息重复）。
+    系统提示应在每次 LLM 调用时前置，永远完整、永远在最前、不进持久化历史。
+    """
+    provider = settings.get_model_provider()
+    system_msgs = [{"role": "system", "content": get_system_prompt(provider)}]
+
+    # Inject skills as a dedicated system message（小模型更关注近期上下文，
+    # 但系统消息本就整体前置，这里保持与旧行为一致的完整 skill 说明）。
+    try:
+        from mini_claude.skills.registry import get_skill_registry
+
+        registry = get_skill_registry()
+        skills = [s for s in registry.list_skills() if s.model_invocable]
+        if skills:
+            parts = [
+                "IMPORTANT: You have the following skills available. "
+                "A skill is a set of specialized instructions you should follow "
+                "when the user's request matches. DO NOT search for skills on disk — "
+                "they are already loaded here:\n"
+            ]
+            for skill in skills:
+                parts.append(f"--- Skill: {skill.name} ---")
+                if skill.description:
+                    parts.append(f"Trigger: {skill.description}")
+                if skill.body:
+                    parts.append(skill.body)
+                parts.append("")
+            parts.append(
+                "To use a skill, tell the user you are following it and apply its instructions. "
+                "You can also suggest the user type /skill <name> to explicitly activate one."
+            )
+            system_msgs.append({"role": "system", "content": "\n".join(parts)})
+    except Exception as e:  # skills 失效不应阻断主链路，但必须可见
+        logger.debug("skills injection failed", error=str(e))
+
+    return system_msgs
+
+
 __all__ = [
     # Types
     "AgentState",
@@ -80,6 +123,7 @@ __all__ = [
     "get_rate_limiter",
     "DegradationManager",
     "get_degradation_manager",
+    "build_system_messages",
     "get_token_counter",
     "TokenLimitStrategy",
     "get_logger",

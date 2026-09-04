@@ -4,9 +4,7 @@ from ._shared import (
     AgentState,
     StopReason,
     AIMessage,
-    SystemMessage,
     get_max_iterations,
-    get_system_prompt,
     settings,
     trace_agent_node,
     logger,
@@ -25,7 +23,6 @@ async def think_node(state: AgentState) -> dict:
         部分状态更新（LangGraph 自动合并）
     """
     with trace_agent_node("think", state["iteration"]) as span:
-        messages = list(state["messages"])
         iteration = state["iteration"]
 
         # 检查迭代限制
@@ -41,40 +38,13 @@ async def think_node(state: AgentState) -> dict:
                 "messages": [AIMessage(content="达到最大迭代次数，任务终止。")],
             }
 
-        # 首次迭代：添加系统提示 + 重置错误状态
+        # 首次迭代：重置错误状态。
+        # 注意：系统提示与 skills **不在这里写入 messages**——messages 是
+        # `Annotated[List, add]` 累加语义，若在此返回「重排后的全量列表」会把
+        # 用户消息复制一份、并把 SystemMessage 放到 HumanMessage 之后。
+        # 系统提示改由 act 节点在每次 LLM 调用时前置（见 build_system_messages）。
         if iteration == 0:
             provider = settings.get_model_provider()
-            system_prompt = get_system_prompt(provider)
-            messages = [SystemMessage(content=system_prompt)] + messages
-
-            # Inject skills as a dedicated system message right before user input
-            # Smaller models pay more attention to recent context
-            try:
-                from mini_claude.skills.registry import get_skill_registry
-
-                registry = get_skill_registry()
-                skills = [s for s in registry.list_skills() if s.model_invocable]
-                if skills:
-                    parts = [
-                        "IMPORTANT: You have the following skills available. "
-                        "A skill is a set of specialized instructions you should follow "
-                        "when the user's request matches. DO NOT search for skills on disk — "
-                        "they are already loaded here:\n"
-                    ]
-                    for skill in skills:
-                        parts.append(f"--- Skill: {skill.name} ---")
-                        if skill.description:
-                            parts.append(f"Trigger: {skill.description}")
-                        if skill.body:
-                            parts.append(skill.body)
-                        parts.append("")
-                    parts.append(
-                        "To use a skill, tell the user you are following it and apply its instructions. "
-                        "You can also suggest the user type /skill <name> to explicitly activate one."
-                    )
-                    messages.insert(1, SystemMessage(content="\n".join(parts)))
-            except Exception as e:
-                logger.debug("skills injection failed", error=str(e))
 
             if span:
                 span.set_attribute("first_iteration", True)
@@ -82,7 +52,7 @@ async def think_node(state: AgentState) -> dict:
 
             logger.debug("think_node: iteration 0, resetting error state")
             return {
-                "messages": messages,
+                "messages": [],
                 "iteration": 1,
                 "stop_reason": StopReason.CONTINUE,
                 "errors": [],  # 重置错误列表
