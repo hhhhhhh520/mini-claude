@@ -15,6 +15,35 @@ from ._shared import (
     logger,
 )
 
+# 执行层捕获异常时使用的固定中文前缀（见 _act_helpers.py 的 except 分支）。
+# 它们是本项目代码自己产生的，不是工具输出正文，因此可安全地作为错误信号。
+_TOOL_EXCEPTION_MARKERS = (
+    "文件系统错误",
+    "参数错误",
+    "执行超时",
+    "执行失败",
+    "被跳过",
+)
+
+
+def _is_tool_error_message(msg: HumanMessage) -> bool:
+    """结构化判断一条工具消息是否代表真正的工具错误.
+
+    刻意不做「正文含某关键词」式的嗅探：
+      a) 参数校验 / 解析错误：_act_helpers 直接以 "Error" 开头追加；
+      b) 工具返回值本身是错误：成功路径包裹为 "Tool {name} result: Error..."，
+         只看包裹边界之后的起始，不嗅探正文；
+      c) 执行层捕获的异常：固定中文前缀出现在消息开头附近。
+    """
+    content = msg.content
+    if content.startswith("Error"):
+        return True
+    result_prefix = f"Tool {msg.name} result: "
+    if content.startswith(result_prefix):
+        return content[len(result_prefix) :].lstrip().lower().startswith("error")
+    head = content[:40]
+    return any(marker in head for marker in _TOOL_EXCEPTION_MARKERS)
+
 
 async def observe_node(state: AgentState) -> dict:
     """Observe 节点：观察结果，判断下一步
@@ -54,16 +83,16 @@ async def observe_node(state: AgentState) -> dict:
                 span.set_attribute("stop_reason", "max_iterations")
             return {"stop_reason": StopReason.MAX_ITERATIONS}
 
-        # 检查是否有工具错误（排除需要确认的安全提示）
-        # "requires confirmation" 是安全提示，不是真正的错误
-        _error_indicators = ("error:", "错误", "失败", "超时")
+        # 检查是否有工具错误。
+        # 只信任结构化信号，绝不对正文做自然语言关键词匹配——否则含「失败/超时」
+        # 字样的正常中文输出会被误判为 Agent 级错误，攻击者控制的文本也会被当成
+        # 错误并在 handle_error 里被抬升为指令。三类结构化信号见 _is_tool_error_message。
         recent_errors = [
             msg.content
             for msg in messages[-5:]
             if isinstance(msg, HumanMessage)
-            and hasattr(msg, "name")
-            and any(ind in msg.content.lower() for ind in _error_indicators)
-            and "requires confirmation" not in msg.content.lower()  # 排除安全确认提示
+            and getattr(msg, "name", None)
+            and _is_tool_error_message(msg)
         ]
         if recent_errors:
             logger.debug("observe_node: found tool errors", errors=recent_errors)
