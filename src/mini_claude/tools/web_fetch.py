@@ -1,12 +1,72 @@
 """Web fetch tool for retrieving page content from URLs."""
 
-from typing import Dict, Any
-from urllib.parse import urlparse
+import ipaddress
+import socket
+from typing import Dict, Any, Tuple
+from urllib.parse import urlparse, urljoin
 
 import requests
 from bs4 import BeautifulSoup
 
 from .base import BaseTool, register_tool
+
+MAX_REDIRECTS = 5
+
+
+def _check_ssrf(url: str) -> Tuple[bool, str]:
+    """Check a URL for SSRF vulnerabilities.
+
+    Validates scheme, hostname, IP address, and DNS resolution to prevent
+    server-side request forgery attacks.
+
+    Args:
+        url: The URL to validate
+
+    Returns:
+        Tuple of (is_safe, reason). is_safe=True means the URL is safe to fetch.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return False, f"Only HTTP/HTTPS URLs are allowed, got: {parsed.scheme}://"
+
+    hostname = parsed.hostname or ""
+    if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+        return False, "Access to localhost is not allowed"
+    if hostname.startswith("169.254."):
+        return False, "Access to link-local addresses is not allowed"
+
+    # Strip IPv6 brackets
+    if hostname.startswith("[") and hostname.endswith("]"):
+        hostname = hostname[1:-1]
+
+    # Check IP address (including IPv4-mapped IPv6 and decimal IP)
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            return False, "Access to private/internal addresses is not allowed"
+        if hasattr(ip, "ipv4_mapped") and ip.ipv4_mapped:
+            mapped = ip.ipv4_mapped
+            if mapped.is_private or mapped.is_loopback or mapped.is_link_local:
+                return False, "Access to private/internal addresses is not allowed"
+    except ValueError:
+        try:
+            ip = ipaddress.ip_address(int(hostname))
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                return False, "Access to private/internal addresses is not allowed"
+        except (ValueError, OverflowError):
+            pass  # Not an IP, treat as domain name
+
+    # DNS rebinding protection
+    try:
+        resolved_ips = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for family, _, _, _, sockaddr in resolved_ips:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                return False, "DNS resolution points to private/internal address"
+    except (socket.gaierror, OSError):
+        pass  # DNS failure will be caught by requests.get()
+
+    return True, "OK"
 
 
 class WebFetchTool(BaseTool):
@@ -45,38 +105,10 @@ class WebFetchTool(BaseTool):
     async def execute(self, url: str, max_length: int = 3000) -> str:
         """Fetch and extract content from a URL."""
         try:
-            # URL 安全校验 - 防止 SSRF
-            parsed = urlparse(url)
-            if parsed.scheme not in ("http", "https"):
-                return f"Error: Only HTTP/HTTPS URLs are allowed, got: {parsed.scheme}://"
-            hostname = parsed.hostname or ""
-            if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
-                return "Error: Access to localhost is not allowed"
-            if hostname.startswith("169.254."):
-                return "Error: Access to link-local addresses is not allowed"
-            # 去除 IPv6 方括号
-            if hostname.startswith("[") and hostname.endswith("]"):
-                hostname = hostname[1:-1]
-            # 检查私有 IP 范围（含 IPv6 映射地址和十进制 IP）
-            import ipaddress
-
-            try:
-                ip = ipaddress.ip_address(hostname)
-                if ip.is_private or ip.is_loopback or ip.is_link_local:
-                    return "Error: Access to private/internal addresses is not allowed"
-                # IPv4 映射的 IPv6 地址（如 ::ffff:127.0.0.1）
-                if hasattr(ip, "ipv4_mapped") and ip.ipv4_mapped:
-                    mapped = ip.ipv4_mapped
-                    if mapped.is_private or mapped.is_loopback or mapped.is_link_local:
-                        return "Error: Access to private/internal addresses is not allowed"
-            except ValueError:
-                # 不是标准 IP，尝试解析十进制 IP（如 2130706433 = 127.0.0.1）
-                try:
-                    ip = ipaddress.ip_address(int(hostname))
-                    if ip.is_private or ip.is_loopback or ip.is_link_local:
-                        return "Error: Access to private/internal addresses is not allowed"
-                except (ValueError, OverflowError):
-                    pass  # 不是 IP 地址，是域名，允许
+            # Initial SSRF check
+            is_safe, reason = _check_ssrf(url)
+            if not is_safe:
+                return f"Error: {reason}"
 
             headers = {
                 "User-Agent": (
@@ -88,8 +120,27 @@ class WebFetchTool(BaseTool):
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             }
 
-            resp = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
-            resp.raise_for_status()
+            # Manual redirect loop with SSRF check on each hop
+            current_url = url
+            for _ in range(MAX_REDIRECTS + 1):
+                resp = requests.get(current_url, headers=headers, timeout=15, allow_redirects=False)
+
+                if resp.status_code in (301, 302, 303, 307, 308):
+                    next_url = resp.headers.get("Location", "")
+                    if not next_url:
+                        break
+                    next_url = urljoin(current_url, next_url)
+                    is_safe, reason = _check_ssrf(next_url)
+                    if not is_safe:
+                        return f"Error: Redirect to blocked address: {reason}"
+                    current_url = next_url
+                    continue
+
+                resp.raise_for_status()
+                break
+            else:
+                return f"Error: Too many redirects (max {MAX_REDIRECTS}) when fetching {url}"
+
             resp.encoding = resp.apparent_encoding
 
             soup = BeautifulSoup(resp.text, "html.parser")

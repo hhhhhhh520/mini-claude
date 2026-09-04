@@ -19,13 +19,15 @@
 - `python -c` / `python3 -c` — 允许任意代码执行
 - `node -e` — 允许任意代码执行
 - `find -exec` — 允许任意命令执行
+- `python -m subprocess/os/sys/ctypes/runpy/http.server/webbrowser/telnetlib/ftplib` — 模块级黑名单
 
 ### 文件操作安全
 
 - `edit_file` 使用 `check_file_write`（非 `check_file_read`），阻止编辑工作区外文件
-- `web_fetch` 阻断 SSRF：禁止 localhost、私有 IP、link-local、file:// 协议
+- `web_fetch` 阻断 SSRF：禁止 localhost、私有 IP、link-local、file:// 协议；域名通过 `socket.getaddrinfo()` 预解析 IP 防 DNS 重绑定；手动重定向循环（最多 5 跳），每跳校验目标地址
 - 文件写入使用 temp+rename 原子操作，防止进程崩溃导致文件损坏
 - Windows symlink 检查使用 `pathlib.resolve()`，正确处理 8.3 短名称
+- Shell 注入检查覆盖 `|`, `>`, `>>`, `&&`, `||` 元字符（引号感知，引号内放行）
 
 ### 子代理隔离
 

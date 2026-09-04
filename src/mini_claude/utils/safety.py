@@ -39,8 +39,8 @@ DANGEROUS_PATTERNS = [
     r"curl.*\|\s*sh",
     r"wget.*\|\s*bash",
     r"wget.*\|\s*sh",
-    r"eval\s+",
-    r"exec\s+",
+    r"eval[\s(]+",
+    r"exec[\s(]+",
     r"sudo\s+",
     r"su\s+",
     r"shutdown",
@@ -62,6 +62,19 @@ DANGEROUS_PATTERNS = [
     r"cmd\s+/c\s+del",
     r"cmd\s+/c\s+format",
 ]
+
+# Python modules blocked from `python -m` execution
+BLOCKED_PYTHON_MODULES = {
+    "subprocess",  # can execute arbitrary system commands
+    "os",          # system-level operations
+    "sys",         # runtime manipulation
+    "ctypes",      # FFI to native code
+    "runpy",       # can execute arbitrary modules
+    "http.server", # serves files over HTTP, exposes workspace
+    "webbrowser",  # opens browser, potential phishing
+    "telnetlib",   # network connections
+    "ftplib",      # FTP connections
+}
 
 # Commands that require user confirmation even if not dangerous
 CONFIRMATION_REQUIRED_PATTERNS = [
@@ -461,8 +474,29 @@ def _check_shell_injection(command: str) -> Tuple[bool, str]:
     if "`" in command:
         return False, "Backtick detected - potential command substitution"
 
-    # Check for pipe (allow for safe read-only commands only - handled elsewhere)
-    # This is just a basic check
+    # Check for shell metacharacters outside quotes
+    # Walk through the command tracking quote state
+    in_single_quote = False
+    in_double_quote = False
+    i = 0
+    while i < len(command):
+        ch = command[i]
+        if ch == "'" and not in_double_quote:
+            in_single_quote = not in_single_quote
+        elif ch == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+        elif not in_single_quote and not in_double_quote:
+            if ch == "|":
+                return False, "Pipe operator detected - potential command chaining"
+            if ch == ">":
+                if i + 1 < len(command) and command[i + 1] == ">":
+                    return False, "Append redirection detected - potential file modification"
+                return False, "Output redirection detected - potential file overwrite"
+            if ch == "&" and i + 1 < len(command) and command[i + 1] == "&":
+                return False, "AND chaining detected - potential command chaining"
+            if ch == "&" and i + 1 < len(command) and command[i + 1] == "|":
+                return False, "OR chaining detected - potential command chaining"
+        i += 1
 
     return True, "OK"
 
@@ -580,6 +614,14 @@ def validate_command_whitelist(command: str) -> Tuple[bool, str]:
             False,
             f"Too many arguments for {cmd_name}: expected max {max_args}, got {len(positional_args)}",
         )
+
+    # Step 7.5: Block dangerous python modules for `python -m`
+    if cmd_name in ("python", "python3") and "-m" in args:
+        module_idx = args.index("-m") + 1
+        if module_idx < len(args):
+            module_name = args[module_idx].split(".")[0]  # only check top-level module
+            if module_name in BLOCKED_PYTHON_MODULES:
+                return False, f"Blocked dangerous Python module: {module_name}"
 
     # Step 8: Special handling for rm command
     if cmd_name == "rm" and positional_args:

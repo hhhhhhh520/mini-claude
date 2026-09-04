@@ -260,6 +260,13 @@ class REPLSession:
                 display.show_error(str(e))
                 continue
 
+        # Cleanup background processes on exit
+        from ..tools.bash import cleanup_all_background_processes, get_background_process_count
+
+        if get_background_process_count() > 0:
+            display.console.print("[dim]清理后台进程...[/]")
+            await cleanup_all_background_processes()
+
     def _build_history_messages(self) -> list:
         """Build LangChain message list from history."""
         from langchain_core.messages import HumanMessage, AIMessage

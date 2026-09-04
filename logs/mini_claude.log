@@ -15,3 +15,20 @@
 10:28:23 | [31mERROR[0m | mini_claude.tools.registry | Tool execution failed
 10:30:51 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
 10:31:40 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:01:08 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:01:26 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:01:54 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:02:13 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:03:53 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:04:16 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:04:43 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:05:16 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:05:36 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:06:28 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:06:55 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:07:23 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:07:48 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:08:34 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:09:05 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:09:31 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk
+13:09:56 | [33mWARNING[0m | mini_claude.monitoring.tracing | OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk

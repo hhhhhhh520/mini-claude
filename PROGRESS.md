@@ -1,13 +1,13 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-06-26 (第三轮代码审查修复完成)
+> 最后更新: 2026-06-28 (多角度 Review 8项修复)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
 **技术选型**: LangGraph + LiteLLM + Rich + Prompt Toolkit
 **目标**: 构建一个迷你版Claude Code，支持多Agent并发处理
-**当前状态**: ✅ 核心功能完成，1606 测试通过，覆盖率 66%
+**当前状态**: ✅ 核心功能完成，1673 测试通过，覆盖率 66%
 
 ## 当前进度
 
@@ -28,6 +28,9 @@
 | **代码审查** | **14项修复（安全漏洞/逻辑错误/功能缺陷/测试质量）** | **2026-06-25** |
 | **待办修复** | **11项修复（并发安全/数据一致性/LLM健壮性/功能接入）** | **2026-06-26** |
 | **第三轮审查** | **11项修复（测试回归/安全加固/死代码/逻辑错误）** | **2026-06-26** |
+| **CI 修复** | **4项修复（依赖缺失/Windows 短路径/测试适配）** | **2026-06-26** |
+| **多角度审查** | **5项修复（错误检测死代码/SSRF DNS重绑定/测试断言/进程清理/模块黑名单）** | **2026-06-26** |
+| **多角度Review** | **8项修复（shell元字符/SSRF重定向/eval正则/模块黑名单/死代码清理/依赖修正/错误脱敏）** | **2026-06-28** |
 
 ### ⏳ 进行中
 
@@ -44,6 +47,34 @@
 | 低 | caplog 测试顺序问题 | test_prompts.py 在全量运行时 36 个测试因 logger handler 冲突失败 |
 | 低 | 假测试清理 | ~52 个虚弱测试（弱断言/无断言/验证 Python 机制） |
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（provider.py, observe.py, web_fetch.py 等） |
+
+## 2026-06-28 多角度 Review 修复（8项）
+
+**触发**: 4 个专项 Agent 并行审查（安全/架构/测试/代码质量），发现 68 个问题，经真伪验证筛出 8 个值得修复。
+
+### 安全加固（4项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 1 | `utils/safety.py` | Shell 元字符 `|>><&` 未检查，`SHELL_CHAIN_CHARS` 定义但未使用 | 引号感知检查，引号外拦截 |
+| 2 | `utils/safety.py` | `eval\s+` 正则不匹配 `eval(code)` | 改为 `eval[\s(]+` |
+| 3 | `utils/safety.py` | `http.server` 未在模块黑名单中 | 加入 `http.server/webbrowser/telnetlib/ftplib` |
+| 4 | `tools/web_fetch.py` | SSRF 重定向跟随不检查目标地址 | 手动重定向循环，每跳校验 + 5 跳限制 |
+
+### 代码清理（2项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 5 | 多文件 | 死代码 2028 行（chaos.py/regression_runner.py/testing/__init__.py） | 删除 |
+| 6 | `pyproject.toml` | 缺 requests/PyYAML 依赖，langchain-anthropic 未使用 | 修正依赖声明 |
+
+### 错误处理（2项）
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 7 | `tools/file_ops.py` | edit_file 错误暴露文件内容前 200 字符 | 脱敏为文件名 + 建议 |
+| 8 | `tools/bash.py` | 异常消息暴露内部详情 | 改为仅显示异常类型名 |
+
+**测试结果**: 1673 passed, 4 failed（预已知网络/健康检查测试）
+
+---
 
 ## 2026-06-26 第三轮代码审查修复（11项）
 
@@ -73,6 +104,33 @@
 | — | `cli/repl.py` | 删除 `get_system_prompt` 后 `provider` 变量也成死代码 | 一并删除 |
 
 **测试**: 1606 测试通过（修复前 1604 passed + 2 failed），覆盖率 66%
+
+## 2026-06-26 CI 修复（4项）
+
+**触发**: 推送到 GitHub 后 CI 失败，Windows 环境 64 个测试报错。
+
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 1 | `pyproject.toml` | 缺少 `langgraph-checkpoint-sqlite` 依赖，CI 导入失败 | 添加依赖 |
+| 2 | `utils/safety.py` | Windows 8.3 短路径（RUNNER~1）展开为长路径（runneradmin）被误判为 symlink | 用 `workspace_real` 比较，路径在工作区内不报错 |
+| 3 | `tests/test_*.py` | `tempfile.TemporaryDirectory()` 返回短路径，与规范化后的工作区不匹配 | fixture 中 `Path(tmpdir).resolve()` 规范化 |
+| 4 | `tests/test_integration/test_parallel_e2e.py` | coordinator 方法改 async 后测试未更新 | 加 `await` + `@pytest.mark.asyncio` |
+
+**CI 状态**: ✓ Lint + ✓ Ubuntu (3.10/3.11/3.12) + ✓ Windows (3.10/3.11/3.12)
+
+## 2026-06-26 多角度审查修复（5项）
+
+**触发**: 5 个并行 Agent 分别从架构/安全/性能/测试/错误处理角度审查，产出 109 个 finding。经源码验证确认 5 个真问题（排除误报如 `python -c` 实际被分号检查拦截、`python -m subprocess` 无 `__main__.py` 是空操作）。
+
+| # | 文件 | 问题 | 修复 |
+|---|------|------|------|
+| 1 | `agent/nodes/observe.py` | 中文错误消息（错误/失败/超时）不匹配 `"error:"` 检测，`StopReason.ERROR` 路径死代码 | 扩展匹配为 `("error:", "错误", "失败", "超时")` + `.lower()` |
+| 2 | `tools/web_fetch.py` | SSRF 域名检查不解析 DNS，重绑定攻击可指向内网 | `requests.get()` 前 `socket.getaddrinfo()` 解析 IP 并检查 |
+| 3 | `tests/test_*.py` | 7 处 `assert isinstance(is_safe, bool)` 恒真，安全回归失效 | 改为具体值断言 |
+| 4 | `tools/bash.py` + `cli/repl.py` | `cleanup_all_background_processes()` 定义但从未调用，进程残留 | REPL 退出时调用清理 |
+| 5 | `utils/safety.py` | `python -m` 无模块级限制，防御未来变化 | 新增 `BLOCKED_PYTHON_MODULES` 黑名单 |
+
+**测试**: 1729 测试通过（0 个新增失败），覆盖率 66%
 
 ## 2026-06-25 代码审查修复（14项）
 
@@ -178,3 +236,7 @@
 | 同步 HTTP | 不修 | web_fetch/weather/web_search 阻塞事件循环，但单用户 CLI 影响有限 | 2026-06-26 |
 | SSRF 防护 | 补全 IPv6 映射 + 十进制 IP | DNS rebinding 改动大，标记后续优化 | 2026-06-26 |
 | 后台进程跟踪 | PID 基础跟踪 + 清理函数 | 完整生命周期管理改动过大，当前方案够用 | 2026-06-26 |
+| Windows 8.3 路径 | fixture 规范化 + safety.py 用 workspace_real 比较 | 短路径展开不是 symlink，不应拦截 | 2026-06-26 |
+| DNS 重绑定防护 | `socket.getaddrinfo()` 预解析域名 IP | 字面 IP 检查不覆盖域名，DNS rebinding 可绕过 | 2026-06-26 |
+| python -m 模块安全 | 黑名单（subprocess/os/sys/ctypes/runpy）而非白名单 | 编程助手需 `python -m pytest/http.server`，白名单阻塞合法用途 | 2026-06-26 |
+| observe_node 错误检测 | 匹配中英文双语错误标识 | 07165af 将错误消息改为中文但未更新检测逻辑，导致死代码 | 2026-06-26 |

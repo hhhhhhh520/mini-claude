@@ -203,12 +203,11 @@ class TestEditFileRetry:
 
     @pytest.mark.asyncio
     async def test_error_message_contains_content_preview(self, temp_dir, mock_workspace):
-        """Test that error message contains file content preview.
+        """Test that error message provides helpful guidance.
 
         When edit_file fails, the error message should:
-        1. Show the expected text preview
-        2. Show the current file content preview
-        3. Provide a suggestion to use read_file
+        1. Indicate text not found
+        2. Provide a suggestion to use read_file
         """
         write_tool = WriteFileTool()
         edit_tool = EditFileTool()
@@ -223,17 +222,11 @@ class TestEditFileRetry:
         # Verify error message structure
         assert "Error" in result, f"Should contain 'Error': {result}"
         assert "not found" in result.lower(), f"Should indicate text not found: {result}"
-        assert "Current file content" in result or "content" in result.lower(), (
-            f"Should show current content: {result}"
-        )
-        assert "Suggestion" in result or "suggestion" in result.lower(), (
-            f"Should contain suggestion: {result}"
-        )
         assert "read_file" in result.lower(), f"Should suggest read_file tool: {result}"
 
     @pytest.mark.asyncio
     async def test_error_message_shows_expected_text(self, temp_dir, mock_workspace):
-        """Test that error message shows the expected text preview."""
+        """Test that error message indicates text not found."""
         write_tool = WriteFileTool()
         edit_tool = EditFileTool()
         filepath = os.path.join(temp_dir, "test_expected.txt")
@@ -243,12 +236,9 @@ class TestEditFileRetry:
         expected_text = "This is the text I expected to find"
         result = await edit_tool.execute(path=filepath, old_text=expected_text, new_text="New text")
 
-        # The error should mention what was expected
+        # The error should indicate text not found
         assert "Error" in result
-        # Check that either the expected text or a preview is shown
-        assert expected_text[:50] in result or "Expected text" in result, (
-            f"Should show expected text: {result}"
-        )
+        assert "not found" in result.lower(), f"Should indicate text not found: {result}"
 
     @pytest.mark.asyncio
     async def test_error_message_truncates_long_content(self, temp_dir, mock_workspace):

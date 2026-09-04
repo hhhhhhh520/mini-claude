@@ -528,8 +528,8 @@ class TestUnicodeBypassAttacks:
             test_cmd = f"ls{char}-la"
             # Should not crash
             is_safe, reason = validate_command_v2(test_cmd)
-            # Command should either be safe or rejected with clear reason
-            assert isinstance(is_safe, bool)
+            # Command with control characters should be rejected
+            assert is_safe is False, f"Control char command should be rejected: {test_cmd!r}"
             assert isinstance(reason, str)
 
 
@@ -591,7 +591,9 @@ class TestNewlineInjection:
         is_safe, reason = validate_command_v2(malicious)
         # Should be rejected because "rm" is not followed by safe path
         # or accepted if properly escaped
-        assert isinstance(is_safe, bool)
+        assert isinstance(is_safe, bool), f"Should return bool, got {type(is_safe)}"
+        if not is_safe:
+            assert reason, "Rejected command should have a reason"
 
 
 class TestEnvironmentVariableExpansion:
@@ -678,8 +680,8 @@ class TestSemicolonCommandChaining:
         # Even in quotes, we reject for defense in depth
         malicious = 'echo "hello; rm -rf /"'
         is_safe, reason = validate_command_v2(malicious)
-        # Depends on implementation - may pass or fail
-        assert isinstance(is_safe, bool)
+        # Semicolons should be blocked regardless of quoting
+        assert is_safe is False, f"Semicolon in quoted string should be rejected: {malicious!r}"
 
     def test_multiple_semicolons(self):
         """Multiple chained commands."""
@@ -850,18 +852,16 @@ class TestHexAndUnicodeEscapes:
         # \x00 is null, \x41 is 'A'
         malicious = "ls\\x00; rm -rf /"
         is_safe, reason = _check_shell_injection(malicious)
-        # Should detect the hex escape or other injection
-        # Implementation may vary based on how escapes are handled
-        assert isinstance(is_safe, bool)
+        # Contains semicolon → should be blocked
+        assert is_safe is False, f"Hex escape with semicolon should be rejected: {malicious!r}"
 
     def test_octal_escape_injection(self):
         """Octal escape sequences should be detected."""
         # \177 is octal for 127 (DEL character)
         malicious = "ls\\177"
         is_safe, reason = _check_shell_injection(malicious)
-        # Should be safe since it doesn't match dangerous pattern
-        # unless specifically checking for octal escapes
-        assert isinstance(is_safe, bool)
+        # Octal escape is a shell injection pattern → should be blocked
+        assert is_safe is False, f"Octal escape should be rejected: {malicious!r}"
 
 
 class TestURL编码Bypass:

@@ -116,7 +116,7 @@ class RunCommandTool(BaseTool):
             return f"Exit code: {process.returncode}\n{result}"
 
         except Exception as e:
-            return f"Error executing command: {e}"
+            return f"Error executing command: {type(e).__name__}"
 
 
 class RunBackgroundTool(BaseTool):
@@ -167,6 +167,12 @@ class RunBackgroundTool(BaseTool):
 
         except Exception as e:
             return f"Error starting background task: {e}"
+
+
+def get_background_process_count() -> int:
+    """Return the number of tracked background processes."""
+    _cleanup_finished_processes()
+    return len(_background_processes)
 
 
 # Register command tools

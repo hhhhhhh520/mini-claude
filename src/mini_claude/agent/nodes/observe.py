@@ -56,12 +56,13 @@ async def observe_node(state: AgentState) -> dict:
 
         # 检查是否有工具错误（排除需要确认的安全提示）
         # "requires confirmation" 是安全提示，不是真正的错误
+        _error_indicators = ("error:", "错误", "失败", "超时")
         recent_errors = [
             msg.content
             for msg in messages[-5:]
             if isinstance(msg, HumanMessage)
             and hasattr(msg, "name")
-            and "error:" in msg.content.lower()
+            and any(ind in msg.content.lower() for ind in _error_indicators)
             and "requires confirmation" not in msg.content.lower()  # 排除安全确认提示
         ]
         if recent_errors:

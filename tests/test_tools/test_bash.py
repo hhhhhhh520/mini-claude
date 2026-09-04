@@ -278,16 +278,17 @@ class TestSafetyChecker:
         checker = SafetyChecker()
         # SafetyChecker 可能没有 check_url 方法，使用 validate_command 测试 URL 相关命令
         is_safe, reason = checker.check_command("curl https://example.com")
-        # curl 命令可能被标记为需要确认（因为 curl | bash 模式）
-        assert isinstance(is_safe, bool), f"应返回布尔值，实际返回 {type(is_safe)}"
+        # curl 不在白名单中，应被拒绝
+        assert is_safe is False, f"curl should be blocked (not in whitelist), got {is_safe}"
+        assert reason, "Rejected command should have a reason"
 
     def test_check_url_encoded_attack(self):
         """测试 URL 编码攻击通过 curl 命令检测"""
         checker = SafetyChecker()
-        # 通过 curl 命令测试 URL 编码攻击
+        # curl 不在白名单中，URL 编码攻击也被拦截
         is_safe, reason = checker.check_command("curl https://example.com/%2e%2e/%2e%2e/etc/passwd")
-        # curl 命令可能被标记为危险或需要确认
-        assert isinstance(is_safe, bool), f"应返回布尔值，实际返回 {type(is_safe)}"
+        assert is_safe is False, f"curl should be blocked, got {is_safe}"
+        assert reason, "Rejected command should have a reason"
 
     def test_check_command_safe(self):
         """测试安全命令检查"""
