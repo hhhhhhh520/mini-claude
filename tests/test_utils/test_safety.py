@@ -938,3 +938,72 @@ class TestCombinedAttackVectors:
         malicious = "$(echo Y2F0IC9ldGMvcGFzc3dk | base64 -d)"
         is_safe, reason = validate_command_v2(malicious)
         assert is_safe is False
+
+
+class TestPythonMModuleBlacklist:
+    """❌1 回归：python -m 黑名单里带点号的条目（http.server）必须真正生效.
+
+    此前 `args[module_idx].split(".")[0]` 把 "http.server" 截成 "http"，
+    与集合里的 "http.server" 永不相等 → 该条目形同虚设。本组测试先于修复而红。
+    """
+
+    def test_http_server_module_blocked(self):
+        is_safe, reason = validate_command("python -m http.server 8000")
+        assert is_safe is False, f"python -m http.server 应被拦，实际放行：{reason}"
+        assert "http.server" in reason or "Blocked" in reason
+
+    def test_http_server_no_args_blocked(self):
+        assert validate_command("python -m http.server")[0] is False
+
+    def test_python3_http_server_blocked(self):
+        assert validate_command("python3 -m http.server")[0] is False
+
+    def test_dotted_submodule_of_blocked_blocked(self):
+        # 黑名单条目的子模块同样危险
+        assert validate_command("python -m http.server.simple")[0] is False
+
+    def test_single_segment_modules_still_blocked(self):
+        # 修复不能破坏既有的单段条目
+        assert validate_command("python -m subprocess")[0] is False
+        assert validate_command("python -m ctypes")[0] is False
+
+    def test_unblocked_module_still_allowed(self):
+        # json.tool 不在黑名单 → 不应被误伤
+        assert validate_command("python -m json.tool data.json")[0] is True
+
+
+class TestBareAmpersandAndRedirection:
+    """❌3 回归：裸 &（cmd.exe 命令分隔符）与 < / ^ / ( / ) 必须在引号外被拦.
+
+    此前引号状态机只处理 && 与 &|，裸 & 落到循环末尾放行。
+    Windows 下 bash.py 用 cmd.exe /c，裸 & 即命令分隔 → 任意命令执行。
+    """
+
+    def test_bare_ampersand_chaining_blocked(self):
+        is_safe, _ = _check_shell_injection("git status & whoami")
+        assert is_safe is False, "裸 & 是 cmd.exe 命令分隔符，必须拦截"
+
+    def test_bare_ampersand_end_to_end_blocked(self):
+        is_safe, _ = validate_command("git status & whoami")
+        assert is_safe is False
+
+    def test_destructive_chained_command_blocked(self):
+        # 子审查实测：这条会真执行 rd /s /q
+        assert _check_shell_injection("echo ok & rd /s /q D:\\proj")[0] is False
+
+    def test_input_redirection_blocked(self):
+        assert _check_shell_injection("python setup.py < secret.txt")[0] is False
+
+    def test_caret_escape_blocked(self):
+        assert _check_shell_injection("echo a^&b")[0] is False
+
+    def test_unquoted_parens_blocked(self):
+        assert _check_shell_injection("echo (whoami)")[0] is False
+
+    def test_quoted_ampersand_allowed(self):
+        # 引号内的 & 是普通字符，不应误伤
+        assert _check_shell_injection('git commit -m "fix & polish"')[0] is True
+
+    def test_plain_command_still_allowed(self):
+        assert _check_shell_injection("ls -la")[0] is True
+

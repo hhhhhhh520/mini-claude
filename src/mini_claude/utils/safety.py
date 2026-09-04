@@ -492,10 +492,16 @@ def _check_shell_injection(command: str) -> Tuple[bool, str]:
                 if i + 1 < len(command) and command[i + 1] == ">":
                     return False, "Append redirection detected - potential file modification"
                 return False, "Output redirection detected - potential file overwrite"
-            if ch == "&" and i + 1 < len(command) and command[i + 1] == "&":
-                return False, "AND chaining detected - potential command chaining"
-            if ch == "&" and i + 1 < len(command) and command[i + 1] == "|":
-                return False, "OR chaining detected - potential command chaining"
+            if ch == "&":
+                # 覆盖 &&、&| 与裸 &。裸 & 是 cmd.exe / POSIX 的命令分隔/后台符，
+                # 放行即任意命令执行。
+                return False, "Background/separator operator detected - potential command chaining"
+            if ch == "<":
+                return False, "Input redirection detected - potential file read"
+            if ch == "^":
+                return False, "Escape character detected - potential command obfuscation"
+            if ch in ("(", ")"):
+                return False, "Subshell/grouping detected - potential command injection"
         i += 1
 
     return True, "OK"
@@ -615,13 +621,19 @@ def validate_command_whitelist(command: str) -> Tuple[bool, str]:
             f"Too many arguments for {cmd_name}: expected max {max_args}, got {len(positional_args)}",
         )
 
-    # Step 7.5: Block dangerous python modules for `python -m`
+    # Step 7.5: Block dangerous python modules for `python -m`.
+    # 匹配模块本身及其任意父包路径（"http.server" 与 "http.server.simple" 都拦）。
+    # 此前 `.split(".")[0]` 把带点条目截成顶级名，导致集合里唯一带点的
+    # "http.server" 永不命中。
     if cmd_name in ("python", "python3") and "-m" in args:
         module_idx = args.index("-m") + 1
         if module_idx < len(args):
-            module_name = args[module_idx].split(".")[0]  # only check top-level module
-            if module_name in BLOCKED_PYTHON_MODULES:
-                return False, f"Blocked dangerous Python module: {module_name}"
+            module_full = args[module_idx]
+            segments = module_full.split(".")
+            for depth in range(len(segments), 0, -1):
+                candidate = ".".join(segments[:depth])
+                if candidate in BLOCKED_PYTHON_MODULES:
+                    return False, f"Blocked dangerous Python module: {module_full}"
 
     # Step 8: Special handling for rm command
     if cmd_name == "rm" and positional_args:
