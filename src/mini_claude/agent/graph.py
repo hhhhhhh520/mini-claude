@@ -1,5 +1,8 @@
 """LangGraph agent graph definition - Refactored version."""
 
+import logging
+
+import aiosqlite
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
@@ -22,9 +25,21 @@ from .routers import (
     route_on_error,
 )
 
+logger = logging.getLogger(__name__)
+
+# build_agent_graph() 建立的 SQLite 连接，退出时由
+# close_checkpoint_connections() 统一关闭。
+_checkpoint_conns: list = []
+
 
 def build_agent_graph(checkpointer_path: str = "sessions.db"):
     """Build the main agent graph - 改进版架构
+
+    返回的图持有 SQLite checkpoint 连接。aiosqlite 的 worker 线程**不是 daemon**，
+    且本模块的登记表会强引用连接，所以未关闭时解释器退出会挂住（不是只泄漏 fd）：
+    调用方退出时必须 await close_checkpoint_connections()。
+
+    必须在运行中的事件循环里调用（见下方 checkpointer 注释）。
 
     Graph structure (8 nodes):
         THINK → PLAN → ACT → OBSERVE → REFLECT → CHECK_COMPLETION → (循环/END)
@@ -105,9 +120,27 @@ def build_agent_graph(checkpointer_path: str = "sessions.db"):
     # 重试后回到 act
     graph.add_edge("retry", "act")
 
-    # Enable checkpointer for state persistence (SQLite-backed)
-    checkpointer = AsyncSqliteSaver.from_conn_string(checkpointer_path)
-    return graph.compile(checkpointer=checkpointer)
+    # Enable checkpointer for state persistence (SQLite-backed).
+    #
+    # 为什么不能用 from_conn_string()：它被 @classmethod @asynccontextmanager
+    # 双重装饰，直接调用返回的是 _AsyncGeneratorContextManager 而不是 saver。
+    # 实测 langgraph 1.1.9 的 compile() 会当场校验并抛
+    #   TypeError: Invalid checkpointer provided ... Received
+    #   _AsyncGeneratorContextManager
+    # （pyproject 里 langgraph>=0.2.0 无上界，故具体失败形态随版本漂移。）
+    #
+    # 为什么可以直接构造：AsyncSqliteSaver 的建表 setup() 在 aget_tuple/alist/
+    # aput/aput_writes/aget_delta_channel_history 里都会惰性 await，因此不需要
+    # 把调用方改造成 async with。
+    #
+    # 新前提：AsyncSqliteSaver.__init__ 会执行 asyncio.get_running_loop()，
+    # 所以 build_agent_graph() **只能在运行中的事件循环里调用**；同步上下文调用
+    # 抛 RuntimeError: no running event loop。
+    # 连接登记在最后一步——登记前任何构造失败都不会留下孤儿登记。
+    conn = aiosqlite.connect(checkpointer_path)
+    compiled = graph.compile(checkpointer=AsyncSqliteSaver(conn))
+    _checkpoint_conns.append(conn)
+    return compiled
 
 
 def build_agent_graph_simple():
@@ -184,5 +217,28 @@ def get_agent_graph():
     """Get or create the default agent graph."""
     global _agent_graph
     if _agent_graph is None:
-        _agent_graph = build_agent_graph()
+        # 必须与 cli/repl.py 的 _check_previous_session() 用同一个库路径，
+        # 否则「发现上次未完成的会话」提示读的表和图写的表会分叉。
+        from mini_claude.config.settings import settings
+
+        _agent_graph = build_agent_graph(checkpointer_path=settings.session_db_path)
     return _agent_graph
+
+
+async def close_checkpoint_connections() -> int:
+    """关闭所有由 build_agent_graph() 建立的 SQLite 连接，并丢弃图单例。
+
+    Returns:
+        实际关闭的连接数。
+    """
+    global _agent_graph, _checkpoint_conns
+    conns, _checkpoint_conns = _checkpoint_conns, []
+    _agent_graph = None
+    closed = 0
+    for conn in conns:
+        try:
+            await conn.close()
+            closed += 1
+        except Exception as exc:  # 退出路径上单个连接失败不应中断清理，但必须可见
+            logger.warning("checkpoint connection close failed: %s: %s", type(exc).__name__, exc)
+    return closed

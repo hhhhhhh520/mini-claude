@@ -157,7 +157,26 @@ class REPLSession:
         return False
 
     async def run_graph(self):
-        """Run REPL with LangGraph state machine."""
+        """Run REPL with LangGraph state machine.
+
+        退出清理放在 finally 里：/exit、Ctrl+D、Ctrl+C、asyncio.CancelledError
+        以及未捕获异常都要走到。后台 bash 进程与 aiosqlite 的 worker 线程都不是
+        daemon，漏清会让子进程变孤儿、或让解释器退出时挂住。
+        """
+        try:
+            await self._run_graph_loop()
+        finally:
+            from ..agent.graph import close_checkpoint_connections
+            from ..tools.bash import cleanup_all_background_processes, get_background_process_count
+
+            if get_background_process_count() > 0:
+                display.console.print("[dim]清理后台进程...[/]")
+                await cleanup_all_background_processes()
+
+            await close_checkpoint_connections()
+
+    async def _run_graph_loop(self):
+        """REPL 主循环本体；资源清理由 run_graph 的 finally 统一负责。"""
         from ..agent.graph import get_agent_graph
         from ..agent.state import create_initial_state
         from mini_claude.config.settings import settings
@@ -259,13 +278,6 @@ class REPLSession:
             except Exception as e:
                 display.show_error(str(e))
                 continue
-
-        # Cleanup background processes on exit
-        from ..tools.bash import cleanup_all_background_processes, get_background_process_count
-
-        if get_background_process_count() > 0:
-            display.console.print("[dim]清理后台进程...[/]")
-            await cleanup_all_background_processes()
 
     def _build_history_messages(self) -> list:
         """Build LangChain message list from history."""

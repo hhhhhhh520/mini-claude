@@ -1,13 +1,21 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-06-28 (多角度 Review 8项修复)
+> 最后更新: 2026-09-04 (修复主图 checkpointer 装配错误，REPL 链路恢复可用)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
 **技术选型**: LangGraph + LiteLLM + Rich + Prompt Toolkit
 **目标**: 构建一个迷你版Claude Code，支持多Agent并发处理
-**当前状态**: ✅ 核心功能完成，1673 测试通过，覆盖率 66%
+**当前状态**: ⚠️ REPL 主链路已于 2026-09-04 修复；收集 1709 = 1664 passed / 5 failed / 40 skipped
+> （5 个失败：3 个 `402 Insufficient Balance` 真实 API 依赖、1 个 `test_token_summary_generation`
+> summarize 真缺陷、1 个 `test_settings` 由本地 gitignored `.env` 覆盖默认模型，与本改动无关。）
+> 覆盖率暂不可测（`pytest-cov` 未装，详见 2026-09-04 小节）。
+
+> 此前长期记载的「1673 测试通过」「核心功能完成」不成立：`langgraph-checkpoint-sqlite`
+> 未装入环境时 `pytest tests/` 在收集阶段即中断，一个测试都跑不完；装上后又暴露
+> `build_agent_graph()` 的 checkpointer 装配错误（见下方 2026-09-04 小节）。
+> 完整问题清单：`issues/ISSUE-012-0628Review修复失效项.md`
 
 ## 当前进度
 
@@ -31,6 +39,7 @@
 | **CI 修复** | **4项修复（依赖缺失/Windows 短路径/测试适配）** | **2026-06-26** |
 | **多角度审查** | **5项修复（错误检测死代码/SSRF DNS重绑定/测试断言/进程清理/模块黑名单）** | **2026-06-26** |
 | **多角度Review** | **8项修复（shell元字符/SSRF重定向/eval正则/模块黑名单/死代码清理/依赖修正/错误脱敏）** | **2026-06-28** |
+| **主链路修复** | **checkpointer 装配错误 + 9 个图级契约测试 + 连接生命周期收尾** | **2026-09-04** |
 
 ### ⏳ 进行中
 
@@ -47,6 +56,85 @@
 | 低 | caplog 测试顺序问题 | test_prompts.py 在全量运行时 36 个测试因 logger handler 冲突失败 |
 | 低 | 假测试清理 | ~52 个虚弱测试（弱断言/无断言/验证 Python 机制） |
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（provider.py, observe.py, web_fetch.py 等） |
+
+## 2026-09-04 主图 checkpointer 装配错误修复
+
+**触发**: 全量探索项目时发现「REPL 是主图唯一的**生产**调用方，但它在调用
+`build_agent_graph()` → `compile()` 时直接抛 `TypeError`，一个真实请求都跑不了」。
+（注：另一条调用路径 `context/providers.py:create_agent_graph` 当前无调用者。）
+
+### 根因（追根溯源，非表面修补）
+
+修复前的 `graph.py:109`（现 `:120-131`）把 `AsyncSqliteSaver.from_conn_string(path)`
+的返回值直接传给 `graph.compile(checkpointer=...)`。而该方法在源码里是：
+
+```python
+@classmethod
+@asynccontextmanager
+async def from_conn_string(cls, conn_string: str) -> AsyncIterator[AsyncSqliteSaver]:
+```
+
+即它返回 `_AsyncGeneratorContextManager`，**不是 saver**。本环境（langgraph 1.1.9）**实测**：
+`compile()` 当场校验并抛 `TypeError: Invalid checkpointer provided ...
+Received _AsyncGeneratorContextManager` → `build_agent_graph()` 直接抛 → **REPL 启动即死**。
+
+（另一个环境观察到的是：langgraph 1.0.x 的 `compile()` 不校验，推迟到 `ainvoke` 才
+`AttributeError: ... 'get_next_version'`。**该形态为转述，本环境未装 1.0.x、未实测。**
+`pyproject.toml:13` 的 `langgraph>=0.2.0` 无上界，所以具体失败形态会随版本漂移。）
+
+**为什么存活 2 个月零 9 天**（引入于 `9d59f60 fix: #14 Checkpointer 改用 SQLite 持久化`）：
+全仓库**没有任何测试调用过 `build_agent_graph()` / `get_agent_graph()`**——
+`test_agent_flow.py`、`test_e2e_user_flow.py`、`agent_spawn.py`、`parallel.py` 全部走
+`build_agent_graph_no_checkpoint()`。加上 `TEST_PLAN.md`（该文件**未纳入版本控制**）把
+T009「REPL 启动」记为「❌ prompt_toolkit 非交互终端崩溃」而放弃，主链路自此无验证。
+
+**真正的病根**：运行时/开发依赖从未按 `pyproject.toml` 完整安装（未 `pip install -e ".[dev]"`），
+且 `langgraph` 无上界——这与本小节要修的缺陷属同一类「声明了却没装/没约束」。
+
+### 修复
+
+| 文件 | 改动 |
+|------|------|
+| `agent/graph.py:120-131` | 改为 `AsyncSqliteSaver(aiosqlite.connect(path))`。可行依据：`AsyncSqliteSaver` 的建表 `setup()` 在 `aget_tuple`/`alist`/`aput`/`aput_writes`/`aget_delta_channel_history` 五条读写路径里都会惰性 `await self.setup()`（已装包源码 `aio.py:360/452/530/583/636`），因此无需把调用方改造成 `async with`。新前提：`AsyncSqliteSaver.__init__` 执行 `asyncio.get_running_loop()`，**只能在运行中的事件循环里调** |
+| `agent/graph.py` | 新增 `_checkpoint_conns` 登记（登记放在最后一步，失败不留孤儿）+ `close_checkpoint_connections()` |
+| `agent/graph.py:208-215` | `get_agent_graph()` 改传 `settings.session_db_path`，与 `_check_previous_session()` 对齐，否则恢复提示与图写的库会分叉 |
+| `cli/repl.py` | `run_graph()` 重构为 `try/finally`，finally 里统一做后台进程清理 + `close_checkpoint_connections()`——覆盖 `/exit`、Ctrl+D、Ctrl+C、`CancelledError` 等全部退出路径。**若只把 close 放在循环末尾，Ctrl+C 会让进程挂住（aiosqlite worker 线程非 daemon 且被登记表强引用，实测 `__del__` 永不触发，解释器退出挂死）** |
+| `tests/test_integration/test_graph_checkpoint.py` | 新增 10 个用例（见下） |
+
+### 针对性测试（先红后绿 + 变异检验）
+
+新增 10 个用例。**修复前**当时已写的 7 条（3 组参数化 compile/ainvoke/persist + 重建读回）
+**全红**（同一 `TypeError`）；其后随修复追加连接生命周期用例（含 1 条生产调用点用例），
+最终 **10/10 全绿**。断言测**外部契约**而非实现细节：checkpointer 是
+`BaseCheckpointSaver` 实例、`ainvoke` 跑完、SQLite 里真有该 thread 的 checkpoint 行、
+重建图后仍能读回状态、REPL 退出时真的调了 close。
+
+变异检验（三条，均只杀对应目标）：
+1. `close` 改成「只清列表不关闭」→ 仅 `test_close_checkpoint_connections_actually_closes` 变红。
+2. 去掉 `repl.py` finally 里的 close → 仅 `test_repl_exit_path_closes_connections` 变红。
+3. `_agent_graph` 复位断言先显式建单例再判，避免「恒 None」的假绿；`test_close_is_idempotent`
+   显式建图后断言「第一次 ≥1、第二次 ==0」，避免「空表上两次都 ==0」的恒真。
+
+端到端验证（非 pytest）：`get_agent_graph()` → 真 `AsyncSqliteSaver` → 一轮图执行跑完 →
+`sessions.db` 里 `checkpoints`/`writes` 表生成且有该 thread 行 → close 返回 1 → 进程干净退出。
+
+### 顺带发现（未在本轮处理）
+
+- 单轮对话观察到产生 **14 条消息**（当时一次探测值），是 `think.py` 返回全量消息列表与
+  `state.py:108` 的 `Annotated[..., add]` reducer 冲突的结果（用户消息被复制、SystemMessage
+  落到 HumanMessage 之后）。机理已用最小图复现：输入 `['HUMAN']` → 输出
+  `['HUMAN','SYSTEM','HUMAN']`。
+- 装上 `langgraph-checkpoint-sqlite` 后 `test_e2e_user_flow.py` 首次可被收集，暴露
+  `test_token_summary_generation` 断言失败 `assert 4 < 4`——即 **summarize 策略压缩后
+  消息数未减少**，此前因收集中断而完全不可见。
+- 遗留 **5** 个失败：3 个是 `402 Insufficient Balance`（真实 API 依赖，其中
+  `test_full_graph_execution` 的 `GraphRecursionError: limit of 10` 是 402 引发
+  error→retry→act 空转的下游表现）；1 个是 `test_token_summary_generation`（summarize 真缺陷）；
+  1 个是 `test_settings.py::test_existing_settings_unchanged`——本地 gitignored `.env` 的
+  `DEFAULT_MODEL=deepseek-chat` 覆盖了码内默认 `deepseek-v4-flash`，属环境态、与本改动无关。
+- **覆盖率目前不可测**：`pytest-cov` 已在 `pyproject.toml:36` dev extra 声明但 `.venv` 未装，
+  `--cov` 直接报 `unrecognized arguments`，故 `coverage.fail_under=60` 从未生效。此前各小节
+  记载的「覆盖率 66%」为历史值，未经本轮复核。
 
 ## 2026-06-28 多角度 Review 修复（8项）
 
