@@ -7,7 +7,7 @@
 **项目地址**: D:\my project\mini-claude
 **技术选型**: LangGraph + LiteLLM + Rich + Prompt Toolkit
 **目标**: 构建一个迷你版Claude Code，支持多Agent并发处理
-**当前状态**: ⚠️ REPL 主链路已于 2026-09-04 修复；收集 1709 = 1664 passed / 5 failed / 40 skipped
+**当前状态**: ⚠️ REPL 主链路已于 2026-09-04 修复；收集 1732 = 1687 passed / 5 failed / 40 skipped
 > （5 个失败：3 个 `402 Insufficient Balance` 真实 API 依赖、1 个 `test_token_summary_generation`
 > summarize 真缺陷、1 个 `test_settings` 由本地 gitignored `.env` 覆盖默认模型，与本改动无关。）
 > 覆盖率暂不可测（`pytest-cov` 未装，详见 2026-09-04 小节）。
@@ -40,6 +40,7 @@
 | **多角度审查** | **5项修复（错误检测死代码/SSRF DNS重绑定/测试断言/进程清理/模块黑名单）** | **2026-06-26** |
 | **多角度Review** | **8项修复（shell元字符/SSRF重定向/eval正则/模块黑名单/死代码清理/依赖修正/错误脱敏）** | **2026-06-28** |
 | **主链路修复** | **checkpointer 装配错误 + 9 个图级契约测试 + 连接生命周期收尾** | **2026-09-04** |
+| **补齐 06-28 遗漏** | **4 项 ❌：python -m 带点黑名单 / 裸 & 元字符 / observe 信任边界 / 回归脚本悬空引用** | **2026-09-04** |
 
 ### ⏳ 进行中
 
@@ -135,6 +136,26 @@ T009「REPL 启动」记为「❌ prompt_toolkit 非交互终端崩溃」而放�
 - **覆盖率目前不可测**：`pytest-cov` 已在 `pyproject.toml:36` dev extra 声明但 `.venv` 未装，
   `--cov` 直接报 `unrecognized arguments`，故 `coverage.fail_under=60` 从未生效。此前各小节
   记载的「覆盖率 66%」为历史值，未经本轮复核。
+
+## 2026-09-04 补齐 06-28 遗漏的 4 项 ❌
+
+`issues/ISSUE-012` 记录的 06-28 Review 失效项里，4 项安全/可靠性 ❌ 在本轮修复。
+每项都按「先写会红的测试 → 修 → 变异检验」推进。
+
+| ❌ | 根因 | 修复 | 测试 |
+|---|------|------|------|
+| 1 | `safety.py` 的 `.split(".")[0]` 把 `http.server` 截成 `http`，黑名单唯一带点条目永不命中 | 改为匹配模块本身及任意父包路径 | +6 用例；变异（改回顶级名）→ 3 用例变红 |
+| 3 | 引号状态机只处理 `&&`/`&|`，裸 `&` 放行 → Windows `cmd.exe` 下任意命令执行 | 引号外补拦裸 `&`、`<`、`^`、`(`、`)` | +8 用例；实测 `echo ok & rd /s /q` 已拦 |
+| 4 | observe 用中文关键词嗅探工具输出正文 → 正常输出误判 + 攻击者文本被 `handle_error` 升格为指令 | 改结构化识别（`Error` 前缀 / 包裹边界 / 固定异常前缀）；`handle_error` 用 `<<<>>>` 定界并标注为数据 | +5 用例；变异（加回关键词嗅探）→ 2 误判用例变红；3 个虚构格式旧测试改为真实格式 |
+| 2 | `regression_runner.py` 被误删，`scripts/run_regression.py:20` 悬空 import，CI 每日回归 job 静默 no-op | 恢复该模块；`TEST_GROUPS` 去掉已不存在的 `test_chaos/test_e2e/test_stress`；修复 CI `Check for regressions` 里 `[ -f regression_*.json ]` 通配符不展开的坏守卫 | +4 用例锁「import 目标存在 + 组路径存在 + `total_failed` 字段」 |
+
+**验证**：`pytest tests/` → **1687 passed / 5 failed / 40 skipped**（收集 1732）。
+5 个失败与上一节完全一致（3 个 402 真实 API、1 个 summarize 真缺陷、1 个 `.env`
+覆盖默认模型），无本轮引入的新回归。`ruff check` 全过，变异无残留。
+
+**仍未处理（留待后续）**：❌5 文档数字已在主链路修复时更新；`bash.py:170` 异常回显、
+`SHELL_CHAIN_CHARS` 死常量、可选依赖未落到 extras（ISSUE-012 表内 6/7/8）；
+以及 CI `regression-tests` 的 `continue-on-error: true` 是否保留（政策决定，未擅动）。
 
 ## 2026-06-28 多角度 Review 修复（8项）
 

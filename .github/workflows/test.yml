@@ -168,19 +168,20 @@ jobs:
       - name: Check for regressions
         if: always()
         run: |
-          if [ -f reports/regression_*.json ]; then
-            python -c "
-            import json
-            import glob
-            files = glob.glob('reports/regression_*.json')
-            if files:
-                with open(files[0]) as f:
-                    data = json.load(f)
-                if data.get('total_failed', 0) > 0:
-                    print('::error::Regression tests failed')
-                    exit(1)
-            "
-          fi
+          python -c "
+          import json, glob, sys
+          # 注意：不能在 shell 里用 `[ -f reports/regression_*.json ]`——
+          # 通配符在 [ -f ] 内不展开，守卫恒为假，检测形同虚设。
+          files = glob.glob('reports/regression_*.json')
+          if not files:
+              print('::warning::未生成回归报告（回归套件可能未运行）')
+              sys.exit(0)
+          with open(files[0]) as f:
+              data = json.load(f)
+          if data.get('total_failed', 0) > 0:
+              print('::error::Regression tests failed: %d failures' % data['total_failed'])
+              sys.exit(1)
+          "
 
   # Job 5: Coverage report (PR only)
   coverage:
