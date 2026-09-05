@@ -2,6 +2,7 @@
 
 > 分析时间: 2026-04-30
 > 项目路径: D:\my project\mini-claude
+> ⚠️ 时点分析：此后项目经历多轮整改（checkpointer 装配、observe 错误检测、messages reducer、安全加固），机制描述以 README 与 issues/ 为准。
 
 ---
 

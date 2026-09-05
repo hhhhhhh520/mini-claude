@@ -13,7 +13,7 @@
 - **会话持久化**：SQLite checkpoint + 启动时恢复提示，支持 `/resume` 断点续跑
 - **工具降级**：连续失败 3 次自动跳过工具，10 分钟后自动恢复
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
-- **高测试覆盖**：1729个测试用例，覆盖率 66%
+- **测试规模**：1735 个测试用例（2026-09-05 实测 1691 passed / 40 skipped；覆盖率因 pytest-cov 未安装暂未统计）
 
 ## 安装
 
@@ -151,7 +151,7 @@ ANTHROPIC_API_KEY=your-claude-key
 GOOGLE_API_KEY=your-gemini-key
 ```
 
-## 可用工具（18个）
+## 可用工具（21个）
 
 ### 文件操作 (8个)
 | 工具 | 功能 |
@@ -171,12 +171,14 @@ GOOGLE_API_KEY=your-gemini-key
 | `run_command` | 执行Shell命令 |
 | `run_background` | 后台执行长时间命令 |
 
-### Web搜索 (1个)
+### Web (3个)
 | 工具 | 功能 |
 |------|------|
 | `web_search` | Web搜索 |
+| `web_fetch` | 抓取网页正文（含 SSRF 防护） |
+| `weather` | 天气查询 |
 
-### Agent协作 (7个)
+### Agent协作 (8个)
 | 工具 | 功能 |
 |------|------|
 | `spawn_agent` | 启动单个子Agent |
@@ -207,12 +209,12 @@ mini-claude/
 ├── src/mini_claude/
 │   ├── cli/          # CLI入口 + 命令处理器
 │   ├── agent/        # Agent核心（LangGraph状态机）
-│   ├── tools/        # 工具层（18个工具）
+│   ├── tools/        # 工具层（21个工具）
 │   ├── skills/       # Skills系统（加载/注册/调用）
 │   ├── llm/          # LLM抽象层 + 系统提示词
 │   ├── config/       # Pydantic配置管理
 │   └── utils/        # 工具函数（含file_lock）
-└── tests/            # 单元测试（1733个）
+└── tests/            # 测试（1735 个用例）
 ```
 
 ## License
