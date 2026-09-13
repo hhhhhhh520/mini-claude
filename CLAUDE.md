@@ -20,6 +20,8 @@
 - `node -e` — 允许任意代码执行
 - `find -exec` — 允许任意命令执行
 - `python -m subprocess/os/sys/ctypes/runpy/http.server/webbrowser/telnetlib/ftplib` — 模块级黑名单（匹配模块本身及其任意父包，带点条目如 `http.server` 同样生效）
+- `pip install` / `pip3 install` / `pip -r/-e`（含 `python -m pip ...` 形式）— 供应链敞口，进 confirmation（拒+文案，与 `pip uninstall` 对称，ISSUE-019）
+- `python <带目录成分的.py>` 在工作区外拒绝（`validate_path`）；纯文件名放行是刻意保留的旧行为，改白名单时别顺手堵死
 
 ### 文件操作安全
 
@@ -50,6 +52,11 @@
 - 工具执行成功/失败会自动记录到降级管理器
 - 10 分钟后自动重置失败计数
 - 修改工具执行逻辑时不可移除降级检查
+
+### CLI 约束
+
+- `ask --json` 只打最终 JSON 一行（中间输出全静默），失败打 `{"error": ...}` 再 exit 1
+- 任何退出路径（ask/repl/未来新入口）都要进 `finally` 清后台进程 + 关 checkpoint 连接
 
 ## LangGraph 约束
 
