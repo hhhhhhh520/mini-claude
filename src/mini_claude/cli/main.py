@@ -251,7 +251,12 @@ def health(ctx, port: int, output_json: bool):
     # Import HealthStatus for display
     from mini_claude.monitoring.health import HealthStatus
 
-    asyncio.run(run_check())
+    report = asyncio.run(run_check())
+
+    # 与 health_handler 的 200/503 约定保持一致：非 HEALTHY 即失败。
+    # 否则脚本/CI 拿到 unhealthy 的退出码 0，会当成系统正常。
+    if report.overall_status() != HealthStatus.HEALTHY:
+        raise SystemExit(1)
 
 
 @main.command()
@@ -404,7 +409,7 @@ def tool_deps(ctx, tool_name: Optional[str], output_json: bool):
         tool = tool_registry.get(tool_name)
         if not tool:
             display.console.print(f"[red]Error: Tool '{tool_name}' not found[/]")
-            return
+            raise SystemExit(1)
 
         info = tool_registry.get_dependency_info(tool_name)
         available, missing_required, missing_optional = info["available"]

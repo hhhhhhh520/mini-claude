@@ -55,6 +55,11 @@
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
+| 中 | ISSUE-019 命令白名单破口 | `python <脚本>` / `pip install` 通过校验，prompt 不可信时可达 RCE。**动手前先复现** |
+| 中 | ISSUE-018 `ask` 缺后台进程清理 | `run_background` 起的进程在 `ask` 退出后成孤儿；`repl` 有对应 `finally`，`ask` 没有 |
+| 低 | ISSUE-021 `tool-deps --json` 崩溃 | 工具名不存在时该分支未先校验存在性，抛未捕获 `ValueError` + traceback（退出码已是非 0，只是与另一路径不一致） |
+| 低 | ISSUE-017 死参数 | `ask --json` 与全局 `--debug` 均"声明了但零使用" |
+| 低 | ISSUE-020 回显未转义 + traceback 丢弃 | rich markup 未 escape（仅输出伪造）；`ask` 的 except 只留 `str(e)` |
 | 低 | reflect_node 异常吞没 | 非关键节点，但应至少记录 ERROR 级别日志 |
 | 低 | caplog 测试顺序问题 | `init_logging()` 会给 `mini_claude` logger 设 `propagate=False` 并替换其 handler，之后 test_prompts.py 的 36 个用例收不到 caplog 日志而失败。2026-09-13 实测确认触发条件；**当前看似正常只因采集顺序**——`test_llm/test_prompts.py` 排在 `test_utils/test_logger.py`（内含 14 处 `init_logging()` 调用）之前。`pytest tests/test_utils tests/test_llm/test_prompts.py` 即可复现 36 红 |
 | 低 | 假测试清理 | ~52 个虚弱测试（弱断言/无断言/验证 Python 机制） |
@@ -93,14 +98,25 @@ except Exception as e:
 
 - **工单原判有误**：其建议的 `raise typer.Exit(code=1)` 及"参考 `main.py:49-52`"均不成立
   ——该项目用 `click`，`src/` 内 typer 零命中。照原方案会引入无用依赖。
-- **同类问题（未改，建议另开工单）**：`health --json` 报告 unhealthy 仍退出 0；
-  `tool-deps <不存在的工具>` 打印 `Error:` 仍退出 0。
-- **死参数**：`ask --json` 声明了 `output_json` 但函数体内零引用（"设计了但未集成"）。
+- **同类问题 → 已一并修复（ISSUE-016）**：`health --json` 报告 unhealthy、`tool-deps <不存在的工具>`
+  打印 `Error:` 时都仍退出 0。已按项目既有约定修好（见下）。
+- **死参数（ISSUE-017）**：`ask --json` 的 `output_json` 声明后零引用；
+  全局 `--debug` 写进 `ctx.obj` 后**全 `src/` 零读取**——两个"设计了但未集成"。
 - `repl` 经查**不是问题**：错误按设计吞掉并继续交互循环。
-- **预先存在的隐患（本次未改，详见 ISSUE-015）**：`ask` 缺 `cleanup_all_background_processes()`
-  → 后台子进程成孤儿（新旧退出路径行为一致，非本次引入）；命令白名单里
-  `python <脚本>` / `pip install` 可通过校验（若 prompt 不可信则可达 RCE）；
-  `display` 未转义 rich markup；`ask` 的 except 丢弃 traceback，`--debug` 也拿不到堆栈。
+- **预先存在的隐患（已开单，本次未改）**：ISSUE-018 `ask` 缺 `cleanup_all_background_processes()`
+  → 后台子进程成孤儿（新旧退出路径行为一致，非本次引入）；ISSUE-019 命令白名单里
+  `python <脚本>` / `pip install` 可通过校验（若 prompt 不可信则可达 RCE，**待复现后再修**）；
+  ISSUE-020 `display` 未转义 rich markup、`ask` 的 except 丢弃 traceback。
+
+### 同类两项一并修复（ISSUE-016）
+
+`health` 与 `tool-deps` 是同一种"报了错却退 0"。约定**不自己发明**——照项目已有的
+`monitoring/health.py:472`（HTTP handler `200 if overall == HEALTHY else 503`），
+即非 HEALTHY 一律失败（`DEGRADED` 也算）。
+
+新增 `tests/test_cli/test_exit_codes.py` 6 条（4 判别 + 2 守卫，用真实 `HealthReport` 对象构造），
+修复前 `4 failed, 2 passed` → 修复后 `6 passed`。真实 CLI 复核：`health --json` → 1、
+`tool-deps __no_such_tool__` → 1、`tool-deps read_file` → 0。
 
 ### 测试隔离教训
 
