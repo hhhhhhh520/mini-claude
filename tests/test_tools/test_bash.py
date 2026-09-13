@@ -202,9 +202,10 @@ class TestSafetyValidation:
         assert is_safe is True
 
     def test_validate_safe_pip_install(self):
-        """测试安全命令 pip install"""
+        """pip install 进确认（ISSUE-019：供应链敞口，不再直放）"""
         is_safe, reason = validate_command("pip install package")
-        assert is_safe is True
+        assert is_safe is False
+        assert "confirmation" in reason.lower()
 
     def test_validate_dangerous_pip_uninstall(self):
         """测试需要确认的命令 pip uninstall"""

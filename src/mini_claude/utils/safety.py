@@ -82,7 +82,11 @@ CONFIRMATION_REQUIRED_PATTERNS = [
     r"git\s+reset\s+--hard",
     r"git\s+clean\s+-fd",
     r"npm\s+publish",
-    r"pip\s+uninstall",
+    r"pip3?\s+uninstall",
+    # ISSUE-019：pip install 是供应链敞口（任意包名），与 uninstall 同级处理；
+    # -r/-e 是同等安装通道；python -m pip ... 同样命中（字符串含 "pip install"）。
+    r"pip3?\s+install",
+    r"pip3?\s+-[re]\b",
     r"conda\s+remove",
     r"docker\s+rm",
     r"docker\s+rmi",
@@ -634,6 +638,20 @@ def validate_command_whitelist(command: str) -> Tuple[bool, str]:
                 candidate = ".".join(segments[:depth])
                 if candidate in BLOCKED_PYTHON_MODULES:
                     return False, f"Blocked dangerous Python module: {module_full}"
+
+    # Step 7.6: Python 脚本路径必须在工作区内（ISSUE-019）。
+    # `python evil.py`（纯文件名）放行——旧行为与官方示例能力；
+    # 带目录成分（/、\、~、绝对路径）的 .py 一律工作区校验，区外拒绝。
+    # bash 工具无交互确认通道，validate_path 用 require_confirmation=False
+    # 拿 (False, reason)，与 CONFIRMATION_REQUIRED_PATTERNS 语义对齐。
+    if cmd_name in ("python", "python3"):
+        for arg in positional_args:
+            if arg.endswith(".py") and (
+                "/" in arg or "\\" in arg or arg.startswith("~") or os.path.isabs(arg)
+            ):
+                path_ok, path_reason = validate_path(arg, require_confirmation=False)
+                if not path_ok:
+                    return False, f"Python script outside workspace: {path_reason}"
 
     # Step 8: Special handling for rm command
     if cmd_name == "rm" and positional_args:
