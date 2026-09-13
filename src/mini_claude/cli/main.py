@@ -130,7 +130,9 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool):
             return result_text
         except Exception as e:
             display.show_error(str(e))
-            return None
+            # 失败必须反映到退出码：脚本与 CI 只认退出码，
+            # 只打印错误再正常返回会让它们把失败当成成功。
+            raise SystemExit(1)
 
     asyncio.run(run_single())
 

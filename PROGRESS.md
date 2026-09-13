@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-09-05 (修复主图 checkpointer 装配错误，REPL 链路恢复可用)
+> 最后更新: 2026-09-13 (修复 `ask` 失败退出码恒为 0，ISSUE-015)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -56,9 +56,60 @@
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
 | 低 | reflect_node 异常吞没 | 非关键节点，但应至少记录 ERROR 级别日志 |
-| 低 | caplog 测试顺序问题 | test_prompts.py 在全量运行时 36 个测试因 logger handler 冲突失败 |
+| 低 | caplog 测试顺序问题 | `init_logging()` 会给 `mini_claude` logger 设 `propagate=False` 并替换其 handler，之后 test_prompts.py 的 36 个用例收不到 caplog 日志而失败。2026-09-13 实测确认触发条件；**当前看似正常只因采集顺序**——`test_llm/test_prompts.py` 排在 `test_utils/test_logger.py`（内含 14 处 `init_logging()` 调用）之前。`pytest tests/test_utils tests/test_llm/test_prompts.py` 即可复现 36 红 |
 | 低 | 假测试清理 | ~52 个虚弱测试（弱断言/无断言/验证 Python 机制） |
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（provider.py, observe.py, web_fetch.py 等） |
+
+## 2026-09-13 `ask` 失败退出码恒为 0（ISSUE-015）
+
+**触发**: 2026-09-12 八项目启动验证发现——`mini-claude ask` 在 LLM 失败（key 欠费/网络错误）时
+打印错误却以退出码 0 结束，脚本与 CI 会误判为成功。
+
+### 根因
+
+`cli/main.py` 的 `ask`：`except Exception` 只 `display.show_error()` + `return None`，
+`asyncio.run(run_single())` 的返回值又被丢弃 → Click 正常返回 → 退出码 0。
+
+### 修复
+
+```python
+except Exception as e:
+    display.show_error(str(e))
+    raise SystemExit(1)
+```
+
+选 `SystemExit` 而非 click 自带 `Exit`：项目内既有同类写法（`monitoring/metrics.py:547`）。
+穿层用哨兵值实测：`SystemExit(7)` 经 `asyncio.run()` 得 7、经 `CliRunner` 记到 exit_code=7；
+真实子进程跑生产代码（`SystemExit(1)`）得 1。（7 与 1 是两次不同实验，非同一次透传。）
+另：`asyncio` 的收尾（cancel 挂起任务 / shutdown executor / close loop）在抛出时照常执行，
+与旧 `return None` 路径逐字一致——本次改动只换了退出方式，未改变任何清理语义。
+
+### 针对性测试（先红后绿）
+
+新增 `tests/test_cli/test_ask_exit_code.py` 5 条：2 条判别（进程内 + **真实子进程**）、3 条守卫。
+最终版测试在修复前实测 `2 failed, 3 passed`（判别用例红、守卫绿），修复后 `5 passed`。
+
+### 顺带修正与发现
+
+- **工单原判有误**：其建议的 `raise typer.Exit(code=1)` 及"参考 `main.py:49-52`"均不成立
+  ——该项目用 `click`，`src/` 内 typer 零命中。照原方案会引入无用依赖。
+- **同类问题（未改，建议另开工单）**：`health --json` 报告 unhealthy 仍退出 0；
+  `tool-deps <不存在的工具>` 打印 `Error:` 仍退出 0。
+- **死参数**：`ask --json` 声明了 `output_json` 但函数体内零引用（"设计了但未集成"）。
+- `repl` 经查**不是问题**：错误按设计吞掉并继续交互循环。
+- **预先存在的隐患（本次未改，详见 ISSUE-015）**：`ask` 缺 `cleanup_all_background_processes()`
+  → 后台子进程成孤儿（新旧退出路径行为一致，非本次引入）；命令白名单里
+  `python <脚本>` / `pip install` 可通过校验（若 prompt 不可信则可达 RCE）；
+  `display` 未转义 rich markup；`ask` 的 except 丢弃 traceback，`--debug` 也拿不到堆栈。
+
+### 测试隔离教训
+
+进程内用例必须 patch 掉 `init_logging`/`load_environment`——`init_logging()` 会给名为
+`mini_claude` 的 logger 设 `propagate=False` 并替换其 handler，同会话后续用例的 `caplog`
+便收不到日志，一次跑红 36 个 `test_prompts` 用例；子进程用例 cwd 必须设 `tmp_path`——
+否则 `init_logging()` 会写脏 **git 跟踪**的 `logs/mini_claude.log`。两条都已实测踩到。
+（另：cwd 不影响 `.env` 加载——`load_dotenv()` 走 `find_dotenv(usecwd=False)`，
+从调用方文件向上查找。子进程因此改用**最小 env 白名单**，而非"剥掉某几个前缀"。）
 
 ## 2026-09-04 主图 checkpointer 装配错误修复
 
