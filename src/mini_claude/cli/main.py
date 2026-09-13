@@ -31,6 +31,12 @@ def init_logging():
 def main(ctx, model: Optional[str], workspace: str, debug: bool):
     """Mini Claude Code - A multi-agent CLI assistant."""
     load_environment()
+    if debug:
+        # ISSUE-017：--debug 不再是死参数——它把日志级别提到 DEBUG
+        #（与 repl 里写 settings.workspace_root 同构；init_logging 之前生效）。
+        from mini_claude.config.settings import settings
+
+        settings.log_level = "DEBUG"
     init_logging()
     ctx.ensure_object(dict)
     ctx.obj["model"] = model
@@ -75,15 +81,21 @@ def repl(ctx):
 def ask(ctx, prompt: str, model: Optional[str], output_json: bool):
     """Execute a single prompt and exit."""
     import json
+    import traceback
     from ..llm.provider import LLMProvider, convert_tools_to_litellm
     from ..tools import get_all_tools, execute_tool
+    from ..utils.logger import get_logger
+
+    logger = get_logger(__name__)
+    debug = bool((ctx.obj or {}).get("debug"))
 
     load_environment()
 
     async def run_single():
         llm = LLMProvider(model)
-        display.user_message(prompt)
-        display.show_thinking()
+        if not output_json:
+            display.user_message(prompt)
+            display.show_thinking()
 
         # Get tools
         tools = get_all_tools()
@@ -111,7 +123,8 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool):
                     if isinstance(tool_args, str):
                         tool_args = json.loads(tool_args)
 
-                    print(f"[Tool] {tool_name}({tool_args})")
+                    if not output_json:
+                        print(f"[Tool] {tool_name}({tool_args})")
                     result = await execute_tool(tool_name, tool_args)
 
                     # Add assistant message and tool result
@@ -126,15 +139,38 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool):
             else:
                 result_text = message.content or ""
 
-            display.agent_message(result_text)
+            if not output_json:
+                display.agent_message(result_text)
             return result_text
         except Exception as e:
-            display.show_error(str(e))
+            # ISSUE-020：堆栈不再丢弃——记进日志；--debug 下再打到终端。
+            logger.error(f"ask failed: {e}", exc_info=True)
+            if debug:
+                traceback.print_exc()
+            if output_json:
+                print(json.dumps({"error": str(e)}, ensure_ascii=False))
+            else:
+                display.show_error(str(e))
             # 失败必须反映到退出码：脚本与 CI 只认退出码，
             # 只打印错误再正常返回会让它们把失败当成成功。
             raise SystemExit(1)
+        finally:
+            # ISSUE-018：ask 退出前清理后台进程（与 repl.run_graph 的 finally 同构）。
+            # SystemExit 会穿过 finally，退出码语义不变；清理在事件循环内直接 await。
+            from ..tools.bash import (
+                cleanup_all_background_processes,
+                get_background_process_count,
+            )
 
-    asyncio.run(run_single())
+            if get_background_process_count() > 0:
+                if not output_json:
+                    display.console.print("[dim]清理后台进程...[/]")
+                await cleanup_all_background_processes()
+
+    result_text = asyncio.run(run_single())
+    # ISSUE-017：--json 不再是死参数——只输出最终 JSON 一行，便于脚本解析。
+    if output_json:
+        print(json.dumps({"answer": result_text}, ensure_ascii=False))
 
 
 @main.command()
@@ -391,12 +427,20 @@ def tool_deps(ctx, tool_name: Optional[str], output_json: bool):
     from rich.table import Table
     from rich.panel import Panel
     from rich.tree import Tree
+    import json
 
     graph = get_dependency_graph()
 
-    if output_json:
-        import json
+    # ISSUE-021：存在性检查必须在 --json 分支之前——原来 --json 先调
+    # get_dependency_info，不存在的工具直接抛未捕获 ValueError。
+    if tool_name and not tool_registry.get(tool_name):
+        if output_json:
+            print(json.dumps({"error": f"Tool '{tool_name}' not found"}))
+        else:
+            display.console.print(f"[red]Error: Tool '{tool_name}' not found[/]")
+        raise SystemExit(1)
 
+    if output_json:
         if tool_name:
             info = tool_registry.get_dependency_info(tool_name)
         else:

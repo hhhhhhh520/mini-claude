@@ -6,6 +6,7 @@ from typing import Dict, List
 from enum import Enum
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.syntax import Syntax
@@ -113,7 +114,9 @@ class AgentDisplay:
 
     def user_message(self, message: str):
         """Display user message."""
-        self.console.print(f"\n[bold green]You:[/] {message}")
+        # ISSUE-020：外部输入必须 escape，否则 prompt 里的 [red] 之类会被 rich
+        # 当作 markup 解析，造成终端输出伪造。
+        self.console.print(f"\n[bold green]You:[/] {escape(message)}")
 
     def agent_message(self, message: str):
         """Display agent response."""
@@ -122,7 +125,7 @@ class AgentDisplay:
         if any(marker in message for marker in ["```", "##", "**", "- "]):
             self.console.print(Markdown(message))
         else:
-            self.console.print(message)
+            self.console.print(escape(message))
 
     def start_stream(self):
         """Start streaming output."""
@@ -215,7 +218,7 @@ class AgentDisplay:
 
     def show_error(self, error: str):
         """Display error message."""
-        self.console.print(f"\n[bold red]Error:[/] {error}")
+        self.console.print(f"\n[bold red]Error:[/] {escape(error)}")
 
     def show_thinking(self, message: str = "Thinking..."):
         """Show thinking indicator."""

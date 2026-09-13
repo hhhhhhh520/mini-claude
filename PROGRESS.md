@@ -65,6 +65,50 @@
 | 低 | 假测试清理 | ~52 个虚弱测试（弱断言/无断言/验证 Python 机制） |
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（provider.py, observe.py, web_fetch.py 等） |
 
+## 2026-09-13 mini-claude ISSUE-017~021 五连修
+
+**触发**: ISSUE-015/016 收尾时开的单（见上节"死参数/预先存在的隐患"），本轮清掉。
+
+### ISSUE-019 命令白名单三通道（先复现后修）
+- **复现实锤**（只读探针）：`python evil.py` / `pip install requests` /
+  `python -m pip install evil-pkg` 全部 PASS（`pip` 不在 `BLOCKED_PYTHON_MODULES` 里）。
+- **修复**（`utils/safety.py`，与既有"确认=拒+confirmation 文案"约定对齐）：
+  `CONFIRMATION_REQUIRED_PATTERNS` 加 `pip3?\s+install` / `pip3?\s+-[re]\b`
+ （顺手把旧 `pip\s+uninstall` 扩成 `pip3?`，旧模式漏 pip3）；
+  Step 7.6：`python`/`python3` 带目录成分的 `.py` 位置参数走工作区校验，
+  区外拒；纯文件名放行（旧行为 + 官方示例能力保留）。
+- **穷举比对**（35 条新旧对照）：差异仅预期的 10 条 PASS→BLOCK
+ （含 `python ../x.py`、`pip3 uninstall` 两个此前漏网），其余 25 条零变化。
+- **测试**：新 `tests/test_utils/test_safety_supply_chain.py` 13 条（6 红→13 绿）；
+  `test_bash.py::test_validate_safe_pip_install` 按行为变更改断言（True→False+confirmation）。
+
+### ISSUE-021 `tool-deps --json` 不存在工具（存在性检查前移）
+- `tool_deps` 在 `--json` 分支前加同一出口：`--json` 下输出 `{"error": ...}`，
+  非 json 下原友好文案，退出 1 不变。
+- **测试**：新 `tests/test_cli/test_tool_deps_json_error.py` 3 条
+  （2 CliRunner + 1 真实子进程断终端无 Traceback），3 红→3 绿。
+
+### ISSUE-017/018/020（ask 联动，一起修）
+- `--json`：成功只打最终 JSON 一行 `{"answer": ...}`（中间输出全静默），
+  失败打 `{"error": ...}` 再 exit 1。
+- `--debug`：`main()` 里 `init_logging()` 之前写 `settings.log_level = "DEBUG"`
+  （与 repl 写 workspace 同构）；`ask` except 改 `logger.error(..., exc_info=True)`
+  （`StructuredLogger` 无 `.exception` 方法，实踩）+ `--debug` 下终端 `traceback.print_exc()`。
+- 018：在 `run_single()` 加 `finally` 调清理（与 `repl.run_graph` 同构；
+  在循环内直接 await，无需另起 loop；SystemExit 穿过 finally，退出码不变）。
+- `display.user_message` / `agent_message` 纯文本分支 / `show_error` 加
+  `rich.markup.escape`（Markdown 渲染分支不动）。
+- **测试**：新 `tests/test_cli/test_ask_json_debug.py` 10 条
+  （含 1 真实子进程复核 `--json`），修复前 7 红 2 绿（守卫绿）→ 10 绿。
+  附带教训：`sort`/`tail -f` 在 Windows cmd 下不可做长驻命令；
+  同步 Popen 与 asyncio 的 `await proc.wait()` 不兼容——018 测试改用
+  "登记活进程 + mock 清理计数"判别 finally 是否被调。
+
+### 全量回归
+`1725 passed / 40 skipped / 7 failed`——5 个预存（2 个 `402 Insufficient Balance` +
+其余环境性）+ 2 个新增预存（`ls` 在 Windows cmd 下不存在，stash 对照证实与本改动无关）。
+`TEST_PLAN.md`（06-28 历史手工计划，untracked）未动。`logs/` 无写脏。
+
 ## 2026-09-13 `ask` 失败退出码恒为 0（ISSUE-015）
 
 **触发**: 2026-09-12 八项目启动验证发现——`mini-claude ask` 在 LLM 失败（key 欠费/网络错误）时
