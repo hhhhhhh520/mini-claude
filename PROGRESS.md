@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-09-04 (修复主图 checkpointer 装配错误，REPL 链路恢复可用)
+> 最后更新: 2026-09-05 (修复主图 checkpointer 装配错误，REPL 链路恢复可用)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -353,14 +353,14 @@ T009「REPL 启动」记为「❌ prompt_toolkit 非交互终端崩溃」而放�
 **文件**: test_alerts.py, test_tracing.py, providers.py, test.yml
 **测试**: 1734 测试通过
 
-## 可用工具（18个）
+## 可用工具（21个）
 
 | 类别 | 工具 |
 |------|------|
 | 文件操作 (8) | read_file, write_file, edit_file, force_write, list_dir, search_files, search_content, list_locks |
 | 命令执行 (2) | run_command, run_background |
 | Web (3) | web_search, web_fetch, weather |
-| Agent协作 (7) | spawn_agent, spawn_parallel, list_agents, get_result, plan_parallel, execute_parallel, parallel_status, aggregate_results |
+| Agent协作 (8) | spawn_agent, spawn_parallel, list_agents, get_result, plan_parallel, execute_parallel, parallel_status, aggregate_results |
 
 **子代理白名单**（`SpawnAgentTool.ALLOWED_TOOLS`）：read_file, write_file, edit_file, list_dir, search_files, search_content, web_search
 
