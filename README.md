@@ -1,6 +1,15 @@
+<div align="center">
+
 # Mini Claude Code
 
-一个迷你版 Claude Code，支持工具调用和多Agent并发处理复杂任务。
+**迷你版 Claude Code** — 工具调用 + 主从多 Agent 并发，在一个 CLI 里跑完整开发循环。
+
+[![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
+[![Tests](https://img.shields.io/badge/Tests-1772%20collected-brightgreen)](tests/)
+[![Tools](https://img.shields.io/badge/Tools-18-orange)](#可用工具18个)
+[![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
+
+</div>
 
 ## 特性
 
@@ -13,7 +22,7 @@
 - **会话持久化**：SQLite checkpoint + 启动时恢复提示，支持 `/resume` 断点续跑
 - **工具降级**：连续失败 3 次自动跳过工具，10 分钟后自动恢复
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
-- **测试规模**：1735 个测试用例（2026-09-05 实测 1691 passed / 40 skipped；覆盖率因 pytest-cov 未安装暂未统计）
+- **测试规模**：1772 个测试用例（2026-09-13 实测收集数；Windows 下 2 个 bash 用例因 Unix 命令假设失败，待修）
 
 ## 安装
 
@@ -214,7 +223,7 @@ mini-claude/
 │   ├── llm/          # LLM抽象层 + 系统提示词
 │   ├── config/       # Pydantic配置管理
 │   └── utils/        # 工具函数（含file_lock）
-└── tests/            # 测试（1735 个用例）
+└── tests/            # 测试（1772 个用例）
 ```
 
 ## License
