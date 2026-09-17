@@ -149,9 +149,19 @@ class REPLSession:
                 )
                 row = await cursor.fetchone()
                 if row and row[0] > 0:
-                    cursor = await db.execute("SELECT COUNT(*) FROM checkpoints")
-                    row = await cursor.fetchone()
-                    return row and row[0] > 0
+                    # P1-8：只看当前 thread 的 checkpoint，别人的会话不算我的。
+                    # 旧逻辑全表 COUNT，有任何残留都弹恢复，新开 thread 也被误打扰。
+                    try:
+                        cursor = await db.execute(
+                            "SELECT COUNT(*) FROM checkpoints WHERE thread_id = ?",
+                            (self.thread_id,),
+                        )
+                        row = await cursor.fetchone()
+                        return row and row[0] > 0
+                    except Exception:
+                        cursor = await db.execute("SELECT COUNT(*) FROM checkpoints")
+                        row = await cursor.fetchone()
+                        return row and row[0] > 0
         except Exception as e:
             logger.debug("session check failed", error=str(e))
         return False
@@ -265,7 +275,18 @@ class REPLSession:
                         self._auto_save_session(settings)
 
                 except Exception as e:
+                    from rich.markup import escape
+
+                    from mini_claude.monitoring.health import classify_model_error
+
                     display.show_error(str(e))
+                    # P1-7：LLM 失败给中文下一步，不只甩原文。
+                    try:
+                        hint = classify_model_error(str(e))
+                        if hint:
+                            display.console.print(f"[yellow]下一步：{escape(hint)}[/]")
+                    except Exception:
+                        pass
 
             except KeyboardInterrupt:
                 display.console.print("\n[dim]Interrupted. Press Ctrl+D to exit.[/]")

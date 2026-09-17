@@ -147,3 +147,55 @@ class TestSessionCommandHandler:
         result = await self.handler.handle(ctx)
         assert result.handled is True
         assert "Usage" in result.message
+
+
+class TestCheckPreviousSessionScoped:
+    """P1-8：恢复提示只看当前 thread，别人的残留不打扰."""
+
+    @pytest.mark.asyncio
+    async def test_other_thread_does_not_trigger(self, tmp_path):
+        import aiosqlite
+
+        from mini_claude.cli.repl import REPLSession
+
+        db = tmp_path / "s.db"
+        async with aiosqlite.connect(db) as conn:
+            await conn.execute(
+                "CREATE TABLE checkpoints (thread_id TEXT, checkpoint_ns TEXT, "
+                "checkpoint_id TEXT, parent_checkpoint_id TEXT, type TEXT, "
+                "checkpoint BLOB, metadata BLOB)"
+            )
+            await conn.execute(
+                "INSERT INTO checkpoints (thread_id) VALUES ('someone-else')"
+            )
+            await conn.commit()
+
+        session = REPLSession()
+        session.thread_id = "mine"
+        with patch(
+            "mini_claude.config.settings.settings.session_db_path", str(db)
+        ):
+            assert await session._check_previous_session() is False
+
+    @pytest.mark.asyncio
+    async def test_own_thread_triggers(self, tmp_path):
+        import aiosqlite
+
+        from mini_claude.cli.repl import REPLSession
+
+        db = tmp_path / "s.db"
+        async with aiosqlite.connect(db) as conn:
+            await conn.execute(
+                "CREATE TABLE checkpoints (thread_id TEXT, checkpoint_ns TEXT, "
+                "checkpoint_id TEXT, parent_checkpoint_id TEXT, type TEXT, "
+                "checkpoint BLOB, metadata BLOB)"
+            )
+            await conn.execute("INSERT INTO checkpoints (thread_id) VALUES ('mine')")
+            await conn.commit()
+
+        session = REPLSession()
+        session.thread_id = "mine"
+        with patch(
+            "mini_claude.config.settings.settings.session_db_path", str(db)
+        ):
+            assert await session._check_previous_session() is True

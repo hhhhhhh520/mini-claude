@@ -166,7 +166,8 @@ class RunBackgroundTool(BaseTool):
             return f"Started background task: {task_id}\nPID: {process.pid}"
 
         except Exception as e:
-            return f"Error starting background task: {e}"
+            # ISSUE-012 #6：与 RunCommandTool:119 对齐，只报类型名，不回显内部详情。
+            return f"Error starting background task: {type(e).__name__}"
 
 
 def get_background_process_count() -> int:

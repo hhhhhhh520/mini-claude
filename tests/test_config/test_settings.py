@@ -110,8 +110,19 @@ class TestUserProfileSettings:
 class TestSettingsBackwardCompatibility:
     """Tests for backward compatibility with existing settings."""
 
-    def test_existing_settings_unchanged(self):
+    def test_existing_settings_unchanged(self, monkeypatch, tmp_path):
         """Test existing settings remain unchanged."""
+        # P1-10：本地 .env（如 DEFAULT_MODEL=deepseek-chat）会覆盖码内默认，
+        # 此单测只验码内默认，必须隔离 cwd+.env 与环境变量。
+        monkeypatch.chdir(tmp_path)
+        for var in (
+            "DEFAULT_MODEL",
+            "MAX_SUB_AGENTS",
+            "MAX_ITERATIONS",
+            "STREAMING_ENABLED",
+            "LOG_LEVEL",
+        ):
+            monkeypatch.delenv(var, raising=False)
         settings = Settings()
         # Check existing settings still have default values
         # Note: default_model changed from "deepseek-chat" to "deepseek-v4-flash"
@@ -127,6 +138,43 @@ class TestSettingsBackwardCompatibility:
         assert settings.default_model == "gpt-4"
         assert settings.max_iterations == 20
         assert settings.vector_db_type == "faiss"
+
+
+class TestGatewayProviderRouting:
+    """网关路由：未知模型跟 base_url 走，不被误判成本地 ollama."""
+
+    def test_qwen_routes_to_openai_compatible(self):
+        from mini_claude.config.settings import ModelProvider
+
+        settings = Settings(
+            openai_base_url="https://tokenrhythm.studio/v1",
+            default_model="qwen3.8-flash",
+        )
+        assert settings.get_model_provider() == ModelProvider.OPENAI
+
+    def test_unknown_model_with_gateway_routes_openai(self):
+        from mini_claude.config.settings import ModelProvider
+
+        settings = Settings(
+            openai_base_url="https://example.com/v1",
+            default_model="some-future-model",
+        )
+        assert settings.get_model_provider() == ModelProvider.OPENAI
+
+    def test_unknown_model_without_gateway_stays_ollama(self):
+        from mini_claude.config.settings import ModelProvider
+
+        settings = Settings(openai_base_url=None, default_model="some-local-model")
+        assert settings.get_model_provider() == ModelProvider.OLLAMA
+
+    def test_deepseek_still_deepseek_with_gateway(self):
+        from mini_claude.config.settings import ModelProvider
+
+        settings = Settings(
+            openai_base_url="https://api.deepseek.com",
+            default_model="deepseek-chat",
+        )
+        assert settings.get_model_provider() == ModelProvider.DEEPSEEK
 
 
 class TestVectorDBTypeEnum:

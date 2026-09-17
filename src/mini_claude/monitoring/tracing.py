@@ -61,8 +61,10 @@ try:
     _tracing_available = True
 except ImportError:
     _tracing_available = False
-    logger.warning(
-        "OpenTelemetry not installed. Tracing disabled. Install with: pip install opentelemetry-api opentelemetry-sdk"
+    # P0-1：import 时只记 debug，避免每次启动都刷 warning；
+    # 用户显式 trace --enable 时 setup() 里再给中文指引。
+    logger.debug(
+        "OpenTelemetry not installed. Tracing disabled. Install with: pip install -e .[tracing]"
     )
 
 
@@ -334,7 +336,9 @@ class TracingManager:
             True if setup successful, False otherwise
         """
         if not _tracing_available:
-            logger.warning("Tracing not available - OpenTelemetry not installed")
+            logger.warning(
+                "Tracing 不可用：缺 opentelemetry，请 pip install -e .[tracing] 后再 trace --enable"
+            )
             return False
 
         # Use settings defaults

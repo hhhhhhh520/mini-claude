@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
 [![Tests](https://img.shields.io/badge/Tests-1772%20collected-brightgreen)](tests/)
-[![Tools](https://img.shields.io/badge/Tools-18-orange)](#可用工具18个)
+[![Tools](https://img.shields.io/badge/Tools-21-orange)](#可用工具21个)
 [![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
 
 </div>
@@ -27,8 +27,16 @@
 ## 安装
 
 ```bash
+# 基础安装（CLI + 主 Agent 循环）
 pip install -e .
+
+# 推荐：一次装全（测试/搜索/向量/追踪/健康服务）
+pip install -e ".[dev,web,vector,tracing,server]"
 ```
+
+缺件时命令会给中文指引而非 traceback：
+`web_search` 需 `[web]`，`trace --enable` 需 `[tracing]`，
+`serve-health` 需 `[server]`，向量记忆需 `[vector]`。
 
 ## 使用
 
@@ -55,7 +63,16 @@ mini-claude ask "搜索Python异步编程最佳实践"
 
 # 代码分析
 mini-claude ask "分析当前项目的代码结构"
+
+# 完整主循环（多步工具/错误恢复，慢但能多轮）
+mini-claude ask --full "并行创建三个 API 模块并自验"
 ```
+
+| 模式 | 循环 | 单次内多轮 | 跨会话恢复 | 花费 | 用途 |
+|------|------|-----------|-----------|------|------|
+| `ask`（默认） | 快捷两步 | 否 | 否 | 便宜 | 问答、单批工具 |
+| `ask --full` | 完整主图 | 是 | 否（无 checkpoint） | 贵 | 单条命令多步活 |
+| REPL | 完整主图+会话 | 是 | 是 | 贵 | 日常干活 |
 
 ### 查看状态
 
@@ -210,6 +227,9 @@ Tool Layer (file_ops, bash, web_search, agent_spawn)
     ↓
 Lock Layer (file_lock.py - 并发控制)
 ```
+
+> 注：`web_fetch/weather/web_search` 为同步阻塞调用，单用户 CLI 下可接受；
+> 并行 agent 高频抓取时会互拖，介意者请先用缓存或串行，异步化待排期。
 
 ## 项目结构
 

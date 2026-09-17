@@ -137,6 +137,13 @@ class LLMSettings(BaseSettings):
             return ModelProvider.OPENAI
         elif "gemini" in model_lower:
             return ModelProvider.GEMINI
+        elif "qwen" in model_lower or "tokenrhythm" in model_lower or "tr-" in model_lower:
+            # TokenRhythm / Qwen 系走 OpenAI 兼容网关（OPENAI_BASE_URL）
+            return ModelProvider.OPENAI
+        elif self.openai_base_url:
+            # 配了自定义 base_url = 网关模式：未知模型一律走 openai/ 兼容通道，
+            # 否则会被当成 ollama/ 打到本地 11434。
+            return ModelProvider.OPENAI
         else:
             return ModelProvider.OLLAMA
 

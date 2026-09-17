@@ -104,6 +104,23 @@ class TestValidationResult:
 class TestAPIKeyValidation:
     """Tests for API key format validation."""
 
+    @pytest.fixture(autouse=True)
+    def _isolate_keys(self, monkeypatch, tmp_path):
+        """隔离本机 .env/环境变量。
+
+        这些用例只显式传一个 key、断言警告数，pydantic-settings 仍会从
+        环境与 .env 读其余 key（本机真实 key 混入会让计数断言假红）。
+        """
+        for var in (
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "GOOGLE_API_KEY",
+            "OPENAI_BASE_URL",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        # 换到空目录：env_file=".env" 是相对路径，找不到文件即不加载。
+        monkeypatch.chdir(tmp_path)
+
     def test_valid_openai_key_format(self):
         """Test valid OpenAI API key format."""
         settings = Settings(openai_api_key="sk-validkey1234567890123")

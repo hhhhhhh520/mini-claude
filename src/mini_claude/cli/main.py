@@ -16,6 +16,26 @@ def load_environment():
     load_dotenv()
 
 
+def _suppress_third_party_stdout_noise():
+    """P0-3：第三方库（litellm）出错时往 stdout 打广告，污染 --json。
+
+    Best-effort：litellm 未装也不炸；正常人类输出不受影响。
+    """
+    import os
+
+    os.environ.setdefault("LITELLM_LOG", "ERROR")
+    # 不设此项时 litellm 启动会去 GitHub 拉远程 model cost map，
+    # 网络不通/SSL 失败要空等约 8 秒（本机实测）才回退本地副本。
+    # 关掉不影响功能：成本表本就有随包本地副本。
+    os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+    try:
+        import litellm
+
+        litellm.suppress_debug_info = True
+    except ImportError:
+        pass
+
+
 def init_logging():
     """Initialize logging system."""
     from ..utils.logger import init_logging_from_settings
@@ -31,6 +51,7 @@ def init_logging():
 def main(ctx, model: Optional[str], workspace: str, debug: bool):
     """Mini Claude Code - A multi-agent CLI assistant."""
     load_environment()
+    _suppress_third_party_stdout_noise()
     if debug:
         # ISSUE-017：--debug 不再是死参数——它把日志级别提到 DEBUG
         #（与 repl 里写 settings.workspace_root 同构；init_logging 之前生效）。
@@ -77,9 +98,19 @@ def repl(ctx):
 @click.argument("prompt")
 @click.option("--model", "-m", default=None, help="Model to use")
 @click.option("--json", "output_json", is_flag=True, help="Output as JSON")
+@click.option(
+    "--full",
+    is_flag=True,
+    help="P1-6：走完整 LangGraph 主循环（多步工具/恢复），默认只做快捷两步问答。",
+)
 @click.pass_context
-def ask(ctx, prompt: str, model: Optional[str], output_json: bool):
-    """Execute a single prompt and exit."""
+def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
+    """Execute a single prompt and exit.
+
+    默认 ask 是快捷两步（问答+一批工具+汇总），便宜快速；
+    REPL 是完整主循环（THINK→PLAN→ACT→OBSERVE→CHECK，多轮/恢复）。
+    要单条命令走完整循环用 --full（慢、贵，但能多步）。
+    """
     import json
     import traceback
     from ..llm.provider import LLMProvider, convert_tools_to_litellm
@@ -90,6 +121,89 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool):
     debug = bool((ctx.obj or {}).get("debug"))
 
     load_environment()
+
+    def _error_payload(e: Exception) -> dict:
+        # P1-7：错误原文保留给脚本，中文 hint 给人看（复用 health 分类器）。
+        payload = {"error": str(e)}
+        try:
+            from ..monitoring.health import classify_model_error
+
+            hint = classify_model_error(str(e))
+            if hint:
+                payload["hint"] = hint
+        except Exception:
+            pass
+        return payload
+
+    def _show_error(e: Exception) -> None:
+        display.show_error(str(e))
+        try:
+            from rich.markup import escape
+
+            from ..monitoring.health import classify_model_error
+
+            hint = classify_model_error(str(e))
+            if hint:
+                # 分类器当前恒返常量，但别把 markup 注入面留给未来的改动。
+                display.console.print(f"[yellow]下一步：{escape(hint)}[/]")
+        except Exception:
+            pass
+
+    async def _cleanup_background() -> None:
+        from ..tools.bash import (
+            cleanup_all_background_processes,
+            get_background_process_count,
+        )
+
+        if get_background_process_count() > 0:
+            if not output_json:
+                display.console.print("[dim]清理后台进程...[/]")
+            await cleanup_all_background_processes()
+
+    async def run_full():
+        """P1-6：完整主循环单发版（无 checkpoint，不污染 REPL 会话）."""
+        import contextlib
+        import sys as _sys
+
+        from ..agent.graph import build_agent_graph_no_checkpoint
+        from ..agent.state import create_initial_state
+
+        if not output_json:
+            display.user_message(prompt)
+            display.show_thinking()
+        graph = build_agent_graph_no_checkpoint()
+        try:
+            # --json 下图节点里的 display（工具调用/流式）会直打 stdout，
+            # 把整段图执行重定向到 stderr，stdout 只留最后的 JSON 一行。
+            if output_json:
+                with contextlib.redirect_stdout(_sys.stderr):
+                    result = await graph.ainvoke(
+                        create_initial_state(prompt, []),
+                        {"recursion_limit": 50},
+                    )
+            else:
+                result = await graph.ainvoke(
+                    create_initial_state(prompt, []),
+                    {"recursion_limit": 50},
+                )
+            messages = result.get("messages", [])
+            last = messages[-1] if messages else None
+            result_text = getattr(last, "content", "") if last is not None else ""
+            result_text = result_text or ""
+            if not output_json:
+                display.agent_message(result_text)
+            return result_text
+        except Exception as e:
+            logger.error(f"ask --full failed: {e}", exc_info=True)
+            if debug:
+                traceback.print_exc()
+            if output_json:
+                print(json.dumps(_error_payload(e), ensure_ascii=False))
+            else:
+                _show_error(e)
+            raise SystemExit(1)
+        finally:
+            await _cleanup_background()
 
     async def run_single():
         llm = LLMProvider(model)
@@ -148,26 +262,18 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool):
             if debug:
                 traceback.print_exc()
             if output_json:
-                print(json.dumps({"error": str(e)}, ensure_ascii=False))
+                print(json.dumps(_error_payload(e), ensure_ascii=False))
             else:
-                display.show_error(str(e))
+                _show_error(e)
             # 失败必须反映到退出码：脚本与 CI 只认退出码，
             # 只打印错误再正常返回会让它们把失败当成成功。
             raise SystemExit(1)
         finally:
             # ISSUE-018：ask 退出前清理后台进程（与 repl.run_graph 的 finally 同构）。
             # SystemExit 会穿过 finally，退出码语义不变；清理在事件循环内直接 await。
-            from ..tools.bash import (
-                cleanup_all_background_processes,
-                get_background_process_count,
-            )
+            await _cleanup_background()
 
-            if get_background_process_count() > 0:
-                if not output_json:
-                    display.console.print("[dim]清理后台进程...[/]")
-                await cleanup_all_background_processes()
-
-    result_text = asyncio.run(run_single())
+    result_text = asyncio.run(run_full() if full else run_single())
     # ISSUE-017：--json 不再是死参数——只输出最终 JSON 一行，便于脚本解析。
     if output_json:
         print(json.dumps({"answer": result_text}, ensure_ascii=False))
@@ -191,12 +297,22 @@ def status(ctx):
 
 
 @main.command()
-@click.argument("model")
+@click.argument("model", required=False)
 @click.pass_context
 def model(ctx, model: str):
-    """Switch default model."""
-    # This would need to update settings
-    display.console.print(f"[dim]Model set to: {model}[/]")
+    """Show model info (switching via CLI is not supported).
+
+    P0-5：此前打印 "Model set to: x" 实则什么都没改，是撒谎。
+    与 REPL /model 对齐：只读展示 + 指到 .env。
+    """
+    from mini_claude.config.settings import settings
+
+    display.console.print(f"[bold]当前模型:[/] {settings.default_model}")
+    if model:
+        display.console.print(
+            f"[yellow]未切换到 {model}：CLI 动态切换未支持（provider/key/token 联动复杂）。[/]"
+        )
+    display.console.print("[dim]改模型请改 .env 的 DEFAULT_MODEL=... 后重跑[/]")
 
 
 @main.command()
@@ -282,6 +398,22 @@ def health(ctx, port: int, output_json: bool):
                 f"\n[bold]Overall Status:[/] [{overall_color}]{report.overall_status().value}[/{overall_color}]"
             )
 
+            # P0-2：本地没坏、只是模型钥匙/余额问题时必须明说，
+            # 否则新人会把 402 当成安装失败。
+            hint = report.model.action_hint()
+            if hint:
+                from rich.markup import escape
+
+                if (
+                    report.service.status == HealthStatus.HEALTHY
+                    and report.tools.status == HealthStatus.HEALTHY
+                ):
+                    display.console.print(
+                        "[yellow]本地服务与工具正常，只是模型调不通，装得没问题。[/]"
+                    )
+                display.console.print(f"[yellow]下一步：{escape(hint)}[/]")
+                display.console.print("[dim]详查跑 mini-claude doctor[/]")
+
         return report
 
     # Import HealthStatus for display
@@ -293,6 +425,94 @@ def health(ctx, port: int, output_json: bool):
     # 否则脚本/CI 拿到 unhealthy 的退出码 0，会当成系统正常。
     if report.overall_status() != HealthStatus.HEALTHY:
         raise SystemExit(1)
+
+
+@main.command()
+@click.pass_context
+def doctor(ctx):
+    """P0-2：新人自查钥匙/网络/工作区，不打真 LLM，不花钱。
+
+    只查 presence（key 是否填了），绝不打印 key 明文。
+    诊断命令永远 exit 0，问题看面板逐项修。
+    """
+    import os
+    from pathlib import Path
+    from rich.panel import Panel
+    from rich.table import Table
+
+    from mini_claude.config.settings import settings
+
+    rows = []
+
+    def _present(value) -> bool:
+        return bool(value and str(value).strip())
+
+    # 1. 模型与钥匙（只判有无）
+    provider = settings.get_model_provider()
+    rows.append(("默认模型", settings.default_model, True))
+    rows.append(("Provider", str(getattr(provider, 'value', provider)), True))
+    has_key = any(
+        [
+            _present(settings.openai_api_key),
+            _present(settings.anthropic_api_key),
+            _present(settings.google_api_key),
+        ]
+    )
+    rows.append(("API Key 已填", "是" if has_key else "否（.env 里填一个）", has_key))
+    rows.append(
+        ("Base URL", settings.openai_base_url or "默认官方", True),
+    )
+
+    # 2. 工作区与会话库
+    ws = Path(settings.workspace_root)
+    ws_ok = ws.exists()
+    rows.append(("工作区存在", str(ws) if ws_ok else f"{ws} 不存在", ws_ok))
+    try:
+        writable = ws.exists() and os.access(ws, os.W_OK)
+    except Exception:
+        writable = False
+    rows.append(("工作区可写", "是" if writable else "否", writable))
+    try:
+        db_parent = Path(settings.session_db_path).parent
+        db_parent.mkdir(parents=True, exist_ok=True)
+        rows.append(("会话库目录可写", str(db_parent), True))
+    except Exception as e:
+        rows.append(("会话库目录可写", f"否：{type(e).__name__}", False))
+
+    # 3. 工具与可选依赖（只判 import，不跑网络）
+    from mini_claude.tools import tool_registry
+
+    tools = tool_registry.list_tools()
+    rows.append((f"工具注册 {len(tools)} 个", ", ".join(tools[:5]) + ("…" if len(tools) > 5 else ""), len(tools) > 0))
+
+    def _has(mod: str) -> bool:
+        try:
+            __import__(mod)
+            return True
+        except ImportError:
+            return False
+
+    rows.append(("搜索依赖 ddgs", "已装" if _has("ddgs") else "未装→ pip install -e .[web]", True))
+    rows.append(("追踪依赖 otel", "已装" if _has("opentelemetry.trace") else "未装→ pip install -e .[tracing]", True))
+    rows.append(("服务依赖 aiohttp", "已装" if _has("aiohttp") else "未装→ pip install -e .[server]", True))
+    rows.append(("向量依赖", "已装(chromadb/faiss)" if (_has("chromadb") or _has("faiss")) else "未装→ pip install -e .[vector]（可选）", True))
+
+    table = Table(title="Doctor")
+    table.add_column("检查项", style="cyan")
+    table.add_column("结果", style="green")
+    table.add_column("状态", style="bold")
+    for name, result, ok in rows:
+        table.add_row(name, str(result), "[green]OK[/]" if ok else "[red]修[/]")
+    display.console.print(table)
+    display.console.print(
+        Panel.fit(
+            "下一步：\n"
+            "1. Key 没填 → 复制 .env.example 为 .env 填一个\n"
+            "2. 欠费/401 → 按 health 的 action_hint 修\n"
+            "3. 工作区不对 → mini-claude --workspace <dir> status",
+            title="Next",
+        )
+    )
 
 
 @main.command()
@@ -310,7 +530,12 @@ def serve_health(ctx, port: int):
     from mini_claude.monitoring.health import run_health_server
 
     display.console.print(f"[dim]Starting health server on port {port}...[/]")
-    asyncio.run(run_health_server(port=port, run=True))
+    try:
+        asyncio.run(run_health_server(port=port, run=True))
+    except RuntimeError as e:
+        # P0-1：缺 aiohttp 时给安装指引，不打 traceback。
+        display.show_error(str(e))
+        raise SystemExit(1)
 
 
 @main.command()

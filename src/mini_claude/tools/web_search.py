@@ -59,7 +59,7 @@ class WebSearchTool(BaseTool):
         try:
             from ddgs import DDGS
         except ImportError:
-            return "Error: ddgs not installed. Run: pip install ddgs -i https://pypi.tuna.tsinghua.edu.cn/simple"
+            return "Error: 缺 ddgs，web_search 用不了。请 pip install -e .[web]（或 pip install ddgs）后再试。"
 
         queries = [query]
 

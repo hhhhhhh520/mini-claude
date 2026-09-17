@@ -583,3 +583,51 @@ class TestHealthJSONOutput:
         data = json.loads(json_str)
 
         assert data["overall_status"] == "healthy"
+
+
+class TestModelErrorClassification:
+    """P0-2：模型错误分类器先红后绿锁定的单测（纯函数，无网络）."""
+
+    def test_billing_402(self):
+        from mini_claude.monitoring.health import classify_model_error
+
+        hint = classify_model_error("litellm.BadRequestError: OpenAIException - Insufficient Balance")
+        assert "欠费" in hint
+
+    def test_invalid_key_401(self):
+        from mini_claude.monitoring.health import classify_model_error
+
+        hint = classify_model_error("Incorrect API key provided: sk-xxx")
+        assert "Key" in hint
+
+    def test_rate_limit_429(self):
+        from mini_claude.monitoring.health import classify_model_error
+
+        hint = classify_model_error("Rate limit reached, 429 too many requests")
+        assert "限流" in hint
+
+    def test_network_timeout(self):
+        from mini_claude.monitoring.health import classify_model_error
+
+        hint = classify_model_error("Connection timed out after 10s")
+        assert "网络" in hint
+
+    def test_empty_no_hint(self):
+        from mini_claude.monitoring.health import classify_model_error
+
+        assert classify_model_error("") == ""
+        assert classify_model_error(None) == ""
+
+    def test_model_health_to_dict_carries_hint(self):
+        import time
+
+        model = ModelHealth(
+            status=HealthStatus.UNHEALTHY,
+            model_name="deepseek-chat",
+            provider="deepseek",
+            last_check_time=time.time(),
+            error_message="Insufficient Balance",
+        )
+        data = model.to_dict()
+        assert "action_hint" in data
+        assert "欠费" in data["action_hint"]

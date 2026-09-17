@@ -39,6 +39,9 @@ ENV/
 .coverage
 htmlcov/
 
+# Runtime logs (P0-4：运行一次写一次，跟踪了每次都脏)
+logs/
+
 # Session database
 *.db
 

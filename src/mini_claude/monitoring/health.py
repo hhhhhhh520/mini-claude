@@ -29,6 +29,19 @@ class HealthStatus(str, Enum):
     DEGRADED = "degraded"
 
 
+def _require_aiohttp():
+    """P0-1：serve_health 是可选能力，缺 aiohttp 时给中文指引而非 traceback。"""
+    try:
+        import aiohttp.web as web
+
+        return web
+    except ImportError:
+        raise RuntimeError(
+            "缺 aiohttp，health 服务起不来。请 pip install -e .[server] 后再试 "
+            "(serve_health /healthz/readyz/livez 都需要它)。"
+        )
+
+
 @dataclass
 class ServiceHealth:
     """Service health information."""
@@ -73,6 +86,13 @@ class ModelHealth:
     response_time_ms: Optional[float] = None
     error_message: Optional[str] = None
 
+    def action_hint(self) -> str:
+        """P0-2：把模型失败翻译成中文下一步，区分“装坏了”与“钥匙/余额问题”。
+
+        返回空字符串表示无需提示（HEALTHY 或无错误信息）。
+        """
+        return classify_model_error(self.error_message)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         data: Dict[str, Any] = {
@@ -85,7 +105,31 @@ class ModelHealth:
             data["response_time_ms"] = round(self.response_time_ms, 2)
         if self.error_message:
             data["error_message"] = self.error_message
+            hint = self.action_hint()
+            if hint:
+                data["action_hint"] = hint
         return data
+
+
+def classify_model_error(error_message: Optional[str]) -> str:
+    """P0-2：模型错误分类器（纯函数，无网络，可单元测试）。
+
+    欠费/钥匙/限流/网络各自给一步行动，避免新人把 402 当成安装失败。
+    """
+    if not error_message:
+        return ""
+    msg = error_message.lower()
+    if "insufficient balance" in msg or "insufficient_quota" in msg or "billing" in msg:
+        return "模型欠费/额度用尽：本地安装正常。去服务商后台充值或换 key，再跑 mini-claude doctor 验证。"
+    if "invalid api key" in msg or "incorrect api key" in msg or "unauthorized" in msg or "401" in msg:
+        return "Key 无效/未授权：检查 .env 里 OPENAI_API_KEY/ANTHROPIC_API_KEY 是否填对、是否多了空格换行。"
+    if "rate limit" in msg or "429" in msg or "too many requests" in msg:
+        return "被限流：等一分钟再试，或降低并发/换模型；高频探测别用 health，用 check_liveness。"
+    if "timeout" in msg or "timed out" in msg or "connection" in msg or "network" in msg:
+        return "网络/连接问题：检查代理与 OPENAI_BASE_URL 能否直连，先 ping 通再跑。"
+    if "model_not_found" in msg or "does not exist" in msg or "404" in msg:
+        return "模型名不存在：检查 DEFAULT_MODEL 是否拼对（如 deepseek-chat），用 mini-claude status 对照。"
+    return "模型调用失败：跑 mini-claude doctor 看钥匙与网络，再用 --debug 看完整堆栈。"
 
 
 @dataclass
@@ -466,7 +510,7 @@ async def health_handler(request: Any) -> Any:
     Returns:
         JSON response with health report.
     """
-    import aiohttp.web as web
+    web = _require_aiohttp()
 
     report = await check_health()
     status_code = 200 if report.overall_status() == HealthStatus.HEALTHY else 503
@@ -484,7 +528,7 @@ async def readiness_handler(request: Any) -> Any:
     Returns:
         JSON response indicating readiness.
     """
-    import aiohttp.web as web
+    web = _require_aiohttp()
 
     report = await check_health()
 
@@ -510,7 +554,7 @@ async def liveness_handler(request: Any) -> Any:
     Returns:
         JSON response indicating liveness.
     """
-    import aiohttp.web as web
+    web = _require_aiohttp()
 
     # Liveness just checks if the process is alive
     return web.Response(
@@ -535,7 +579,7 @@ async def run_health_server(
     Returns:
         aiohttp Application instance.
     """
-    import aiohttp.web as web
+    web = _require_aiohttp()
 
     app = web.Application()
     app.router.add_get("/health", health_handler)

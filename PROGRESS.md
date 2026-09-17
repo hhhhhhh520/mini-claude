@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-09-13 (修复 `ask` 失败退出码恒为 0，ISSUE-015)
+> 最后更新: 2026-09-14 (P0/P1 好用优化：extras/doctor/--json纯净/logs去跟踪/model诚实/ask--full/报错中文/会话按thread)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -55,15 +55,23 @@
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
-| 中 | ISSUE-019 命令白名单破口 | `python <脚本>` / `pip install` 通过校验，prompt 不可信时可达 RCE。**动手前先复现** |
-| 中 | ISSUE-018 `ask` 缺后台进程清理 | `run_background` 起的进程在 `ask` 退出后成孤儿；`repl` 有对应 `finally`，`ask` 没有 |
-| 低 | ISSUE-021 `tool-deps --json` 崩溃 | 工具名不存在时该分支未先校验存在性，抛未捕获 `ValueError` + traceback（退出码已是非 0，只是与另一路径不一致） |
-| 低 | ISSUE-017 死参数 | `ask --json` 与全局 `--debug` 均"声明了但零使用" |
-| 低 | ISSUE-020 回显未转义 + traceback 丢弃 | rich markup 未 escape（仅输出伪造）；`ask` 的 except 只留 `str(e)` |
-| 低 | reflect_node 异常吞没 | 非关键节点，但应至少记录 ERROR 级别日志 |
-| 低 | caplog 测试顺序问题 | `init_logging()` 会给 `mini_claude` logger 设 `propagate=False` 并替换其 handler，之后 test_prompts.py 的 36 个用例收不到 caplog 日志而失败。2026-09-13 实测确认触发条件；**当前看似正常只因采集顺序**——`test_llm/test_prompts.py` 排在 `test_utils/test_logger.py`（内含 14 处 `init_logging()` 调用）之前。`pytest tests/test_utils tests/test_llm/test_prompts.py` 即可复现 36 红 |
-| 低 | 假测试清理 | ~52 个虚弱测试（弱断言/无断言/验证 Python 机制） |
-| 低 | 无测试覆盖模块 | ~15 个源模块无测试（provider.py, observe.py, web_fetch.py 等） |
+| 中 | 假测试清理 | ~52 个虚弱测试（弱断言/无断言/验证 Python 机制），待逐个加固 |
+| 中 | 覆盖率重测 | 09-14 起 `pyproject` 已补 `vector/tracing/server` extras 与 `tiktoken` 硬依赖；本地先 `pip install -e ".[dev]"` 建基线，再卡 `fail_under=60` |
+| 低 | caplog 测试顺序问题 | `init_logging()` 设 `propagate=False` 致后跑的 36 个 `test_prompts` 收不到 caplog；`pytest tests/test_utils tests/test_llm/test_prompts.py` 可复现 |
+| 低 | reflect_node 异常吞没 | 非关键节点，但应至少记 ERROR 日志 |
+| 低 | 无测试覆盖模块 | ~15 个源模块无测试（`observe.py`、`web_fetch.py` 等核心路径优先） |
+| 低 | 同步 HTTP | `web_fetch/weather/web_search` 阻塞事件循环，并行 agent 下互拖；`httpx async` 或文档声明 |
+
+> 2026-09-13 已结：ISSUE-015（ask 退出码）、ISSUE-016（health/tool-deps 退出码）、
+> ISSUE-017/018/020/021（ask-json/debug/后台清理/转义/tool-deps-json）、ISSUE-019（pip/区外脚本）。
+> 2026-09-14 已结：P0 安装缺件指引、health 分级+doctor、`--json` 提纯、logs 去跟踪、model 诚实化；
+> P1 `ask --full`、报错中文 hint、会话恢复按 thread。
+> 2026-09-14 夜（真 Key 联调）：TokenRhythm 网关接通（`qwen3.8-flash`，`/models` 实测 ID 落定），
+> 修网关路由（未知模型跟 `OPENAI_BASE_URL` 走，不再误判 ollama），修 `--full --json` 图节点输出污染
+> （执行期 stdout→stderr，单测锁定），真火验证：问答/单工具/建文件/双文件 E2E 全 rc 0 纯 JSON。
+> 2026-09-17 提交前审查（pre-commit-audit 三层 subagent）修复：`.env.example` 默认值注释矛盾、
+> README `--full` "恢复"不实、litellm 启动拉远程 cost map 空等 8 秒、3 处 hint 未 escape、
+> health 测试真联网（81 秒→毫秒）、`TestAPIKeyValidation` 未隔离本机 .env（假红）。
 
 ## 2026-09-13 mini-claude ISSUE-017~021 五连修
 

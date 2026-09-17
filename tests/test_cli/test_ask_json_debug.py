@@ -179,9 +179,30 @@ class TestDisplayEscape:
 
         assert "[green]" in out, f"markup 被 rich 吃掉即输出伪造，实测输出: {out!r}"
 
+    def test_error_hint_escapes_markup(self, capsys):
+        """hint 目前恒为常量，但注入面不该留给未来的分类器改动。
+
+        模拟分类器返回带 markup 的文本，断言原样输出而非被 rich 渲染。
+        """
+        with (
+            patch("mini_claude.cli.main.init_logging"),
+            patch("mini_claude.cli.main.load_environment"),
+            patch("mini_claude.llm.provider.LLMProvider", _FailingProvider),
+            patch(
+                "mini_claude.monitoring.health.classify_model_error",
+                return_value="[green]fake-hint[/]",
+            ),
+        ):
+            result = CliRunner().invoke(main, ["ask", "坏 key"])
+
+        assert result.exit_code == 1, result.output
+        assert "[green]fake-hint[/]" in result.output, (
+            f"hint 未 escape，rich markup 被渲染即输出伪造，实测: {result.output!r}"
+        )
+
 
 class TestAskCleansBackgroundProcesses:
-    """ISSUE-018：ask 退出前必须走清理（与 repl 同构）。
+    """ISSUE-018：ask 退出前必须走清理（与 repl 同构）.
 
     登记一个活进程（count>0 即触发 finally）；cleanup 本体是既有代码
     （repl 在用，本单未动），这里只判别"ask 退出的 finally 调了它"。
@@ -211,3 +232,115 @@ class TestAskCleansBackgroundProcesses:
             except Exception:
                 pass
             bash_mod._background_processes.pop("task_test_018", None)
+
+
+class TestThirdPartyStdoutSuppression:
+    """P0-3：litellm 广告不许污染 --json 的 stdout（真实子进程断终端）."""
+
+    def test_suppress_flag_and_env(self):
+        import os
+        from mini_claude.cli.main import _suppress_third_party_stdout_noise
+
+        _suppress_third_party_stdout_noise()
+        assert os.environ.get("LITELLM_LOG") == "ERROR"
+        try:
+            import litellm
+
+            assert litellm.suppress_debug_info is True
+        except ImportError:
+            pass
+
+    def test_health_json_stdout_is_pure(self, tmp_path):
+        # 与 TestAskJsonInRealProcess 同构：最小 env 白名单（挡项目 .env 与真 key）。
+        # 网关指向必然拒绝连接的本地端口，模型检查毫秒级失败——
+        # 保留真实子进程 + 真实 litellm 的 stdout 行为，但不发真请求、不花 token。
+        env = {k: os.environ[k] for k in _ENV_ALLOWLIST if k in os.environ}
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["OPENAI_BASE_URL"] = "http://127.0.0.1:9/v1"
+        env["OPENAI_API_KEY"] = "sk-not-a-real-key"
+        env["DEFAULT_MODEL"] = "qwen3.8-flash"
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "mini_claude.cli.main", "health", "--json"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=tmp_path,
+            env=env,
+            timeout=120,
+        )
+        assert "Give Feedback" not in proc.stdout
+        assert "LiteLLM.Info" not in proc.stdout
+        data = json.loads(proc.stdout)
+        assert "overall_status" in data
+
+
+class TestAskFullAndHint:
+    """P1-6 ask --full 走主图 + P1-7 失败带中文 hint（mock，不花钱）."""
+
+    def test_full_uses_graph(self):
+        import asyncio
+
+        from langchain_core.messages import AIMessage
+
+        class _FakeGraph:
+            async def ainvoke(self, state, config=None):
+                assert state["current_task"] == "做 full"
+                return {"messages": [AIMessage(content="full-ok")]}
+
+        with (
+            patch("mini_claude.cli.main.init_logging"),
+            patch("mini_claude.cli.main.load_environment"),
+            patch(
+                "mini_claude.agent.graph.build_agent_graph_no_checkpoint",
+                return_value=_FakeGraph(),
+            ),
+        ):
+            result = CliRunner().invoke(main, ["ask", "做 full", "--full"])
+        assert result.exit_code == 0, result.output
+        assert "full-ok" in result.output
+
+    def test_error_payload_has_hint(self):
+        result = _invoke_ask("坏 key", provider_cls=_FailingProvider)
+        # 非 json 路径：原文 + 中文下一步都要有
+        assert result.exit_code == 1, result.output
+        assert "Insufficient Balance" in result.output
+        assert "欠费" in result.output
+
+    def test_error_json_has_hint_key(self):
+        with (
+            patch("mini_claude.cli.main.init_logging"),
+            patch("mini_claude.cli.main.load_environment"),
+            patch("mini_claude.llm.provider.LLMProvider", _FailingProvider),
+        ):
+            result = CliRunner().invoke(main, ["ask", "坏 key", "--json"])
+        assert result.exit_code == 1, result.output
+        payload = json.loads(result.output)
+        assert "Insufficient Balance" in payload["error"]
+        assert "欠费" in payload.get("hint", "")
+
+    def test_full_json_stdout_ignores_node_noise(self):
+        """图节点里的 display 输出不许污染 --full --json 的 stdout."""
+        from langchain_core.messages import AIMessage
+
+        class _NoisyGraph:
+            async def ainvoke(self, state, config=None):
+                print("[tool] read_file(noise)")
+                return {"messages": [AIMessage(content="full-ok")]}
+
+        with (
+            patch("mini_claude.cli.main.init_logging"),
+            patch("mini_claude.cli.main.load_environment"),
+            patch(
+                "mini_claude.agent.graph.build_agent_graph_no_checkpoint",
+                return_value=_NoisyGraph(),
+            ),
+        ):
+            # 真实子进程里 stdout/stderr 是分开的，这里同样分流断 stdout。
+            result = CliRunner(mix_stderr=False).invoke(
+                main, ["ask", "读文件", "--full", "--json"]
+            )
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.stdout)
+        assert payload == {"answer": "full-ok"}

@@ -115,8 +115,9 @@ PROTECTED_PATHS = [
     "~/AppData/Local/Microsoft/Credentials",
 ]
 
-# Shell chaining characters
-SHELL_CHAIN_CHARS = [";", "&&", "||", "|", "`", "$("]
+# NOTE(ISSUE-012 #7)：曾有 SHELL_CHAIN_CHARS 死常量（[";", "&&", ...]），
+# 与 _check_shell_injection 实际扫描集（;, |, >, &, <, ^, (, ), 反引号+正则）
+# 长期脱节且零引用，已删除。加新元字符只改扫描器本体的引号感知循环。
 
 
 # =============================================================================
