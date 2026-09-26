@@ -165,16 +165,12 @@ class TestCheckPreviousSessionScoped:
                 "checkpoint_id TEXT, parent_checkpoint_id TEXT, type TEXT, "
                 "checkpoint BLOB, metadata BLOB)"
             )
-            await conn.execute(
-                "INSERT INTO checkpoints (thread_id) VALUES ('someone-else')"
-            )
+            await conn.execute("INSERT INTO checkpoints (thread_id) VALUES ('someone-else')")
             await conn.commit()
 
         session = REPLSession()
         session.thread_id = "mine"
-        with patch(
-            "mini_claude.config.settings.settings.session_db_path", str(db)
-        ):
+        with patch("mini_claude.config.settings.settings.session_db_path", str(db)):
             assert await session._check_previous_session() is False
 
     @pytest.mark.asyncio
@@ -195,7 +191,5 @@ class TestCheckPreviousSessionScoped:
 
         session = REPLSession()
         session.thread_id = "mine"
-        with patch(
-            "mini_claude.config.settings.settings.session_db_path", str(db)
-        ):
+        with patch("mini_claude.config.settings.settings.session_db_path", str(db)):
             assert await session._check_previous_session() is True

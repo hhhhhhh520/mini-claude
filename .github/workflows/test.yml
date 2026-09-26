@@ -51,7 +51,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          # 锁版本带：规则集已由 pyproject [tool.ruff.lint] select 锁定，
+          # 这里防的是 ruff format 行为在更高大版本漂移（ISSUE-023）
+          pip install "ruff>=0.15.11,<0.17"
 
       - name: Run Ruff linter
         run: ruff check src/ tests/

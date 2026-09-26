@@ -3,6 +3,7 @@
 
 ask 是唯一同时动这三处的函数，一起修、一起测。
 """
+
 import json
 import os
 import subprocess
@@ -11,7 +12,6 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from mini_claude.cli import main as main_mod
 from mini_claude.cli.display import display
 from mini_claude.cli.main import main
 from mini_claude.tools import bash as bash_mod
@@ -73,7 +73,7 @@ class TestAskJson:
         assert "ok" in result.output
 
 
-_JSON_OK_STUB = '''\
+_JSON_OK_STUB = """\
 from unittest.mock import patch
 
 from mini_claude.cli.main import main
@@ -92,12 +92,22 @@ with patch("mini_claude.cli.main.init_logging"), patch(
     "mini_claude.cli.main.load_environment"
 ), patch("mini_claude.llm.provider.LLMProvider", _Provider):
     main(["ask", "--json", "hi"])
-'''
+"""
 
 _ENV_ALLOWLIST = (
-    "PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC",
-    "TEMP", "TMP", "APPDATA", "LOCALAPPDATA", "USERPROFILE",
-    "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE",
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "USERPROFILE",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
 )
 
 
@@ -152,9 +162,7 @@ class TestDebugFlag:
             result = CliRunner().invoke(main, ["--debug", "ask", "说 ok"])
 
         assert result.exit_code == 1, result.output
-        assert "Traceback" in result.output, (
-            f"--debug 下终端必须有堆栈:\n{result.output[-800:]}"
-        )
+        assert "Traceback" in result.output, f"--debug 下终端必须有堆栈:\n{result.output[-800:]}"
 
     def test_no_debug_no_traceback(self):
         """守卫：默认不打堆栈（只记日志），终端保持干净。"""
@@ -214,14 +222,13 @@ class TestAskCleansBackgroundProcesses:
         async def _fake_cleanup():
             called.append(1)
 
-        proc = subprocess.Popen(
-            [sys.executable, "-c", "import time; time.sleep(60)"]
-        )
+        proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
         bash_mod._background_processes["task_test_018"] = proc
         try:
-            with patch.object(
-                bash_mod, "cleanup_all_background_processes", _fake_cleanup
-            ), patch.object(bash_mod, "get_background_process_count", return_value=1):
+            with (
+                patch.object(bash_mod, "cleanup_all_background_processes", _fake_cleanup),
+                patch.object(bash_mod, "get_background_process_count", return_value=1),
+            ):
                 result = _invoke_ask("说 ok")
 
             assert result.exit_code == 0, result.output
@@ -280,7 +287,6 @@ class TestAskFullAndHint:
     """P1-6 ask --full 走主图 + P1-7 失败带中文 hint（mock，不花钱）."""
 
     def test_full_uses_graph(self):
-        import asyncio
 
         from langchain_core.messages import AIMessage
 
@@ -338,9 +344,7 @@ class TestAskFullAndHint:
             ),
         ):
             # 真实子进程里 stdout/stderr 是分开的，这里同样分流断 stdout。
-            result = CliRunner(mix_stderr=False).invoke(
-                main, ["ask", "读文件", "--full", "--json"]
-            )
+            result = CliRunner(mix_stderr=False).invoke(main, ["ask", "读文件", "--full", "--json"])
         assert result.exit_code == 0, result.output
         payload = json.loads(result.stdout)
         assert payload == {"answer": "full-ok"}

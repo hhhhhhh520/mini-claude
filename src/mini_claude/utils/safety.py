@@ -66,14 +66,14 @@ DANGEROUS_PATTERNS = [
 # Python modules blocked from `python -m` execution
 BLOCKED_PYTHON_MODULES = {
     "subprocess",  # can execute arbitrary system commands
-    "os",          # system-level operations
-    "sys",         # runtime manipulation
-    "ctypes",      # FFI to native code
-    "runpy",       # can execute arbitrary modules
-    "http.server", # serves files over HTTP, exposes workspace
+    "os",  # system-level operations
+    "sys",  # runtime manipulation
+    "ctypes",  # FFI to native code
+    "runpy",  # can execute arbitrary modules
+    "http.server",  # serves files over HTTP, exposes workspace
     "webbrowser",  # opens browser, potential phishing
-    "telnetlib",   # network connections
-    "ftplib",      # FTP connections
+    "telnetlib",  # network connections
+    "ftplib",  # FTP connections
 }
 
 # Commands that require user confirmation even if not dangerous

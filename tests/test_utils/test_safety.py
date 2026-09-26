@@ -1006,4 +1006,3 @@ class TestBareAmpersandAndRedirection:
 
     def test_plain_command_still_allowed(self):
         assert _check_shell_injection("ls -la")[0] is True
-

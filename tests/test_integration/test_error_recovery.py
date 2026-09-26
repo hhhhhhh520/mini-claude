@@ -399,7 +399,9 @@ class TestFileSystemErrorRecovery:
 
         # 模拟权限错误
         state["messages"].append(
-            HumanMessage(content="Tool write_file result: Error: Permission denied", name="write_file")
+            HumanMessage(
+                content="Tool write_file result: Error: Permission denied", name="write_file"
+            )
         )
 
         result = await observe_node(state)
@@ -553,9 +555,7 @@ class TestObserveTrustBoundary:
             )
         )
         result = await observe_node(state)
-        assert result.get("stop_reason") != StopReason.ERROR, (
-            f"正常输出被误判为错误：{result}"
-        )
+        assert result.get("stop_reason") != StopReason.ERROR, f"正常输出被误判为错误：{result}"
         assert not result.get("errors"), f"不应产生 errors：{result.get('errors')}"
 
     @pytest.mark.asyncio
@@ -590,7 +590,10 @@ class TestObserveTrustBoundary:
         """执行层捕获的异常（固定中文前缀）仍要能触发 ERROR."""
         state = create_initial_state("写文件")
         state["messages"].append(
-            HumanMessage(content="Tool write_file 文件系统错误: [Errno 13] Permission denied", name="write_file")
+            HumanMessage(
+                content="Tool write_file 文件系统错误: [Errno 13] Permission denied",
+                name="write_file",
+            )
         )
         result = await observe_node(state)
         assert result.get("stop_reason") == StopReason.ERROR

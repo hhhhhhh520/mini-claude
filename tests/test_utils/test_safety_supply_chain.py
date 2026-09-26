@@ -9,6 +9,7 @@
 3. `python -m pip install/...` → 同样 confirmation（`pip` 不在模块黑名单里）。
 无害用法（`-V`/`--version`/`list`/`show`/`freeze`/`-m pytest`）必须原样放行。
 """
+
 import os
 
 from mini_claude.utils import safety

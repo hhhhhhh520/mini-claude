@@ -121,7 +121,12 @@ def classify_model_error(error_message: Optional[str]) -> str:
     msg = error_message.lower()
     if "insufficient balance" in msg or "insufficient_quota" in msg or "billing" in msg:
         return "模型欠费/额度用尽：本地安装正常。去服务商后台充值或换 key，再跑 mini-claude doctor 验证。"
-    if "invalid api key" in msg or "incorrect api key" in msg or "unauthorized" in msg or "401" in msg:
+    if (
+        "invalid api key" in msg
+        or "incorrect api key" in msg
+        or "unauthorized" in msg
+        or "401" in msg
+    ):
         return "Key 无效/未授权：检查 .env 里 OPENAI_API_KEY/ANTHROPIC_API_KEY 是否填对、是否多了空格换行。"
     if "rate limit" in msg or "429" in msg or "too many requests" in msg:
         return "被限流：等一分钟再试，或降低并发/换模型；高频探测别用 health，用 check_liveness。"

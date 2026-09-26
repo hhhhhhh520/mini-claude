@@ -5,6 +5,7 @@
 traceback 而非可解析错误。修法：存在性检查前移，两条路径同一出口，
 --json 下输出结构化错误。
 """
+
 import json
 import os
 import subprocess
@@ -47,12 +48,22 @@ class TestToolDepsJsonUnknownTool:
 
 
 _ENV_ALLOWLIST = (
-    "PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC",
-    "TEMP", "TMP", "APPDATA", "LOCALAPPDATA", "USERPROFILE",
-    "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE",
+    "PATH",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "TEMP",
+    "TMP",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "USERPROFILE",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
 )
 
-_PROCESS_STUB = '''\
+_PROCESS_STUB = """\
 import sys
 from unittest.mock import patch
 
@@ -62,7 +73,7 @@ with patch("mini_claude.cli.main.init_logging"), patch(
     "mini_claude.cli.main.load_environment"
 ):
     main(["tool-deps", "--json", "__no_such_tool__"])
-'''
+"""
 
 
 class TestToolDepsJsonUnknownToolInRealProcess:

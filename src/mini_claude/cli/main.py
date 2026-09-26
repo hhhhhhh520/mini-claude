@@ -54,7 +54,7 @@ def main(ctx, model: Optional[str], workspace: str, debug: bool):
     _suppress_third_party_stdout_noise()
     if debug:
         # ISSUE-017：--debug 不再是死参数——它把日志级别提到 DEBUG
-        #（与 repl 里写 settings.workspace_root 同构；init_logging 之前生效）。
+        # （与 repl 里写 settings.workspace_root 同构；init_logging 之前生效）。
         from mini_claude.config.settings import settings
 
         settings.log_level = "DEBUG"
@@ -450,7 +450,7 @@ def doctor(ctx):
     # 1. 模型与钥匙（只判有无）
     provider = settings.get_model_provider()
     rows.append(("默认模型", settings.default_model, True))
-    rows.append(("Provider", str(getattr(provider, 'value', provider)), True))
+    rows.append(("Provider", str(getattr(provider, "value", provider)), True))
     has_key = any(
         [
             _present(settings.openai_api_key),
@@ -483,7 +483,13 @@ def doctor(ctx):
     from mini_claude.tools import tool_registry
 
     tools = tool_registry.list_tools()
-    rows.append((f"工具注册 {len(tools)} 个", ", ".join(tools[:5]) + ("…" if len(tools) > 5 else ""), len(tools) > 0))
+    rows.append(
+        (
+            f"工具注册 {len(tools)} 个",
+            ", ".join(tools[:5]) + ("…" if len(tools) > 5 else ""),
+            len(tools) > 0,
+        )
+    )
 
     def _has(mod: str) -> bool:
         try:
@@ -493,9 +499,25 @@ def doctor(ctx):
             return False
 
     rows.append(("搜索依赖 ddgs", "已装" if _has("ddgs") else "未装→ pip install -e .[web]", True))
-    rows.append(("追踪依赖 otel", "已装" if _has("opentelemetry.trace") else "未装→ pip install -e .[tracing]", True))
-    rows.append(("服务依赖 aiohttp", "已装" if _has("aiohttp") else "未装→ pip install -e .[server]", True))
-    rows.append(("向量依赖", "已装(chromadb/faiss)" if (_has("chromadb") or _has("faiss")) else "未装→ pip install -e .[vector]（可选）", True))
+    rows.append(
+        (
+            "追踪依赖 otel",
+            "已装" if _has("opentelemetry.trace") else "未装→ pip install -e .[tracing]",
+            True,
+        )
+    )
+    rows.append(
+        ("服务依赖 aiohttp", "已装" if _has("aiohttp") else "未装→ pip install -e .[server]", True)
+    )
+    rows.append(
+        (
+            "向量依赖",
+            "已装(chromadb/faiss)"
+            if (_has("chromadb") or _has("faiss"))
+            else "未装→ pip install -e .[vector]（可选）",
+            True,
+        )
+    )
 
     table = Table(title="Doctor")
     table.add_column("检查项", style="cyan")

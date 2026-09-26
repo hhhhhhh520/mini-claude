@@ -591,7 +591,9 @@ class TestModelErrorClassification:
     def test_billing_402(self):
         from mini_claude.monitoring.health import classify_model_error
 
-        hint = classify_model_error("litellm.BadRequestError: OpenAIException - Insufficient Balance")
+        hint = classify_model_error(
+            "litellm.BadRequestError: OpenAIException - Insufficient Balance"
+        )
         assert "欠费" in hint
 
     def test_invalid_key_401(self):

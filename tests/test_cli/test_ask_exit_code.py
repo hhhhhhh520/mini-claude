@@ -86,7 +86,7 @@ class TestAskExitCode:
         assert result.exit_code == 0, result.output
 
 
-_PROCESS_STUB = '''
+_PROCESS_STUB = """
 from unittest.mock import patch
 
 from mini_claude.cli.main import main
@@ -95,18 +95,18 @@ from mini_claude.cli.main import main
 
 with patch("mini_claude.llm.provider.LLMProvider", _Provider):
     main(["ask", "hi"])
-'''
+"""
 
-_FAILING_PROVIDER_SNIPPET = '''
+_FAILING_PROVIDER_SNIPPET = """
 class _Provider:
     def __init__(self, *a, **k):
         pass
 
     async def chat(self, *a, **k):
         raise RuntimeError("Insufficient Balance")
-'''
+"""
 
-_OK_PROVIDER_SNIPPET = '''
+_OK_PROVIDER_SNIPPET = """
 class _Provider:
     def __init__(self, *a, **k):
         pass
@@ -114,7 +114,7 @@ class _Provider:
     async def chat(self, *a, **k):
         msg = type("M", (), {"content": "ok", "tool_calls": None})()
         return type("R", (), {"choices": [type("C", (), {"message": msg})()]})()
-'''
+"""
 
 
 _ENV_ALLOWLIST = (
