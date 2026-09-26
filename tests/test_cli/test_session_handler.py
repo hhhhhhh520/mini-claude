@@ -170,7 +170,13 @@ class TestCheckPreviousSessionScoped:
 
         session = REPLSession()
         session.thread_id = "mine"
-        with patch("mini_claude.config.settings.settings.session_db_path", str(db)):
+        # patch.object 直接对象级 patch：config/ 下 settings.py（shim 模块）与
+        # settings/（包）同名并存，且包 __init__ 的 from-import 让
+        # "mini_claude.config.settings.settings" 字符串 target 的逐段 getattr
+        # 解析在 py3.10 的 mock 上解析失败（ModuleNotFoundError），不能用字符串路径。
+        from mini_claude.config.settings import settings as settings_obj
+
+        with patch.object(settings_obj, "session_db_path", str(db)):
             assert await session._check_previous_session() is False
 
     @pytest.mark.asyncio
@@ -191,5 +197,8 @@ class TestCheckPreviousSessionScoped:
 
         session = REPLSession()
         session.thread_id = "mine"
-        with patch("mini_claude.config.settings.settings.session_db_path", str(db)):
+        # 同上：patch.object 对象级 patch，绕开歧义字符串 target（py3.10 mock 解析失败）
+        from mini_claude.config.settings import settings as settings_obj
+
+        with patch.object(settings_obj, "session_db_path", str(db)):
             assert await session._check_previous_session() is True

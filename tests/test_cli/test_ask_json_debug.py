@@ -344,7 +344,12 @@ class TestAskFullAndHint:
             ),
         ):
             # 真实子进程里 stdout/stderr 是分开的，这里同样分流断 stdout。
-            result = CliRunner(mix_stderr=False).invoke(main, ["ask", "读文件", "--full", "--json"])
+            # click 8.2 移除了 mix_stderr（恒分流），老版本需显式传 False。
+            try:
+                runner = CliRunner(mix_stderr=False)
+            except TypeError:
+                runner = CliRunner()
+            result = runner.invoke(main, ["ask", "读文件", "--full", "--json"])
         assert result.exit_code == 0, result.output
         payload = json.loads(result.stdout)
         assert payload == {"answer": "full-ok"}
