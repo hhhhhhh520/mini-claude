@@ -137,6 +137,11 @@ class AgentState(TypedDict):
     execution_plan: Optional[ExecutionPlanType]  # 当前执行计划（序列化形式）
     current_step_index: int  # 当前执行的步骤索引
 
+    # 会话任务清单（可选，P1-1）
+    # 注意：**全量替换语义**（todo_write 每次提交完整清单），
+    # 不能挂 add reducer——act 节点返回的 todos 直接覆盖旧值。
+    todos: List[Dict[str, Any]]
+
 
 def create_initial_state(
     user_input: str,
@@ -181,6 +186,7 @@ def create_initial_state(
         improvement_suggestions=[],
         execution_plan=None,
         current_step_index=0,
+        todos=[],
     )
 
 

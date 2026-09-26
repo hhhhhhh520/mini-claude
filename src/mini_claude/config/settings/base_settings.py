@@ -99,6 +99,9 @@ class BaseEnvironmentSettings(BaseSettings):
     # Workspace
     workspace_root: str = Field(default="D:/my project/mini-claude/workspace")
 
+    # Project memory (P1-2): CLAUDE.md auto-loading
+    claude_md_enabled: bool = Field(default=True)
+
     # Config Hot Reload settings
     config_watch_enabled: bool = Field(default=False)
     config_watch_debounce_seconds: float = Field(default=1.0)

@@ -181,7 +181,7 @@ async def act_node(state: AgentState) -> dict:
                     if progress_msg:
                         logger.info("act_node: plan progress", progress=progress_msg)
 
-                new_messages, early_return, step_success = await _execute_tools(
+                new_messages, early_return, step_success, state_extras = await _execute_tools(
                     tool_calls,
                     degr_manager,
                     metrics_collector,
@@ -209,6 +209,11 @@ async def act_node(state: AgentState) -> dict:
                 # Merge early_return fields if present
                 if early_return:
                     result.update(early_return)
+
+                # 工具执行产生的状态增量（如 todo_write 全量清单）。
+                # todos 是全量替换语义（无 reducer），direct update 覆盖旧值。
+                if state_extras:
+                    result.update(state_extras)
 
                 return result
 
@@ -384,9 +389,15 @@ async def _execute_tools(
         step_index: Current step index (for progress display)
 
     Returns:
-        Tuple of (updated_messages, early_return_dict or None, step_success)
+        Tuple of (updated_messages, early_return_dict or None, step_success, state_extras)
+        state_extras: 工具执行产生的非消息状态增量（如 todo_write 的全量清单），
+        由 act_node 合并进返回值。工具本身拿不到 state，这是既有架构的写入通道。
     """
+    from ...tools.todos import validate_todos
+    from ...cli.display import display
+
     step_success = True  # Assume success unless a tool fails
+    state_extras: Dict = {}
 
     for i, tool_call in enumerate(tool_calls):
         tool_name = tool_call["name"]
@@ -410,21 +421,29 @@ async def _execute_tools(
         if execution_plan and i == 0:
             progress_msg = _get_plan_progress_message(execution_plan, step_index)
             if progress_msg:
-                from ...cli.display import display
-
                 display.show_info(progress_msg)
 
         new_messages, state_update = await execute_single_tool(
             tool_name, tool_args, degr_manager, metrics_collector, trace_tool_call, new_messages
         )
 
+        # todo_write：清单校验通过时全量替换进 state，并当场渲染给用户。
+        # 校验失败时工具已返回 Error 文本回流给 LLM 自纠，state 不动。
+        if (
+            tool_name == "todo_write"
+            and isinstance(tool_args, dict)
+            and not tool_args.get("_parse_error")
+        ):
+            todos = tool_args.get("todos")
+            if validate_todos(todos) == []:
+                state_extras["todos"] = todos
+                display.show_todos(todos)
+
         # Display tool result to user so they can see what happened
         if new_messages:
             last_msg = new_messages[-1]
             content = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
             if content and not state_update:
-                from ...cli.display import display
-
                 # Strip the "Tool xxx result: " prefix for cleaner display
                 display_text = content
                 if display_text.startswith(f"Tool {tool_name} result: "):
@@ -436,6 +455,9 @@ async def _execute_tools(
             step_success = False
 
         if state_update:
-            return new_messages, state_update, step_success
+            # 提前返回（确认/错误）也要带上已产生的状态增量，不丢已完成的 todo 提交
+            if state_extras:
+                state_update = {**state_extras, **state_update}
+            return new_messages, state_update, step_success, state_extras
 
-    return new_messages, None, step_success
+    return new_messages, None, step_success, state_extras

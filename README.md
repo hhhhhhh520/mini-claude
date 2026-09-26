@@ -5,8 +5,8 @@
 **迷你版 Claude Code** — 工具调用 + 主从多 Agent 并发，在一个 CLI 里跑完整开发循环。
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
-[![Tests](https://img.shields.io/badge/Tests-1772%20collected-brightgreen)](tests/)
-[![Tools](https://img.shields.io/badge/Tools-21-orange)](#可用工具21个)
+[![Tests](https://img.shields.io/badge/Tests-1831%20collected-brightgreen)](tests/)
+[![Tools](https://img.shields.io/badge/Tools-22-orange)](#可用工具22个)
 [![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
 
 </div>
@@ -22,7 +22,9 @@
 - **会话持久化**：SQLite checkpoint + 启动时恢复提示，支持 `/resume` 断点续跑
 - **工具降级**：连续失败 3 次自动跳过工具，10 分钟后自动恢复
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
-- **测试规模**：1772 个测试用例（2026-09-13 实测收集数；Windows 下 2 个 bash 用例因 Unix 命令假设失败，待修）
+- **任务清单**：`todo_write` 维护会话 todo，多步任务进度实时渲染（对齐 Claude Code TodoWrite）
+- **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md` 与工作区 `CLAUDE.md` 作为持久约定（`CLAUDE_MD_ENABLED` 可关）
+- **测试规模**：1831 个测试用例（2026-09-27 实测收集数）
 
 ## 安装
 
@@ -177,7 +179,7 @@ ANTHROPIC_API_KEY=your-claude-key
 GOOGLE_API_KEY=your-gemini-key
 ```
 
-## 可用工具（21个）
+## 可用工具（22个）
 
 ### 文件操作 (8个)
 | 工具 | 功能 |
@@ -203,6 +205,11 @@ GOOGLE_API_KEY=your-gemini-key
 | `web_search` | Web搜索 |
 | `web_fetch` | 抓取网页正文（含 SSRF 防护） |
 | `weather` | 天气查询 |
+
+### 任务清单 (1个)
+| 工具 | 功能 |
+|------|------|
+| `todo_write` | 维护会话任务清单（全量提交，清单实时渲染给用户） |
 
 ### Agent协作 (8个)
 | 工具 | 功能 |
@@ -238,7 +245,7 @@ mini-claude/
 ├── src/mini_claude/
 │   ├── cli/          # CLI入口 + 命令处理器
 │   ├── agent/        # Agent核心（LangGraph状态机）
-│   ├── tools/        # 工具层（21个工具）
+│   ├── tools/        # 工具层（22个工具）
 │   ├── skills/       # Skills系统（加载/注册/调用）
 │   ├── llm/          # LLM抽象层 + 系统提示词
 │   ├── config/       # Pydantic配置管理

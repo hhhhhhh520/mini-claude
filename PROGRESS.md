@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-09-14 (P0/P1 好用优化：extras/doctor/--json纯净/logs去跟踪/model诚实/ask--full/报错中文/会话按thread)
+> 最后更新: 2026-09-27 (P1 快赢包落地：todo_write 任务清单 + CLAUDE.md 项目记忆自动加载；CI 修复 ISSUE-023/024)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -73,7 +73,49 @@
 > README `--full` "恢复"不实、litellm 启动拉远程 cost map 空等 8 秒、3 处 hint 未 escape、
 > health 测试真联网（81 秒→毫秒）、`TestAPIKeyValidation` 未隔离本机 .env（假红）。
 
+## 2026-09-27 P1 快赢包落地：todo_write + CLAUDE.md 项目记忆（PLAN_对标ClaudeCode差距收敛 Phase 1）
+
+背景：CI 修复后（ISSUE-023/024）启动对齐 Claude Code 的差距收敛，先做感知最强的两项。
+设计依据：`ANALYSIS_对标ClaudeCode差距.md`；实现前研读 free-code 逆向源码的对应模块
+（仅参考架构与语义，未搬运任何代码）。
+
+### P1-1 todo_write 任务清单
+
+- 数据模型：`AgentState.todos`（**全量替换语义**，刻意不挂 `add` reducer——todo_write
+  每次提交完整清单，act 返回的增量直接覆盖旧值，避免 ISSUE-014 类消息复制问题在 todo 上重演）。
+- 工具：`tools/todos.py` 的 `TodoWriteTool` + `validate_todos`（状态枚举、非空清单恰好一个
+  in_progress、content 去重、空清单=清空）。工具无状态：校验失败返回 Error 文本让 LLM 自纠，
+  校验通过由 act 执行链写 state（工具拿不到 state 是既有架构）。
+- act 接线：`_execute_tools` 返回值从 3 元组扩为 4 元组（新增 `state_extras`），
+  todo_write 校验通过时写入 `state_extras["todos"]` 并**当场渲染**（`display.show_todos`，
+  内容 escape——LLM 生成文本，ISSUE-020 同款纪律）；act_node 把 extras 合并进返回增量。
+  提前返回（确认/错误）路径同样携带已产生的 extras，不丢提交。
+- 渲染：✓ completed / → in_progress（优先 active_form）/ ○ pending。
+- 提示词：工具清单加 Task Checklist 小节 + Rule 11（何时建清单、何时标状态）。
+- 红线遵守：未加入两份子代理白名单（`SpawnAgentTool`/`SpawnParallelTool`，测试锁定）。
+
+### P1-2 CLAUDE.md 自动加载
+
+- 加载器：`utils/claudemd.py` `load_claude_md(workspace_root, home_dir)`——
+  用户级 `~/.mini-claude/CLAUDE.md` + 项目级 `<workspace_root>/CLAUDE.md`，
+  用户级在前；单文件 64KB、总量 128KB 截断留标记；坏编码 replace 解码；缺失返回空串。
+- 注入：`build_system_messages()` 在系统提示后、skills 前插入，`claude_md_enabled`
+  开关（`CLAUDE_MD_ENABLED` 环境变量，默认开）。加载/注入异常只 debug 日志，不阻断主链路。
+- 不进持久化对话历史（与 skills 同通道），`/resume` 后约定依然生效。
+
+### 验证
+
+- 新增 40 测：工具级 21（含"不进子代理白名单"守卫）+ act_node 级 3（全量替换契约）
+  + display 4（含转义）+ claudemd 12（合并顺序/截断/开关/异常不阻断）。
+- 图级契约：`tests/test_integration/test_graph_checkpoint.py` 13 条全过（CLAUDE.md 要求）。
+- CI 等效全量筛选（无 .env）：1750 passed / 40 skipped / 0 failed（2026-09-27 实测，收集 1831）。
+- 教训×2：① f-string 提示词里写字面 `{content...}` 会被当格式化字段，
+  必须双写 `{{...}}`（本轮实踩，收集期 NameError）；② 测试断言子串时注意
+  active_form 包含 content 的情况。
+
 ## 2026-09-13 mini-claude ISSUE-017~021 五连修
+
+
 
 **触发**: ISSUE-015/016 收尾时开的单（见上节"死参数/预先存在的隐患"），本轮清掉。
 

@@ -7,7 +7,7 @@
 **核心特性**:
 - THINK→PLAN→ACT→OBSERVE 四阶段状态机循环
 - 支持 Claude/OpenAI/DeepSeek/Gemini/Ollama 五种模型提供商
-- 21个工具：文件操作、命令执行、Web搜索、Agent协作
+- 22个工具：文件操作、命令执行、Web搜索、Agent协作、任务清单
 - 子 Agent 并行执行 + 文件锁机制
 - SQLite 会话持久化 + REPL 交互
 

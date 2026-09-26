@@ -186,6 +186,29 @@ class AgentDisplay:
         for i, step in enumerate(plan, 1):
             self.console.print(f"  [cyan]{i}.[/] {step}")
 
+    def show_todos(self, todos: List[dict]):
+        """Display the session todo checklist (P1-1).
+
+        在 todo_write 执行当场渲染，内容是 LLM 生成的文本，必须 escape
+        （ISSUE-020 教训：回显不可信文本前先转义）。
+        """
+        if todos is None:
+            return
+        if not todos:
+            self.console.print("[dim][Todos] 清单已清空[/]")
+            return
+        self.console.print("[bold cyan][Todos][/]")
+        for t in todos:
+            content = escape(str(t.get("content", "")))
+            status = t.get("status", "pending")
+            if status == "completed":
+                self.console.print(f"  [green]✓[/] [dim]{content}[/]")
+            elif status == "in_progress":
+                label = t.get("active_form") or content
+                self.console.print(f"  [yellow]→[/] [bold]{escape(str(label))}[/]")
+            else:
+                self.console.print(f"  [dim]○[/] {content}")
+
     def show_sub_agents(self, agents: Dict[str, dict]):
         """Display sub-agent status panel."""
         if not agents:

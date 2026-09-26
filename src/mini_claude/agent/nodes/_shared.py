@@ -68,6 +68,26 @@ def build_system_messages() -> list:
     provider = settings.get_model_provider()
     system_msgs = [{"role": "system", "content": get_system_prompt(provider)}]
 
+    # Inject CLAUDE.md project/user memory (P1-2)——与 skills 同一通道：
+    # 每次调用前置、不进持久化历史、失效不阻断主链路。
+    if getattr(settings, "claude_md_enabled", False):
+        try:
+            from mini_claude.utils.claudemd import load_claude_md
+
+            claude_md = load_claude_md(settings.workspace_root)
+            if claude_md:
+                system_msgs.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "以下约定来自 CLAUDE.md（用户级与项目级记忆），"
+                            "在本会话中必须始终遵守：\n\n" + claude_md
+                        ),
+                    }
+                )
+        except Exception as e:
+            logger.debug("claudemd injection failed", error=str(e))
+
     # Inject skills as a dedicated system message（小模型更关注近期上下文，
     # 但系统消息本就整体前置，这里保持与旧行为一致的完整 skill 说明）。
     try:
