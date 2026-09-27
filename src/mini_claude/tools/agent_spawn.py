@@ -101,14 +101,14 @@ class SpawnAgentTool(BaseTool):
         Returns:
             Extracted result string
         """
-        from langchain_core.messages import AIMessage, HumanMessage
+        from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
         tool_results = []
         ai_response = None
 
         for msg in messages:
-            # Collect tool results (HumanMessage with name = tool name)
-            if isinstance(msg, HumanMessage) and hasattr(msg, "name") and msg.name:
+            # Collect tool results（ISSUE-026 起为 ToolMessage；旧 checkpoint 为 HumanMessage+name）
+            if isinstance(msg, (ToolMessage, HumanMessage)) and hasattr(msg, "name") and msg.name:
                 tool_results.append(msg.content)
             # Record last AI response without tool_calls
             elif (

@@ -84,6 +84,8 @@
 ## LangGraph 约束
 
 - `AgentState.messages` 是 `Annotated[List[BaseMessage], add]`（累加语义）：节点**只能返回增量**，返回全量列表会把已有消息再拼一份（用户消息被复制、SystemMessage 错位——2026-09-04 修过一次，见 issues/ISSUE-014）
+- **工具结果一律 `ToolMessage` 回传（role=tool + tool_call_id + status），禁止 HumanMessage 文本**；assistant 历史消息必须携带 tool_calls 不许剥（ISSUE-026：Qwen 类网关按消息形状判定函数调用模式，形状偏离即从第二轮起退化为 `<tool_call>` 正文）。确认挂起标 `status="success"`（挂起不是执行错误）；改工具循环必须含"真 key 多步任务 E2E 无泄漏"验收
+- checkpoint 序列化类型必须注册 serde 白名单（`graph.py` JsonPlusSerializer `allowed_msgpack_modules`），CI 已开 `LANGGRAPH_STRICT_MSGPACK=true`——往 state 塞新自定义类型时同步注册，否则 CI 硬失败（ISSUE-027）
 - 系统提示与 skills **不写入** `state["messages"]`：由 `act_node` 在每次 LLM 调用时经 `build_system_messages()` 前置（不进持久化历史、不被摘要/截断吃掉）
 - 工具错误检测禁止对消息正文做自然语言关键词匹配（会误判正常中文输出、放大注入文本），只认结构化标记——见 `observe._is_tool_error_message`（`Error` 前缀 / 包裹边界 / 固定异常前缀）
 

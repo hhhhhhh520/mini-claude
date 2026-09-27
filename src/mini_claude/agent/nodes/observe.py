@@ -5,6 +5,7 @@ from ._shared import (
     StopReason,
     HumanMessage,
     AIMessage,
+    ToolMessage,
     get_max_iterations,
     detect_project_type,
     check_project_completion,
@@ -26,15 +27,37 @@ _TOOL_EXCEPTION_MARKERS = (
 )
 
 
-def _is_tool_error_message(msg: HumanMessage) -> bool:
+def _is_tool_result_message(msg) -> bool:
+    """判断一条消息是否是工具结果。
+
+    ISSUE-026 起新协议下工具结果是 ``ToolMessage``；旧 checkpoint 里是
+    带 name 的 ``HumanMessage``（兼容 /resume 恢复的历史会话）。
+    """
+    if isinstance(msg, ToolMessage):
+        return True
+    return isinstance(msg, HumanMessage) and getattr(msg, "name", None) and bool(msg.name)
+
+
+def _is_tool_error_message(msg) -> bool:
     """结构化判断一条工具消息是否代表真正的工具错误.
 
     刻意不做「正文含某关键词」式的嗅探：
-      a) 参数校验 / 解析错误：_act_helpers 直接以 "Error" 开头追加；
-      b) 工具返回值本身是错误：成功路径包裹为 "Tool {name} result: Error..."，
-         只看包裹边界之后的起始，不嗅探正文；
-      c) 执行层捕获的异常：固定中文前缀出现在消息开头附近。
+      a) ToolMessage.status == "error"：执行层统一标错（ISSUE-026 起的结构化信号）；
+      b) 工具返回值本身以 Error 开头（工具层以字符串报告失败的约定）；
+      c) 旧格式 "Tool {name} result: Error..."：只看包裹边界之后的起始，
+         兼容 /resume 恢复的旧 checkpoint；
+      d) 执行层捕获的异常：固定中文前缀出现在消息开头附近。
     """
+    if isinstance(msg, ToolMessage):
+        if msg.status == "error":
+            return True
+        content = str(msg.content)
+        if content.lower().startswith("error"):
+            return True
+        return any(marker in content[:40] for marker in _TOOL_EXCEPTION_MARKERS)
+
+    if not (isinstance(msg, HumanMessage) and getattr(msg, "name", None)):
+        return False
     content = msg.content
     if content.startswith("Error"):
         return True
@@ -90,9 +113,7 @@ async def observe_node(state: AgentState) -> dict:
         recent_errors = [
             msg.content
             for msg in messages[-5:]
-            if isinstance(msg, HumanMessage)
-            and getattr(msg, "name", None)
-            and _is_tool_error_message(msg)
+            if _is_tool_result_message(msg) and _is_tool_error_message(msg)
         ]
         if recent_errors:
             logger.debug("observe_node: found tool errors", errors=recent_errors)
@@ -106,9 +127,7 @@ async def observe_node(state: AgentState) -> dict:
 
         # 检查是否有需要确认的安全提示（当作普通结果处理）
         has_confirmation_prompt = any(
-            isinstance(msg, HumanMessage)
-            and hasattr(msg, "name")
-            and "requires confirmation" in msg.content.lower()
+            _is_tool_result_message(msg) and "requires confirmation" in msg.content.lower()
             for msg in messages[-3:]
         )
         if has_confirmation_prompt:
@@ -116,10 +135,7 @@ async def observe_node(state: AgentState) -> dict:
             # 不设置 ERROR，让 LLM 处理
 
         # 检查是否有工具结果
-        has_tool_result = any(
-            isinstance(msg, HumanMessage) and hasattr(msg, "name") and msg.name
-            for msg in messages[-3:]
-        )
+        has_tool_result = any(_is_tool_result_message(msg) for msg in messages[-3:])
 
         if span:
             span.set_attribute("has_tool_result", has_tool_result)
@@ -194,7 +210,7 @@ async def observe_node(state: AgentState) -> dict:
             # 子代理模式：写入操作后停止
             if state.get("is_subagent", False):
                 for msg in reversed(messages):
-                    if isinstance(msg, HumanMessage) and hasattr(msg, "name") and msg.name:
+                    if _is_tool_result_message(msg):
                         if msg.name in ["write_file", "edit_file"]:
                             logger.debug("observe_node: subagent completed write operation")
                             if span:

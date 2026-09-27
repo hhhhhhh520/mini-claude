@@ -72,6 +72,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ['3.10', '3.11', '3.12']
+    env:
+      # ISSUE-027 守卫：checkpoint 反序列化出现未白名单类型即硬失败（本地已全量验证）
+      LANGGRAPH_STRICT_MSGPACK: 'true'
 
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +115,8 @@ jobs:
     env:
       OPENAI_BASE_URL: http://127.0.0.1:9
       OPENAI_API_KEY: sk-unreachable-guard
+      # ISSUE-027 守卫：checkpoint serde 白名单外类型即硬失败
+      LANGGRAPH_STRICT_MSGPACK: 'true'
 
     steps:
       - uses: actions/checkout@v4

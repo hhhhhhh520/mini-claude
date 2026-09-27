@@ -381,6 +381,8 @@ class REPLSession:
                 self.messages.append({"role": "user", "content": msg.content})
             elif isinstance(msg, AIMessage):
                 self.messages.append({"role": "assistant", "content": msg.content or ""})
+            # 其余（ToolMessage 等工具结果）：不进 REPL 展示历史（[Tool] 行由
+            # act 回调实时显示），但保留在 checkpoint 里供 LLM 下一轮按协议使用
 
         self.messages = self.manage_history(self.messages)
 

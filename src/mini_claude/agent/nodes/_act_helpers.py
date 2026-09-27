@@ -2,9 +2,9 @@
 
 import asyncio
 import json
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from ._shared import (
     get_token_counter,
@@ -18,23 +18,49 @@ from ...mcp.bridge import McpConfirmationRequired
 from ...permissions.manager import PermissionAskRequired
 
 
-def convert_message(msg) -> Dict[str, str]:
-    """Convert LangChain message to LiteLLM format.
+def convert_message(msg) -> Dict[str, Any]:
+    """Convert LangChain message to LiteLLM wire format.
+
+    ISSUE-026：线格式必须符合 OpenAI 函数调用协议——assistant 历史携带
+    tool_calls、工具结果为 role=tool + tool_call_id。Qwen 类网关按消息形状
+    判定函数调用模式，形状偏离（剥 tool_calls / 结果走 user 文本）会让模型
+    从第二轮起退化为原生 <tool_call> 文本输出，工具不再执行。
 
     Args:
-        msg: LangChain message (HumanMessage, AIMessage, SystemMessage)
+        msg: LangChain message (HumanMessage, AIMessage, SystemMessage, ToolMessage)
 
     Returns:
-        Dict with 'role' and 'content' keys
+        Dict in LiteLLM/OpenAI wire format
     """
+    if isinstance(msg, ToolMessage):
+        d: Dict[str, Any] = {
+            "role": "tool",
+            "tool_call_id": msg.tool_call_id,
+            "content": msg.content,
+        }
+        if getattr(msg, "name", None):
+            d["name"] = msg.name
+        return d
+    if isinstance(msg, AIMessage):
+        d = {"role": "assistant", "content": msg.content or ""}
+        if msg.tool_calls:
+            d["tool_calls"] = [
+                {
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {
+                        "name": tc["name"],
+                        "arguments": json.dumps(tc.get("args", {}), ensure_ascii=False),
+                    },
+                }
+                for tc in msg.tool_calls
+            ]
+        return d
     if isinstance(msg, HumanMessage):
         return {"role": "user", "content": msg.content}
-    elif isinstance(msg, AIMessage):
-        return {"role": "assistant", "content": msg.content or ""}
-    elif isinstance(msg, SystemMessage):
+    if isinstance(msg, SystemMessage):
         return {"role": "system", "content": msg.content}
-    else:
-        return {"role": "user", "content": str(msg.content)}
+    return {"role": "user", "content": str(msg.content)}
 
 
 async def handle_token_budget(
@@ -211,9 +237,12 @@ def parse_tool_calls(raw_tool_calls) -> List[Dict]:
         if not name:
             continue
 
+        # id 必须非空：role=tool 结果靠 tool_call_id 与 assistant.tool_calls 配对
+        # （部分网关不回 id，回退生成确定性 id，两条消息用同一个才协议完整）
+        call_id = (tc.get("id", "") if isinstance(tc, dict) else tc.id) or ""
         tool_calls.append(
             {
-                "id": tc.get("id", "") if isinstance(tc, dict) else tc.id,
+                "id": call_id or f"call_{len(tool_calls)}_{name}",
                 "name": name,
                 "args": args,
             }
@@ -229,8 +258,14 @@ async def execute_single_tool(
     metrics_collector,
     trace_tool_call,
     new_messages: List,
+    tool_call_id: str = "",
 ) -> Tuple[List, Dict]:
     """Execute a single tool call.
+
+    所有分支的结果一律回传 ``ToolMessage``（ISSUE-026）：role=tool +
+    tool_call_id 是 OpenAI 函数调用协议的硬性形状，user 文本回传会让
+    Qwen 类网关从第二轮起丢失函数调用状态。``status`` 表示"本次调用是否
+    出错"——确认挂起不是执行错误（observe 错误检测依赖此区分）。
 
     Args:
         tool_name: Name of the tool to execute
@@ -239,6 +274,7 @@ async def execute_single_tool(
         metrics_collector: MetricsCollector instance
         trace_tool_call: Trace function for tool calls
         new_messages: List to append result messages to
+        tool_call_id: 对应 assistant.tool_calls 的 id（协议配对用）
 
     Returns:
         Tuple of (updated_new_messages, state_update or None if should continue)
@@ -256,9 +292,11 @@ async def execute_single_tool(
         else:
             logger.warning("Tool skipped due to failures", tool=tool_name)
             new_messages.append(
-                HumanMessage(
+                ToolMessage(
                     content=f"Tool {tool_name} 被跳过（之前多次失败）",
                     name=tool_name,
+                    tool_call_id=tool_call_id,
+                    status="error",
                 )
             )
             return new_messages, None
@@ -269,18 +307,39 @@ async def execute_single_tool(
         if tool_args.get("_parse_error"):
             error_msg = f"Error: 工具参数解析失败 - {tool_args['_parse_error']}"
             logger.warning(error_msg)
-            new_messages.append(HumanMessage(content=error_msg, name=tool_name))
+            new_messages.append(
+                ToolMessage(
+                    content=error_msg,
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                    status="error",
+                )
+            )
             return new_messages, None
 
         if not tool_args.get("path"):
             error_msg = f"Error: Tool {tool_name} requires 'path' argument"
             logger.debug(error_msg)
-            new_messages.append(HumanMessage(content=error_msg, name=tool_name))
+            new_messages.append(
+                ToolMessage(
+                    content=error_msg,
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                    status="error",
+                )
+            )
             return new_messages, None
         if tool_name == "write_file" and not tool_args.get("content"):
             error_msg = "Error: Tool write_file requires 'content' argument"
             logger.debug(error_msg)
-            new_messages.append(HumanMessage(content=error_msg, name=tool_name))
+            new_messages.append(
+                ToolMessage(
+                    content=error_msg,
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                    status="error",
+                )
+            )
             return new_messages, None
 
     try:
@@ -297,9 +356,11 @@ async def execute_single_tool(
         metrics_collector.record_tool_call(tool_name, success=True)
 
         new_messages.append(
-            HumanMessage(
-                content=f"Tool {tool_name} result: {result}",
+            ToolMessage(
+                content=str(result),
                 name=tool_name,
+                tool_call_id=tool_call_id,
+                status="success",
             )
         )
         return new_messages, None
@@ -310,9 +371,11 @@ async def execute_single_tool(
 
         logger.debug("Path confirmation required", path=e.path)
         new_messages.append(
-            HumanMessage(
+            ToolMessage(
                 content=f"路径确认请求：{e.path}\n\n原因：{e.reason}\n\n请回复 'yes' 或 'y' 确认访问此路径，或提供其他路径。",
                 name=tool_name,
+                tool_call_id=tool_call_id,
+                status="success",
             )
         )
         return new_messages, {
@@ -328,13 +391,15 @@ async def execute_single_tool(
 
         logger.debug("MCP confirmation required", server=e.server, tool=e.tool)
         new_messages.append(
-            HumanMessage(
+            ToolMessage(
                 content=(
                     f"MCP 工具确认请求：{e.server}/{e.tool}\n\n"
                     "该 MCP 工具本次会话尚未放行。请回复 'yes' 或 'y' 放行"
                     "（本次会话内不再询问），或拒绝并改用其他方式。"
                 ),
                 name=tool_name,
+                tool_call_id=tool_call_id,
+                status="success",
             )
         )
         return new_messages, {
@@ -349,13 +414,15 @@ async def execute_single_tool(
         logger.debug("permission ask required", tool=e.tool, arg=e.arg)
         arg_hint = f"\n参数：{e.arg}" if e.arg else ""
         new_messages.append(
-            HumanMessage(
+            ToolMessage(
                 content=(
                     f"权限确认请求：工具 {e.tool}{arg_hint}\n\n"
                     "该调用命中 ask 权限规则。请回复 'yes' 或 'y' 放行"
                     "（本次会话内对同参数不再询问），或拒绝并改用其他方式。"
                 ),
                 name=tool_name,
+                tool_call_id=tool_call_id,
+                status="success",
             )
         )
         return new_messages, {
@@ -369,9 +436,11 @@ async def execute_single_tool(
         degr_manager.tool.record_failure(tool_name, f"File system error: {e}")
         metrics_collector.record_tool_call(tool_name, success=False)
         new_messages.append(
-            HumanMessage(
+            ToolMessage(
                 content=f"Tool {tool_name} 文件系统错误: {e}",
                 name=tool_name,
+                tool_call_id=tool_call_id,
+                status="error",
             )
         )
         return new_messages, None
@@ -382,9 +451,11 @@ async def execute_single_tool(
         degr_manager.tool.record_failure(tool_name, f"Parameter error: {e}")
         metrics_collector.record_tool_call(tool_name, success=False)
         new_messages.append(
-            HumanMessage(
+            ToolMessage(
                 content=f"Tool {tool_name} 参数错误: {e}",
                 name=tool_name,
+                tool_call_id=tool_call_id,
+                status="error",
             )
         )
         return new_messages, None
@@ -395,9 +466,11 @@ async def execute_single_tool(
         degr_manager.tool.record_failure(tool_name, "Timeout")
         metrics_collector.record_tool_call(tool_name, success=False)
         new_messages.append(
-            HumanMessage(
+            ToolMessage(
                 content=f"Tool {tool_name} 执行超时",
                 name=tool_name,
+                tool_call_id=tool_call_id,
+                status="error",
             )
         )
         return new_messages, None
@@ -408,9 +481,11 @@ async def execute_single_tool(
         degr_manager.tool.record_failure(tool_name, f"Unexpected error: {type(e).__name__}")
         metrics_collector.record_tool_call(tool_name, success=False)
         new_messages.append(
-            HumanMessage(
+            ToolMessage(
                 content=f"Tool {tool_name} 执行失败，请检查参数或重试",
                 name=tool_name,
+                tool_call_id=tool_call_id,
+                status="error",
             )
         )
         return new_messages, None

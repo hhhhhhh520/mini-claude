@@ -30,7 +30,7 @@ def manage_message_history(
 
     try:
         from ..utils.token_manager import get_token_counter
-        from langchain_core.messages import HumanMessage
+        from langchain_core.messages import HumanMessage, ToolMessage
 
         token_counter = get_token_counter(default_model)
 
@@ -40,7 +40,12 @@ def manage_message_history(
             if isinstance(msg, dict):
                 messages_for_count.append(msg)
             else:
-                role = "user" if isinstance(msg, HumanMessage) else "assistant"
+                if isinstance(msg, HumanMessage):
+                    role = "user"
+                elif isinstance(msg, ToolMessage):
+                    role = "tool"
+                else:
+                    role = "assistant"
                 content = msg.content if hasattr(msg, "content") else str(msg)
                 messages_for_count.append({"role": role, "content": content})
 

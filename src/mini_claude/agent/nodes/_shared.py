@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from ..state import AgentState, StopReason, get_max_iterations
 from ..completion_config import (
@@ -145,6 +145,7 @@ __all__ = [
     "AIMessage",
     "HumanMessage",
     "SystemMessage",
+    "ToolMessage",
     "Optional",
     # Functions
     "get_max_iterations",

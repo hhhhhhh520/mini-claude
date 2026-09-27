@@ -5,6 +5,7 @@ import logging
 import aiosqlite
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 from .state import AgentState
 from .nodes import (
@@ -138,7 +139,11 @@ def build_agent_graph(checkpointer_path: str = "sessions.db"):
     # 抛 RuntimeError: no running event loop。
     # 连接登记在最后一步——登记前任何构造失败都不会留下孤儿登记。
     conn = aiosqlite.connect(checkpointer_path)
-    compiled = graph.compile(checkpointer=AsyncSqliteSaver(conn))
+    # ISSUE-027：StopReason 是自定义枚举，进 checkpoint 走 msgpack ext 编码。
+    # 不注册白名单时 LangGraph 每次反序列化都警告，且未来版本默认阻断
+    # （/resume、/rewind 将整体失效）。显式允许 → 显式声明序列化契约。
+    serde = JsonPlusSerializer(allowed_msgpack_modules=[("mini_claude.agent.state", "StopReason")])
+    compiled = graph.compile(checkpointer=AsyncSqliteSaver(conn, serde=serde))
     _checkpoint_conns.append(conn)
     return compiled
 

@@ -23,8 +23,11 @@
    - [ ] `ruff check` + `ruff format --check` 通过（规则集已锁定 E4/E7/E9/F）
    - [ ] push 后 CI 绿
    - [ ] 根因/设计记录进 `issues/`（本地，gitignored）
-   - [ ] README.md 徽章同步（现有 4 枚徽章中的 **Tools-21** 工具数；目前无命令数徽章，若新增 `/mcp`、`/permissions` 等命令可顺带补建）
+   - [ ] README.md 徽章同步（现有 4 枚徽章中的 **Tools-24** 工具数；目前无命令数徽章，若新增 `/mcp`、`/permissions` 等命令可顺带补建）
    - [ ] 至少 1 条真 Key 联调 E2E（mock 测试不等于功能正常）
+   - [ ] 改动涉及工具循环（act/_act_helpers/main.py ask 路径）时，追加真网多步任务
+     验收：连续 ≥3 轮工具调用全部以 API tool_calls 执行、无 `<tool_call>` 正文泄漏
+     （2026-09-28 ISSUE-026 后新增；mock 层绿 ≠ 真实 provider 语义对）
 4. **架构红线**（来自项目 CLAUDE.md，新功能不得破坏）：
    - `messages` 是累加 reducer，节点只返回增量；todo 等需要全量替换的状态**不得**挂 `add` reducer
    - 系统提示/CLAUDE.md/skills 不写入 `state["messages"]`，走 `build_system_messages()` 每次前置

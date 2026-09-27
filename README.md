@@ -5,8 +5,8 @@
 **迷你版 Claude Code** — 工具调用 + 主从多 Agent 并发，在一个 CLI 里跑完整开发循环。
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
-[![Tests](https://img.shields.io/badge/Tests-1984%20collected-brightgreen)](tests/)
-[![Tools](https://img.shields.io/badge/Tools-22-orange)](#可用工具22个)
+[![Tests](https://img.shields.io/badge/Tests-1998%20collected-brightgreen)](tests/)
+[![Tools](https://img.shields.io/badge/Tools-24-orange)](#可用工具24个)
 [![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
 
 </div>
@@ -30,7 +30,7 @@
 - **会话回退**：`/rewind` 列出回合边界 checkpoint，从任意回合分叉重跑（基于 LangGraph 时间旅行）
 - **后台任务**：`run_background` 输出落盘，`task_output`/`task_kill` 读取与终止（对齐 BashOutput/KillShell）
 - **模型热切换**：`/model <name>` 会话内即时切换（含子代理），`.env` 默认值不动
-- **测试规模**：1984 个测试用例（2026-09-27 实测收集数）
+- **测试规模**：1998 个测试用例（2026-09-28 实测收集数）
 
 ## 安装
 
@@ -238,7 +238,7 @@ ANTHROPIC_API_KEY=your-claude-key
 GOOGLE_API_KEY=your-gemini-key
 ```
 
-## 可用工具（22个）
+## 可用工具（24个）
 
 ### 文件操作 (8个)
 | 工具 | 功能 |
@@ -252,11 +252,13 @@ GOOGLE_API_KEY=your-gemini-key
 | `search_content` | 按内容搜索文件 |
 | `list_locks` | 查看文件锁状态 |
 
-### 命令执行 (2个)
+### 命令执行 (4个)
 | 工具 | 功能 |
 |------|------|
 | `run_command` | 执行Shell命令 |
 | `run_background` | 后台执行长时间命令 |
+| `task_output` | 读取后台任务输出（对齐 BashOutput） |
+| `task_kill` | 终止后台任务（对齐 KillShell） |
 
 ### Web (3个)
 | 工具 | 功能 |

@@ -424,7 +424,13 @@ async def _execute_tools(
                 display.show_info(progress_msg)
 
         new_messages, state_update = await execute_single_tool(
-            tool_name, tool_args, degr_manager, metrics_collector, trace_tool_call, new_messages
+            tool_name,
+            tool_args,
+            degr_manager,
+            metrics_collector,
+            trace_tool_call,
+            new_messages,
+            tool_call_id=tool_call.get("id", ""),
         )
 
         # todo_write：清单校验通过时全量替换进 state，并当场渲染给用户。
@@ -444,11 +450,7 @@ async def _execute_tools(
             last_msg = new_messages[-1]
             content = last_msg.content if hasattr(last_msg, "content") else str(last_msg)
             if content and not state_update:
-                # Strip the "Tool xxx result: " prefix for cleaner display
-                display_text = content
-                if display_text.startswith(f"Tool {tool_name} result: "):
-                    display_text = display_text[len(f"Tool {tool_name} result: ") :]
-                display.show_tool_result(display_text[:500])
+                display.show_tool_result(str(content)[:500])
 
         # Check if tool execution failed
         if state_update and state_update.get("stop_reason") == StopReason.ERROR:

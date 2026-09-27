@@ -236,40 +236,67 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
         messages = [{"role": "user", "content": prompt}]
 
         try:
-            # First call with tools
-            response = await llm.chat(
-                messages=messages,
-                tools=litellm_tools,
-                tool_choice="auto",
-            )
+            # ISSUE-026：完整函数调用循环——assistant 消息原样携带 tool_calls、
+            # 工具结果以 role=tool + tool_call_id 回传、后续调用继续带 tools。
+            # 旧实现剥 tool_calls + user 文本回传，Qwen 类网关第二轮起丢失
+            # 函数调用状态，把 <tool_call> 原生文本当正文输出。
+            max_tool_rounds = 10
+            rounds = 0
+            result_text = ""
+            while True:
+                response = await llm.chat(
+                    messages=messages,
+                    tools=litellm_tools,
+                    tool_choice="auto",
+                )
+                message = response.choices[0].message
+                tool_calls = getattr(message, "tool_calls", None)
+                if not tool_calls:
+                    result_text = message.content or ""
+                    break
 
-            message = response.choices[0].message
+                rounds += 1
+                if rounds > max_tool_rounds:
+                    result_text = (message.content or "") + "\n（工具调用轮数达到上限，已停止执行）"
+                    break
 
-            # Check for tool calls
-            if hasattr(message, "tool_calls") and message.tool_calls:
-                # Execute tools
-                for tc in message.tool_calls:
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": message.content or "",
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments,
+                                },
+                            }
+                            for tc in tool_calls
+                        ],
+                    }
+                )
+
+                for tc in tool_calls:
                     tool_name = tc.function.name
                     tool_args = tc.function.arguments
 
                     if isinstance(tool_args, str):
-                        tool_args = json.loads(tool_args)
+                        try:
+                            tool_args = json.loads(tool_args)
+                        except json.JSONDecodeError as e:
+                            logger.warning(
+                                f"ask: tool arguments JSON parse failed ({e})",
+                                tool_name=tool_name,
+                            )
+                            tool_args = {"_raw": str(tool_args)[:500]}
 
                     if not output_json:
                         print(f"[Tool] {tool_name}({tool_args})")
                     result = await execute_tool(tool_name, tool_args)
 
-                    # Add assistant message and tool result
-                    messages.append({"role": "assistant", "content": message.content or ""})
-                    messages.append(
-                        {"role": "user", "content": f"Tool {tool_name} result: {result}"}
-                    )
-
-                # Second call to process tool results
-                response = await llm.chat(messages=messages)
-                result_text = response.choices[0].message.content
-            else:
-                result_text = message.content or ""
+                    messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
             if not output_json:
                 display.agent_message(result_text)
