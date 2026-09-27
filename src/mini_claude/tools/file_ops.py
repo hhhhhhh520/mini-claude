@@ -7,8 +7,55 @@ import contextvars
 from typing import Dict, Any
 
 from .base import BaseTool, register_tool
-from ..utils.safety import SafetyChecker, truncate_content
 from ..utils.file_lock import file_lock_manager
+from ..utils.safety import (
+    PathConfirmationRequired,
+    SafetyChecker,
+    truncate_content,
+)
+
+
+def _diff_preview_reason(path: str, new_content: str, old_text=None, new_text=None) -> str:
+    """P4-3：为路径确认生成 unified diff 变更预览（附加到 reason）。
+
+    - write/force_write：现有内容 vs 新内容
+    - edit：old_text 替换后的全文 vs 原全文
+    - 新文件标注"新建文件"；diff 超长截断，确认消息不能被撑爆
+    """
+    import difflib
+    import itertools
+
+    old_content = ""
+    exists = os.path.exists(path)
+    if exists:
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                old_content = f.read()
+        except OSError:
+            old_content = ""
+
+    if old_text is not None:
+        applied = old_content.replace(old_text, new_text or "")
+        old_side, new_side = old_content, applied
+    else:
+        old_side, new_side = old_content, new_content
+
+    old_lines = old_side.splitlines(keepends=True)
+    new_lines = new_side.splitlines(keepends=True)
+    diff = difflib.unified_diff(
+        old_lines,
+        new_lines,
+        fromfile="旧内容",
+        tofile="新内容",
+        lineterm="",
+    )
+    lines = list(itertools.islice(diff, 61))
+    text = "\n".join(lines)
+    if len(lines) >= 61:
+        text += "\n…（diff 已截断）"
+
+    header = "变更预览（unified diff）：" if exists else "变更预览（新建文件）："
+    return f"{header}\n```diff\n{text}\n```"
 
 
 def _atomic_write(path: str, content: str) -> None:
@@ -223,9 +270,15 @@ class WriteFileTool(BaseTool):
 
         checker = SafetyChecker()
         # Sub-agents cannot request path confirmation - directly reject if outside workspace
-        is_valid, reason = checker.check_file_write(
-            path, require_confirmation=not is_subagent_mode()
-        )
+        try:
+            is_valid, reason = checker.check_file_write(
+                path, require_confirmation=not is_subagent_mode()
+            )
+        except PathConfirmationRequired as e:
+            # P4-3：确认请求附带 unified diff 变更预览
+            raise PathConfirmationRequired(
+                e.path, e.reason + "\n\n" + _diff_preview_reason(path, content)
+            )
         if not is_valid:
             return f"Error: {reason}"
 
@@ -301,9 +354,25 @@ class EditFileTool(BaseTool):
 
         checker = SafetyChecker()
         # Sub-agents cannot request path confirmation - directly reject if outside workspace
-        is_valid, reason = checker.check_file_write(
-            path, require_confirmation=not is_subagent_mode()
-        )
+        try:
+            is_valid, reason = checker.check_file_write(
+                path, require_confirmation=not is_subagent_mode()
+            )
+        except PathConfirmationRequired as e:
+            # P4-3：edit 确认附带替换后的 unified diff
+            old_content = ""
+            if os.path.exists(path):
+                try:
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        old_content = f.read()
+                except OSError:
+                    old_content = ""
+            raise PathConfirmationRequired(
+                e.path,
+                e.reason
+                + "\n\n"
+                + _diff_preview_reason(path, old_content, old_text=old_text, new_text=new_text),
+            )
         if not is_valid:
             return f"Error: {reason}"
 
@@ -610,7 +679,12 @@ class ForceWriteTool(BaseTool):
             path = os.path.join(settings.workspace_root, path)
 
         checker = SafetyChecker()
-        is_valid, reason = checker.check_file_write(path)
+        try:
+            is_valid, reason = checker.check_file_write(path)
+        except PathConfirmationRequired as e:
+            raise PathConfirmationRequired(
+                e.path, e.reason + "\n\n" + _diff_preview_reason(path, content)
+            )
         if not is_valid:
             return f"Error: {reason}"
 

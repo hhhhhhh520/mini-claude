@@ -5,7 +5,7 @@ Commands:
     /? - Show help
     /exit, /quit, /q - Exit REPL
     /clear - Clear screen
-    /model <name> - Switch model
+    /model [name] - Show current model or hot-switch to <name>
 """
 
 from rich.panel import Panel
@@ -45,9 +45,24 @@ class HelpCommandHandler(CommandHandler):
             return CommandResult(handled=True)
 
         if cmd == "/model":
+            # P4-4：热切换——改 settings.default_model 并重建 provider 单例
+            from ...agent.nodes import _shared
+            from ...config.settings import settings as app_settings
+
+            args = (ctx.args or "").strip()
+            if not args:
+                return CommandResult(
+                    handled=True,
+                    message=f"当前模型: {app_settings.default_model}\n"
+                    "切换: /model <model-name>（.env 的 DEFAULT_MODEL 仍是下次启动默认）",
+                )
+            old = app_settings.default_model
+            app_settings.default_model = args
+            _shared.rebuild_llm_provider(args)
             return CommandResult(
                 handled=True,
-                message="[dim]Model switching is not supported. Configure via .env file (DEFAULT_MODEL=...)[/]",
+                message=f"模型已切换: {old} → {args}\n"
+                "（本会话即时生效，含子代理；.env 默认值未改动）",
             )
 
         return CommandResult(handled=False)
@@ -58,7 +73,7 @@ class HelpCommandHandler(CommandHandler):
 /help - Show this help
 /exit, /quit, /q - Exit REPL
 /clear - Clear screen
-/model - Show model info (configure via .env)
+/model [name] - Show current model or hot-switch to <name>
 /status - Show session status (including token usage)
 /tokens - Show detailed token usage
 /metrics - Show Prometheus metrics
@@ -78,6 +93,7 @@ class HelpCommandHandler(CommandHandler):
 /skills - List all available skills
 /skill <name> [args] - Invoke a skill
 /mcp [connect|disconnect|reload] - Manage MCP servers and tools
+/rewind [n] - List turn checkpoints or rewind to #n (fork re-run)
 /permissions [mode] - View or switch permission mode (shift+tab cycles)
 /hooks - View configured hooks (PreToolUse/PostToolUse/Stop)"""
 
@@ -90,5 +106,5 @@ class HelpCommandHandler(CommandHandler):
             "/help, /? - Show this help\n"
             "/exit, /quit, /q - Exit REPL\n"
             "/clear - Clear screen\n"
-            "/model <name> - Switch model"
+            "/model [name] - Show current model or hot-switch to <name>"
         )

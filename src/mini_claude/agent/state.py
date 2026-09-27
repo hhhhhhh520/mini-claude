@@ -190,6 +190,41 @@ def create_initial_state(
     )
 
 
+def create_turn_increment(user_input: str, thread_id: str = "default") -> AgentState:
+    """创建**单回合增量**状态（P4-1）。
+
+    REPL 每轮只传新消息 + 本回合初始字段，历史由 checkpointer 携带。
+    实测（2026-09-27）：带 checkpointer 时传全量历史会把旧消息整段复制
+    （ISSUE-014 的多轮版），增量是唯一正确姿势。
+
+    刻意**不包含 todos**：todo 清单是跨回合状态，增量里带空列表会把
+    上回合的进度清掉；fork 回旧快照时也应保留快照当时的 todos。
+
+    与 checkpoint_id 配合即 /rewind 的分叉重跑。
+    """
+    from langchain_core.messages import HumanMessage
+
+    return AgentState(
+        messages=[HumanMessage(content=user_input)],
+        current_task=user_input,
+        iteration=0,
+        stop_reason=StopReason.CONTINUE,
+        thread_id=thread_id,
+        sub_agents={},
+        sub_agent_results={},
+        is_subagent=False,
+        allowed_tools=None,
+        errors=[],
+        retry_count=0,
+        pending_confirmation_path=None,
+        reflection_notes=[],
+        lessons_learned=[],
+        improvement_suggestions=[],
+        execution_plan=None,
+        current_step_index=0,
+    )
+
+
 def get_max_iterations(state: AgentState) -> int:
     """获取最大迭代次数（子代理使用更小的限制）"""
     from mini_claude.config.settings import settings

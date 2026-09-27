@@ -90,6 +90,8 @@ class REPLSession:
         self._execution_state = None
         self._active_skill = None
         self._active_skill_args = ""
+        # P4-1 /rewind：待分叉快照的 configurable（含 checkpoint_id），下轮用后即清
+        self._rewind_configurable = None
 
     def _get_profile_manager(self) -> UserProfileManager:
         """Get or create profile manager."""
@@ -222,7 +224,6 @@ class REPLSession:
     async def _run_graph_loop(self):
         """REPL 主循环本体；资源清理由 run_graph 的 finally 统一负责。"""
         from ..agent.graph import get_agent_graph
-        from ..agent.state import create_initial_state
         from mini_claude.config.settings import settings
 
         self.running = True
@@ -296,13 +297,23 @@ class REPLSession:
                 display.show_thinking()
 
                 try:
-                    history_messages = self._build_history_messages()
-                    initial_state = create_initial_state(effective_input, history_messages)
+                    # P4-1：每轮只传增量（新消息+本回合初始字段）。
+                    # 历史（含 todos）由 checkpointer 携带——实测传全量历史会
+                    # 把旧消息整段复制进 checkpoint（ISSUE-014 多轮版）。
+                    # /rewind 时 config 带 checkpoint_id，从快照分叉重跑。
+                    from ..agent.state import create_turn_increment
+
+                    turn_state = create_turn_increment(effective_input, thread_id=self.thread_id)
+
+                    configurable = {"thread_id": self.thread_id}
+                    if self._rewind_configurable is not None:
+                        configurable.update(self._rewind_configurable)
+                        self._rewind_configurable = None
 
                     result = await graph.ainvoke(
-                        initial_state,
+                        turn_state,
                         config={
-                            "configurable": {"thread_id": self.thread_id},
+                            "configurable": configurable,
                             "recursion_limit": 50,
                         },
                     )
@@ -356,23 +367,6 @@ class REPLSession:
             except Exception as e:
                 display.show_error(str(e))
                 continue
-
-    def _build_history_messages(self) -> list:
-        """Build LangChain message list from history."""
-        from langchain_core.messages import HumanMessage, AIMessage
-
-        history_messages = []
-        for msg in self.messages:
-            if isinstance(msg, dict):
-                role = msg.get("role", "user")
-                content = msg.get("content", "")
-                if role == "user":
-                    history_messages.append(HumanMessage(content=content))
-                elif role == "assistant":
-                    history_messages.append(AIMessage(content=content))
-            else:
-                history_messages.append(msg)
-        return history_messages
 
     def _process_result(self, result: dict) -> None:
         """Process graph result and update state."""

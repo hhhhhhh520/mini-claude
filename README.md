@@ -5,7 +5,7 @@
 **迷你版 Claude Code** — 工具调用 + 主从多 Agent 并发，在一个 CLI 里跑完整开发循环。
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
-[![Tests](https://img.shields.io/badge/Tests-1955%20collected-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-1984%20collected-brightgreen)](tests/)
 [![Tools](https://img.shields.io/badge/Tools-22-orange)](#可用工具22个)
 [![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
 
@@ -27,7 +27,10 @@
 - **MCP 支持**：接入 Model Context Protocol 服务器（stdio），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道（对齐 Claude Code 生态）
 - **Hooks**：PreToolUse/PostToolUse/Stop 三事件，用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换），超时强杀
 - **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则（glob 匹配主参数），deny > ask > allow > 模式默认
-- **测试规模**：1955 个测试用例（2026-09-27 实测收集数）
+- **会话回退**：`/rewind` 列出回合边界 checkpoint，从任意回合分叉重跑（基于 LangGraph 时间旅行）
+- **后台任务**：`run_background` 输出落盘，`task_output`/`task_kill` 读取与终止（对齐 BashOutput/KillShell）
+- **模型热切换**：`/model <name>` 会话内即时切换（含子代理），`.env` 默认值不动
+- **测试规模**：1984 个测试用例（2026-09-27 实测收集数）
 
 ## 安装
 

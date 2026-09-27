@@ -34,6 +34,20 @@ from mini_claude.agent.graph import build_agent_graph
 from mini_claude.agent.state import create_initial_state
 
 
+def _bypass_degradation(monkeypatch):
+    """旁路降级管理器：全量跑时网络型测试可能把模型推到 fallback，
+    导致 act 走真实 provider 分支（无 key 即炸）。图级 fake 测试一律旁路。"""
+    from unittest.mock import MagicMock
+
+    from mini_claude.config.settings import settings
+
+    degr = MagicMock()
+    degr.model.get_current_model.return_value = settings.default_model
+    import mini_claude.agent.nodes.act as act_mod
+
+    monkeypatch.setattr(act_mod, "get_degradation_manager", lambda: degr)
+
+
 @pytest.fixture(autouse=True)
 async def _drain_checkpoint_conns():
     """每个用例后关闭连接，避免用例间互相泄漏 / Windows 上临时库文件被占用."""
@@ -334,6 +348,7 @@ async def test_system_prompt_prepended_to_llm_call(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "streaming_enabled", False)
     # 速率限制器是进程级单例，前面的图测试可能已耗尽 "default" 会话配额，旁路之
     monkeypatch.setattr(get_rate_limiter(), "check_limit", lambda *a, **k: True)
+    _bypass_degradation(monkeypatch)
     db = str(tmp_path.resolve() / "ckpt.db")
 
     captured_calls = []

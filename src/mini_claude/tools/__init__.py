@@ -15,7 +15,7 @@ from .file_ops import (
     is_subagent_mode,
     get_current_agent,
 )
-from .bash import RunCommandTool, RunBackgroundTool
+from .bash import RunCommandTool, RunBackgroundTool, TaskOutputTool, TaskKillTool
 from .agent_spawn import (
     SpawnAgentTool,
     ListAgentsTool,
@@ -99,6 +99,8 @@ __all__ = [
     # Bash tools
     "RunCommandTool",
     "RunBackgroundTool",
+    "TaskOutputTool",
+    "TaskKillTool",
     # Agent tools
     "SpawnAgentTool",
     "ListAgentsTool",

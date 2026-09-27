@@ -30,6 +30,24 @@ logger = get_logger("mini_claude.agent.nodes")
 # Initialize LLM provider
 llm_provider = LLMProvider()
 
+
+def get_llm_provider():
+    """取当前 LLM provider 实例（P4-4）。
+
+    act 等模块不得在 import 期按名绑定 llm_provider——/model 热切换会重建
+    单例，按名绑定会失联（ISSUE-024 同款教训）。统一经本访问器取。
+    """
+    return llm_provider
+
+
+def rebuild_llm_provider(model: Optional[str] = None):
+    """重建 provider 单例（/model 热切换）；返回新实例。"""
+    global llm_provider
+    llm_provider = LLMProvider(model=model)
+    logger.info("llm provider rebuilt", model=llm_provider.model)
+    return llm_provider
+
+
 # Initialize degradation manager (lazy)
 _degradation_manager: Optional[DegradationManager] = None
 

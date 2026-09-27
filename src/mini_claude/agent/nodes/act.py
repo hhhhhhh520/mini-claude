@@ -20,7 +20,7 @@ from ._shared import (
     trace_tool_call,
     trace_llm_call,
     logger,
-    llm_provider,
+    get_llm_provider,
     LLMProvider,
 )
 from ._act_helpers import (
@@ -275,7 +275,7 @@ async def _call_llm_with_retry(
                 if span:
                     span.set_attribute("degraded_model", current_model)
             else:
-                local_provider = llm_provider
+                local_provider = get_llm_provider()
 
             if span:
                 span.set_attribute("model", current_model)

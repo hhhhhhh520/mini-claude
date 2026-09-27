@@ -122,42 +122,41 @@ class TestHelpCommandHandler:
         display.console.clear.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_model_command(self):
-        """Test model command."""
-        session = MagicMock()
+    async def test_model_command_switches(self):
+        """P4-4：/model <name> 热切换——settings + provider 单例都更新"""
+        from mini_claude.agent.nodes import _shared
+        from mini_claude.config.settings import settings as app_settings
 
-        display = MagicMock()
-        display.console = MagicMock()
-
-        ctx = CommandContext(
-            session=session,
-            command="/model",
-            args="gpt-4",
-            display=display,
-        )
-
-        result = await self.handler.handle(ctx)
-        assert result.handled is True
-        assert "not supported" in result.message
+        old = app_settings.default_model
+        try:
+            session = MagicMock()
+            display = MagicMock()
+            display.console = MagicMock()
+            ctx = CommandContext(
+                session=session, command="/model", args="gpt-4-test", display=display
+            )
+            result = await self.handler.handle(ctx)
+            assert result.handled is True
+            assert app_settings.default_model == "gpt-4-test"
+            assert _shared.llm_provider.model == "gpt-4-test"
+            assert old in result.message
+        finally:
+            app_settings.default_model = old
+            _shared.rebuild_llm_provider(old)
 
     @pytest.mark.asyncio
-    async def test_model_command_no_arg(self):
-        """Test model command without argument."""
-        session = MagicMock()
+    async def test_model_command_no_arg_shows_current(self):
+        """P4-4：无参 /model 显示当前模型"""
+        from mini_claude.config.settings import settings as app_settings
 
+        session = MagicMock()
         display = MagicMock()
         display.console = MagicMock()
-
-        ctx = CommandContext(
-            session=session,
-            command="/model",
-            args="",
-            display=display,
-        )
-
+        ctx = CommandContext(session=session, command="/model", args="", display=display)
         result = await self.handler.handle(ctx)
         assert result.handled is True
-        assert "not supported" in result.message
+        assert app_settings.default_model in result.message
+        assert "not supported" not in result.message
 
     def test_get_help_text(self):
         """Test get_help_text returns content."""

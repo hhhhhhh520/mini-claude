@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-09-27 (P1 快赢包 + P2 MCP 客户端 + P3 Hooks/权限落地；CI 修复 ISSUE-023/024)
+> 最后更新: 2026-09-27 (P1~P4 全部落地：Todo/CLAUDE.md/MCP/Hooks/权限/rewind/后台任务/model 热切换；修复多轮消息复制 bug)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -177,6 +177,35 @@
 ### 实踩教训
 - E2E 里让 LLM"执行 echo-denied*"验证 deny 不可靠——LLM 会改写命令串导致 glob 不命中；
   按工具名 deny（如 weather）才是确定性验证。
+
+## 2026-09-27 P4 rewind + 打磨落地（PLAN_对标ClaudeCode差距收敛 Phase 4 收官）
+
+### 交付
+- P4-1 `/rewind`：get_state_history 列回合边界快照（next∈{('think',),()}）→ `/rewind <n>`
+  暂存快照 configurable → 下一轮输入带 checkpoint_id 增量分叉重跑；旧分支保留在
+  checkpoint 链，可再次回退
+- **顺手修掉潜伏多轮 bug（重要）**：REPL 旧逻辑每轮传全量历史，实测带 checkpointer 时
+  旧消息被 add-reducer 整段复制（'第一轮'存两份，ISSUE-014 多轮版）。新 `create_turn_increment`
+  统一增量传参；todos 刻意不在增量里（跨回合状态）
+- P4-2 `task_output`/`task_kill` 工具：run_background 输出改文件重定向（顺带修掉
+  PIPE 写满卡死子进程的隐患），读尾部/列任务/终止
+- P4-3 确认流程 unified diff：write/edit/force_write 触发路径确认时 reason 附变更预览
+  （新建文件标注、60 行截断）
+- P4-4 `/model` 热切换：改造占位——settings.default_model + `_shared.rebuild_llm_provider`，
+  act 改经 `get_llm_provider()` 访问器取实例（import 期绑定会失联，ISSUE-024 同款）
+
+### 验证
+- 新增 29 测（fork 契约 4 / task 工具 7 / diff 预览 6 / model 切换 5 / rewind 命令 6 + 增量形状）
+- CI 等效全量（无 .env）：1903 passed / 40 skipped / 0 failed（收集 1984）
+- 真 Key E2E：真 LLM 两轮（1+1/2+2）无复制 → 分叉回第一轮结束 → 旧 2+2 丢弃、新 3+3 接入
+  → close_checkpoint_connections 收口，进程干净退出
+
+### 实踩教训
+- 测试轮询子进程退出必须 `await asyncio.sleep`——同步 time.sleep 阻塞事件循环，
+  退出回调得不到调度，returncode 永不更新（表现为"任务永远 running"）
+- 全量回归中网络型测试可能把降级管理器推到 fallback 模型，后续 fake-LLM 图测试
+  被迫走真实 provider 分支（无 key 即炸）——图级 fake 测试统一旁路降级管理器
+- E2E 里按快照内容（而非列表序号）选取 fork 边界，避免对 checkpoint 排序的隐式依赖
 
 ## 2026-09-13 mini-claude ISSUE-017~021 五连修
 
