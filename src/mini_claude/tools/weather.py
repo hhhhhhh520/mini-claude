@@ -2,9 +2,10 @@
 
 from typing import Dict, Any
 
-import requests
+import httpx
 
 from .base import BaseTool, register_tool
+from ._http import get_shared_client
 
 
 class WeatherTool(BaseTool):
@@ -41,7 +42,7 @@ class WeatherTool(BaseTool):
         }
 
     async def execute(self, city: str, days: int = 2) -> str:
-        """Get weather for a city."""
+        """Get weather for a city. 非阻塞：共享 httpx client（多 Agent 并行不互拖）"""
         try:
             # wttr.in returns JSON weather data - free, no API key
             url = f"https://wttr.in/{city}"
@@ -49,7 +50,8 @@ class WeatherTool(BaseTool):
                 "format": "j1",
             }
             headers = {"User-Agent": "curl/8.0"}
-            resp = requests.get(url, params=params, headers=headers, timeout=15)
+            client = get_shared_client()
+            resp = await client.get(url, params=params, headers=headers)
             resp.raise_for_status()
             data = resp.json()
 
@@ -90,11 +92,11 @@ class WeatherTool(BaseTool):
 
             return output
 
-        except requests.exceptions.Timeout:
+        except httpx.TimeoutException:
             return f"Error: Weather request for '{city}' timed out. Please try again."
-        except requests.exceptions.HTTPError:
+        except httpx.HTTPStatusError:
             return f"Error: Could not find weather for '{city}'. Check the city name (use Chinese or English)."
-        except requests.exceptions.ConnectionError:
+        except httpx.ConnectError:
             return "Error: Could not connect to weather service. Please check your internet connection."
         except Exception as e:
             return f"Weather error: {type(e).__name__}: {str(e)}"

@@ -1,14 +1,16 @@
 """Web fetch tool for retrieving page content from URLs."""
 
+import asyncio
 import ipaddress
 import socket
 from typing import Dict, Any, Tuple
 from urllib.parse import urlparse, urljoin
 
-import requests
+import httpx
 from bs4 import BeautifulSoup
 
 from .base import BaseTool, register_tool
+from ._http import get_shared_client
 
 MAX_REDIRECTS = 5
 
@@ -103,10 +105,17 @@ class WebFetchTool(BaseTool):
         }
 
     async def execute(self, url: str, max_length: int = 3000) -> str:
-        """Fetch and extract content from a URL."""
+        """Fetch and extract content from a URL.
+
+        非阻塞实现（对标 Claude Code 的 WebFetch）：共享 httpx.AsyncClient +
+        asyncio；SSRF 检查含 socket.getaddrinfo（阻塞调用），经 asyncio.to_thread
+        卸载到线程池——多 Agent 并行时抓取互不拖累。
+        注意不能用"每调用新建 AsyncClient"：其构造会同步加载 SSL 证书库
+        （Windows ~0.2s），在事件循环上就是全局冻结，见 tools/_http.py。
+        """
         try:
             # Initial SSRF check
-            is_safe, reason = _check_ssrf(url)
+            is_safe, reason = await asyncio.to_thread(_check_ssrf, url)
             if not is_safe:
                 return f"Error: {reason}"
 
@@ -122,15 +131,16 @@ class WebFetchTool(BaseTool):
 
             # Manual redirect loop with SSRF check on each hop
             current_url = url
+            client = get_shared_client()
             for _ in range(MAX_REDIRECTS + 1):
-                resp = requests.get(current_url, headers=headers, timeout=15, allow_redirects=False)
+                resp = await client.get(current_url, headers=headers, follow_redirects=False)
 
                 if resp.status_code in (301, 302, 303, 307, 308):
                     next_url = resp.headers.get("Location", "")
                     if not next_url:
                         break
                     next_url = urljoin(current_url, next_url)
-                    is_safe, reason = _check_ssrf(next_url)
+                    is_safe, reason = await asyncio.to_thread(_check_ssrf, next_url)
                     if not is_safe:
                         return f"Error: Redirect to blocked address: {reason}"
                     current_url = next_url
@@ -141,8 +151,8 @@ class WebFetchTool(BaseTool):
             else:
                 return f"Error: Too many redirects (max {MAX_REDIRECTS}) when fetching {url}"
 
-            resp.encoding = resp.apparent_encoding
-
+            # httpx 的 .text 自带编码探测（headers charset → body 嗅探），
+            # 不再需要 requests 时代的 apparent_encoding 二段式
             soup = BeautifulSoup(resp.text, "html.parser")
 
             # Remove non-content elements
@@ -195,14 +205,12 @@ class WebFetchTool(BaseTool):
             domain = urlparse(url).netloc
             return f"Content from {domain}:\nTitle: {title}\n\n{text if text else 'No readable text content found.'}"
 
-        except requests.exceptions.Timeout:
+        except httpx.TimeoutException:
             return f"Error: Request to {url} timed out after 15 seconds."
-        except requests.exceptions.ConnectionError:
+        except httpx.ConnectError:
             return f"Error: Could not connect to {url}. The site may be blocked or unavailable."
-        except requests.exceptions.HTTPError as e:
+        except httpx.HTTPStatusError as e:
             return f"Error: HTTP {e.response.status_code} when fetching {url}"
-        except requests.exceptions.TooManyRedirects:
-            return f"Error: Too many redirects when fetching {url}"
         except Exception as e:
             return f"Error fetching {url}: {type(e).__name__}: {str(e)}"
 

@@ -200,12 +200,16 @@ jobs:
               sys.exit(1)
           "
 
-  # Job 5: Coverage report (PR only)
+  # Job 5: Coverage report —— 每次 push/PR 都跑（与 integration job 同批修复的
+  # "从不运行"盲区：原条件仅 pull_request，本仓库直推 master 等于从不触发）。
+  # 基线实测 70%（branch coverage，2026-09-28），fail_under=60 留足余量。
   coverage:
     name: Coverage Report
     runs-on: ubuntu-latest
-    needs: unit-tests
-    if: github.event_name == 'pull_request'
+    needs: lint
+    if: github.event_name != 'schedule'
+    env:
+      LANGGRAPH_STRICT_MSGPACK: 'true'
 
     steps:
       - uses: actions/checkout@v4
@@ -222,8 +226,10 @@ jobs:
           pip install -e ".[dev]" -c constraints.txt
 
       - name: Run coverage
+        # marker 表达式与 unit-tests job 一致：e2e/stress/chaos 不进 coverage
+        #（旧表达式 "not integration" 会连真网 e2e 一起跑，激活即翻车）
         run: |
-          python -m pytest tests/ -m "not integration" --cov=src/mini_claude --cov-report=xml:coverage.xml --cov-report=term-missing
+          python -m pytest tests/ -m "unit or not integration and not e2e and not stress and not chaos" --cov=src/mini_claude --cov-report=xml:coverage.xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

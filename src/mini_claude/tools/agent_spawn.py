@@ -14,20 +14,25 @@ from ..utils.logger import get_logger
 
 logger = get_logger("mini_claude.tools.agent_spawn")
 
+# 子代理工具白名单——单一事实源（PLAN backlog 项，原 SpawnAgentTool 与
+# SpawnParallelTool 各存一份，新增工具时容易漏改另一份）。
+# CRITICAL: 此清单刻意不含 spawn_agent/spawn_parallel——子代理不能再生
+# 子代理（防无限递归）。
+SUBAGENT_ALLOWED_TOOLS = [
+    "read_file",
+    "write_file",
+    "edit_file",
+    "list_dir",
+    "search_files",
+    "search_content",
+    "web_search",
+]
+
 
 class SpawnAgentTool(BaseTool):
     """Spawn a sub-agent for parallel execution."""
 
-    # CRITICAL: Sub-agents cannot spawn more agents (prevent infinite recursion)
-    ALLOWED_TOOLS = [
-        "read_file",
-        "write_file",
-        "edit_file",
-        "list_dir",
-        "search_files",
-        "search_content",
-        "web_search",
-    ]
+    ALLOWED_TOOLS = SUBAGENT_ALLOWED_TOOLS
 
     @property
     def name(self) -> str:
@@ -292,16 +297,7 @@ class GetResultTool(BaseTool):
 class SpawnParallelTool(BaseTool):
     """Spawn multiple agents in parallel."""
 
-    # CRITICAL: Sub-agents cannot spawn more agents (prevent infinite recursion)
-    ALLOWED_TOOLS = [
-        "read_file",
-        "write_file",
-        "edit_file",
-        "list_dir",
-        "search_files",
-        "search_content",
-        "web_search",
-    ]
+    ALLOWED_TOOLS = SUBAGENT_ALLOWED_TOOLS
 
     @property
     def name(self) -> str:

@@ -78,6 +78,7 @@
 ### 依赖与 CI 约束
 
 - 装包一律带锁合面：`pip install -e ".[dev]" -c constraints.txt`，与 CI 完全一致；升级依赖是显式动作（改 pin → 本地两层全绿 + 不可达端点全绿 → 推送盯 CI）
+- web 工具必须用 `tools/_http.py` 的共享 httpx client：**每次新建 AsyncClient 会同步加载 SSL 证书库（~0.2s），在事件循环上就是全局冻结**；新增占用资源的退出清理（client/checkpoint/MCP/后台进程）一律挂进 repl 与 ask 的 finally 清理链
 - CI 有 integration 层 job（每次 push 跑，`OPENAI_BASE_URL` 指向不可达端口）：integration 层测试承诺全 mock，打真网即红——新增 integration 测试必须遵守该承诺
 - `config/settings` 只允许 `settings/` 包一个实体，禁止再造同名 `.py` shim（曾因双名并存 + `config/__init__` re-export 实例，导致 `import ...settings as m` 拿到 Settings 实例而非模块、py3.10 mock 字符串目标解析错乱）
 

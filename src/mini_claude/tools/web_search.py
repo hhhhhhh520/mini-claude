@@ -1,5 +1,6 @@
 """Web search tool using DuckDuckGo via ddgs library."""
 
+import asyncio
 from typing import Dict, Any
 
 from .base import BaseTool, register_tool
@@ -74,16 +75,23 @@ class WebSearchTool(BaseTool):
         last_error = None
         for q in queries:
             try:
-                results = []
-                with DDGS(timeout=15) as ddgs:
-                    for r in ddgs.text(q, max_results=num_results):
-                        results.append(
-                            {
-                                "title": r.get("title", ""),
-                                "url": r.get("href", ""),
-                                "snippet": r.get("body", "")[:200],
-                            }
-                        )
+
+                def _run_search(query=q):
+                    # ddgs 是同步库：整块挪进线程池执行，事件循环零阻塞
+                    # （多 Agent 并行搜索不再互拖——对标 Claude Code 非阻塞工具）
+                    results = []
+                    with DDGS(timeout=15) as ddgs:
+                        for r in ddgs.text(query, max_results=num_results):
+                            results.append(
+                                {
+                                    "title": r.get("title", ""),
+                                    "url": r.get("href", ""),
+                                    "snippet": r.get("body", "")[:200],
+                                }
+                            )
+                    return results
+
+                results = await asyncio.to_thread(_run_search)
 
                 if results:
                     prefix = (

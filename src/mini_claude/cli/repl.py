@@ -196,6 +196,7 @@ class REPLSession:
         finally:
             from ..agent.graph import close_checkpoint_connections
             from ..mcp.manager import close_mcp_connections
+            from ..tools._http import close_shared_client
             from ..tools.bash import cleanup_all_background_processes, get_background_process_count
 
             if get_background_process_count() > 0:
@@ -206,6 +207,8 @@ class REPLSession:
             # MCP 连接同样非 daemon 级资源（stdio 子进程 + anyio 任务），
             # 漏关会挂解释器——与 checkpoint 同级的退出纪律。
             await close_mcp_connections()
+            # 共享 httpx client（web 工具）连接收口——同一清理链
+            await close_shared_client()
 
     async def _connect_mcp_servers(self):
         """启动时自动连接 mcp.json 配置的 server（失败逐个提示，不阻断）。"""

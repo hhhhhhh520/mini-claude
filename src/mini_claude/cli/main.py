@@ -150,6 +150,7 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
             pass
 
     async def _cleanup_background() -> None:
+        from ..tools._http import close_shared_client
         from ..tools.bash import (
             cleanup_all_background_processes,
             get_background_process_count,
@@ -159,6 +160,8 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
             if not output_json:
                 display.console.print("[dim]清理后台进程...[/]")
             await cleanup_all_background_processes()
+        # 共享 httpx client（web 工具）连接收口——与后台进程/checkpoint 同级纪律
+        await close_shared_client()
 
     async def run_full():
         """P1-6：完整主循环单发版（无 checkpoint，不污染 REPL 会话）."""

@@ -158,8 +158,9 @@
 
 ### 后续 Backlog（不承诺排期）
 
+- ~~子代理白名单双份 `ALLOWED_TOOLS` 提取为共享常量~~ 已完成（2026-09-28 `SUBAGENT_ALLOWED_TOOLS`）
+- ~~web 三件套异步化~~ 已完成（2026-09-28：httpx 共享 client + ddgs to_thread；注意 AsyncClient 构造的 SSL 证书库同步加载 ~0.2s，必须用进程级共享实例）
 - **Task 系统 v2**（本体正在用 `isTodoV2Enabled()` 把 Todo 升级为 Task：TaskCreate/List/Update + 子代理任务委托）
-- 子代理白名单双份 `ALLOWED_TOOLS`（`agent_spawn.py` 内 SpawnAgentTool/SpawnParallelTool 各一份）提取为共享常量——首次需要给子代理开放新工具时顺手做
 - `ScheduleCronTool` 定时任务、Agent Teams
 - CLAUDE.md `@import`、MCP resources/OAuth、扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
 
