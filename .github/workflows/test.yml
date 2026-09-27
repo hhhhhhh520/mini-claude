@@ -128,8 +128,10 @@ jobs:
           pip install -e ".[dev]" -c constraints.txt
 
       - name: Run integration tests
+        # --cov-fail-under=0：单层覆盖率必然不达全局 fail_under=60（首跑 32.79% 翻车教训），
+        # 60% 门槛留给全量 coverage job；这里保留 XML 报告作 artifact，但不卡门槛
         run: |
-          python -m pytest tests/test_integration -m "not e2e" -v --tb=short --junitxml=reports/junit/integration-tests.xml --cov=src/mini_claude --cov-report=xml:reports/coverage/integration-coverage.xml
+          python -m pytest tests/test_integration -m "not e2e" -v --tb=short --junitxml=reports/junit/integration-tests.xml --cov=src/mini_claude --cov-fail-under=0 --cov-report=xml:reports/coverage/integration-coverage.xml
 
       - name: Upload test results
         if: always()
