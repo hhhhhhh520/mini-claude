@@ -15,7 +15,11 @@
 1. **IP 纪律**：free-code 是专有软件的逆向产物，**只读架构与行为语义，一律不搬运代码**（哪怕改名）。所有实现用 Python 按 mini-claude 现有架构风格从零写。
 2. **先红后绿**：每个功能先写失败测试再实现（项目既有纪律）。
 3. **完成定义（DoD）**，每个任务收尾必须全部满足：
-   - [ ] 新增/修改代码有测试，`pytest tests/ -m "unit or not integration and not e2e and not stress and not chaos"` 全绿
+   - [ ] 新增/修改代码有测试，两层全绿：
+     `pytest tests/ -m "unit or not integration and not e2e and not stress and not chaos"`（CI 筛选层）
+     与 `pytest tests/test_integration tests/test_e2e.py -m "integration"`（integration 层）
+   - [ ] 无任何测试打真实网络：`OPENAI_BASE_URL=http://127.0.0.1:9` 下两层全绿
+     （e2e 标记除外；2026-09-27 勘误后新增，防"环境运气绿"）
    - [ ] `ruff check` + `ruff format --check` 通过（规则集已锁定 E4/E7/E9/F）
    - [ ] push 后 CI 绿
    - [ ] 根因/设计记录进 `issues/`（本地，gitignored）

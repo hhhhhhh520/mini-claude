@@ -4,6 +4,7 @@ import pytest
 import asyncio
 import tempfile
 import os
+from types import SimpleNamespace
 from unittest.mock import MagicMock, AsyncMock, patch
 
 from langchain_core.messages import HumanMessage, AIMessage
@@ -336,19 +337,54 @@ class TestExtendedErrorRecovery:
 
 
 class TestNetworkErrorRecovery:
-    """网络错误恢复测试"""
+    """网络错误恢复测试
+
+    P4 修正（2026-09-27）：旧版 patch 的是 `mini_claude.agent.nodes.llm_provider`
+    ——向后兼容 re-export，对 act 经 `get_llm_provider()` 取实例的路径**从未生效**，
+    两个测试一直在打真实 LLM 端点（ISSUE-023 遗留项，本次兑现修复）：
+    - 结果随网络状态翻转（不可达端点假绿 / 真 key 下真红 + 烧额度）
+    - 现改为 patch `_shared.llm_provider` 单例的方法（act 实际取实例处），
+      并旁路降级管理器（防跨测试 fallback 污染 + 消除 retry 退避等待）。
+    """
+
+    @pytest.fixture
+    def _isolated_llm(self, monkeypatch):
+        from mini_claude.config.settings import settings
+        from mini_claude.utils.safety import get_rate_limiter
+
+        monkeypatch.setattr(get_rate_limiter(), "check_limit", lambda *a, **k: True)
+
+        # 降级管理器旁路：get_current_model 恒等默认值（走被 patch 的单例），
+        # max_retries=0 + wait 为空协程（连接错误单次尝试即 ERROR，测试秒级完成）
+        degr = MagicMock()
+        degr.model.get_current_model.return_value = settings.default_model
+        degr.backoff = SimpleNamespace(max_retries=0, reset=lambda: None, wait=AsyncMock())
+        import mini_claude.agent.nodes.act as act_mod
+
+        monkeypatch.setattr(act_mod, "get_degradation_manager", lambda: degr)
 
     @pytest.mark.asyncio
-    async def test_llm_connection_error_recovery(self):
+    async def test_llm_connection_error_recovery(self, _isolated_llm):
         """测试 LLM 连接错误恢复"""
-        from unittest.mock import patch
+        from mini_claude.agent.nodes import _shared
 
         state = create_initial_state("测试任务")
 
-        # 模拟连接错误
-        with patch("mini_claude.agent.nodes.llm_provider") as mock_provider:
-            mock_provider.chat = AsyncMock(side_effect=ConnectionError("Network error"))
-
+        # 模拟连接错误：patch 到 act 实际取实例的单例方法上。
+        # chat 与 chat_stream_with_tools 必须同时封死（流式开关决定走哪条），
+        # 漏一个就漏到真实 API。
+        with (
+            patch.object(
+                _shared.llm_provider,
+                "chat",
+                AsyncMock(side_effect=ConnectionError("Network error")),
+            ),
+            patch.object(
+                _shared.llm_provider,
+                "chat_stream_with_tools",
+                AsyncMock(side_effect=ConnectionError("Network error")),
+            ),
+        ):
             # act_node 应该处理连接错误并返回错误状态
             result = await act_node(state)
             assert result["stop_reason"] == StopReason.ERROR, (
@@ -356,19 +392,32 @@ class TestNetworkErrorRecovery:
             )
 
     @pytest.mark.asyncio
-    async def test_llm_timeout_recovery(self):
-        """测试 LLM 超时恢复"""
+    async def test_llm_timeout_recovery(self, _isolated_llm):
+        """测试 LLM 超时恢复
+
+        超时以 TimeoutError 形态进入恢复路径（provider 层超时表现为抛
+        TimeoutError）。旧版 slow_response+wait_for 方案在 patch 失效时依赖
+        真实端点快速失败才凑出 ERROR，是假绿；本版确定性验证 act 对
+        TimeoutError 的处理。
+        """
+        from mini_claude.agent.nodes import _shared
+
         state = create_initial_state("Test task")
 
-        async def slow_response(*args, **kwargs):
-            await asyncio.sleep(100)  # Never returns
-            return MagicMock()
-
-        with patch("mini_claude.agent.nodes.llm_provider") as mock_provider:
-            mock_provider.chat = slow_response
-
+        with (
+            patch.object(
+                _shared.llm_provider,
+                "chat",
+                AsyncMock(side_effect=asyncio.TimeoutError("LLM request timed out")),
+            ),
+            patch.object(
+                _shared.llm_provider,
+                "chat_stream_with_tools",
+                AsyncMock(side_effect=asyncio.TimeoutError("LLM request timed out")),
+            ),
+        ):
             # 应该超时或返回错误状态
-            result = await asyncio.wait_for(act_node(state), timeout=2.0)
+            result = await act_node(state)
             assert result.get("stop_reason") == StopReason.ERROR, (
                 f"超时时应返回 ERROR 状态，实际返回 {result.get('stop_reason')}"
             )

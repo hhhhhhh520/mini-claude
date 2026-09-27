@@ -282,10 +282,34 @@ class TestExtendedAgentFlow:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
-    async def test_reflect_node_integration(self):
-        """测试 Reflect 节点集成"""
+    async def test_reflect_node_integration(self, monkeypatch):
+        """测试 Reflect 节点集成
+
+        integration 标记承诺 mocked services——旧版未 mock，实际打真实 LLM
+        （网络不通才暴露）。现 mock 单例 chat 返回合法 reflection JSON。
+        """
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
         from mini_claude.agent.nodes import reflect_node
+        from mini_claude.agent.nodes import _shared
         from langchain_core.messages import AIMessage
+
+        fake_response = SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content=(
+                            '{"successes": ["工具调用链路完整"], '
+                            '"failures": ["错误处理路径未覆盖"], '
+                            '"improvements": ["为下一步补充回归测试"]}'
+                        )
+                    )
+                )
+            ],
+            usage=SimpleNamespace(prompt_tokens=10, completion_tokens=5),
+        )
+        monkeypatch.setattr(_shared.llm_provider, "chat", AsyncMock(return_value=fake_response))
 
         # 创建复杂任务状态
         state = create_initial_state("开发一个完整的 REST API 项目，包含用户认证、数据库连接和测试")

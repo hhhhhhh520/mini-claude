@@ -174,8 +174,36 @@
   ② PreToolUse hook 真阻断 run_command——回答含"被 PreToolUse hook 阻断：E2E-HOOK-BLOCK"；
   ③ accept_edits 行为由单测锁定
 
-### 实踩教训
-- E2E 里让 LLM"执行 echo-denied*"验证 deny 不可靠——LLM 会改写命令串导致 glob 不命中；
+### 勘误（2026-09-27 晚，外部复核触发）
+
+外部实跑同一条 DoD 命令得 1901 passed / 2 failed（TestNetworkErrorRecovery），
+本条推翻上文的"1903 passed / 0 failed"验收结论：
+
+1. **Mock 打偏（根因）**：那两个测试 patch 的是 `nodes/llm_provider` 向后兼容
+   re-export，act 经 `get_llm_provider()` 取实例——patch 从未生效，测试在打真实
+   API（真 key 下还会烧额度）。这正是 ISSUE-023 遗留清单里自己写明"应改为
+   patch act 取例处"却一直未修的债。
+2. **我的 1903 绿是环境运气**：回归跑时 .env 被移走，真实端点快速返回认证错误
+   "恰好喂饱"断言；外部带真 key 复跑即红。把端点改成不可达，connection 测试
+   假绿、timeout 测试仍红——结果随网络状态翻转。
+3. **"全量"名不副实**：1903 是 CI 筛选层（unit 等 marker 过滤）；integration 层
+   另有 21 条。两层合计才是全量。
+
+### 勘误修复
+
+- TestNetworkErrorRecovery 重写：patch `_shared.llm_provider` 的 **chat 与
+  chat_stream_with_tools 双方法**（流式开关决定走哪条，漏一个就漏到真网）+
+  旁路降级管理器（防 fallback 污染 + 消除退避等待）；超时测试改走确定性
+  TimeoutError 路径（旧 slow_response+wait_for 从未真正测过 act）
+- 不可达端点实验顺带挖出**同款假 mock**：test_reflect_node_integration 标称
+  integration（mocked）实则打真实 LLM——已 mock 单例 chat 返回合法 reflection JSON
+- 三场景验证（真 key / 端点不可达 / 不可达+无 .env）结果一致，9s 内完成，无网络等待
+- 不可达端点下全两层：1944 passed / 3 failed → 3 条全为 `@pytest.mark.e2e`
+  （明示真实 API 依赖，marker 体系正确管理，不可达下按设计失败）
+- 文档口径更正：**"CI 筛选层"与"integration 层"分开计数，合称全量**；
+  DoD 命令见 PLAN 更新
+
+## 2026-09-13 mini-claude ISSUE-017~021 五连修——LLM 会改写命令串导致 glob 不命中；
   按工具名 deny（如 weather）才是确定性验证。
 
 ## 2026-09-27 P4 rewind + 打磨落地（PLAN_对标ClaudeCode差距收敛 Phase 4 收官）
