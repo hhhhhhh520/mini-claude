@@ -40,6 +40,9 @@ pip install -e .
 
 # 推荐：一次装全（测试/搜索/向量/追踪/健康服务）
 pip install -e ".[dev,web,vector,tracing,server]"
+
+# 开发/改代码：带依赖锁合面，与 CI 的解析结果完全一致（constraints.txt 说明见文件头）
+pip install -e ".[dev]" -c constraints.txt
 ```
 
 缺件时命令会给中文指引而非 traceback：

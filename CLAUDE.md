@@ -75,6 +75,12 @@
 - `ask --json` 只打最终 JSON 一行（中间输出全静默），失败打 `{"error": ...}` 再 exit 1
 - 任何退出路径（ask/repl/未来新入口）都要进 `finally` 清后台进程 + 关 checkpoint 连接
 
+### 依赖与 CI 约束
+
+- 装包一律带锁合面：`pip install -e ".[dev]" -c constraints.txt`，与 CI 完全一致；升级依赖是显式动作（改 pin → 本地两层全绿 + 不可达端点全绿 → 推送盯 CI）
+- CI 有 integration 层 job（每次 push 跑，`OPENAI_BASE_URL` 指向不可达端口）：integration 层测试承诺全 mock，打真网即红——新增 integration 测试必须遵守该承诺
+- `config/settings` 只允许 `settings/` 包一个实体，禁止再造同名 `.py` shim（曾因双名并存 + `config/__init__` re-export 实例，导致 `import ...settings as m` 拿到 Settings 实例而非模块、py3.10 mock 字符串目标解析错乱）
+
 ## LangGraph 约束
 
 - `AgentState.messages` 是 `Annotated[List[BaseMessage], add]`（累加语义）：节点**只能返回增量**，返回全量列表会把已有消息再拼一份（用户消息被复制、SystemMessage 错位——2026-09-04 修过一次，见 issues/ISSUE-014）

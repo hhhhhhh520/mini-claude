@@ -53,3 +53,6 @@ issues/
 PROGRESS.md
 *.txt
 /test_*.py
+
+# 依赖锁合面是核心交付物，不能被 *.txt 误吞
+!constraints.txt

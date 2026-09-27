@@ -1,0 +1,44 @@
+# 依赖锁定合面（pip constraints）——根治 ISSUE-023 / ISSUE-024 类漂移：
+# 上游发新版（ruff 0.16 默认规则集扩容、click 8.2 破坏性改动）→ 代码没动 CI 无故全红。
+#
+# 用法（本地与 CI 完全一致，让两边的依赖解析落在同一个已验证合面内）:
+#   pip install -e ".[dev]" -c constraints.txt
+# CI 的所有安装步骤见 .github/workflows/test.yml（均已带 -c constraints.txt）。
+#
+# 维护纪律:
+#   - 下列版本 = 当前全绿环境的实测版本（pip freeze），经两层测试 + 不可达端点 + CI 六矩阵验证。
+#   - 升级依赖是显式动作：改这里的 pin → 本地两层全绿 + 不可达端点全绿 → 推送盯 CI，不通过就回滚 pin。
+#   - 再有传递依赖爆雷（click/ruff/mcp 前科），即使是传递依赖也要在此补 pin。
+
+# ---- 直接依赖（pyproject [project.dependencies] 的实测绿版本）----
+langgraph==1.1.9
+langgraph-checkpoint-sqlite==3.1.1
+langchain-core==1.3.0
+litellm==1.83.11
+rich==15.0.0
+prompt-toolkit==3.0.52
+pydantic==2.12.5
+pydantic-settings==2.14.0
+click==8.1.8
+aiosqlite==0.22.1
+python-dotenv==1.0.1
+beautifulsoup4==4.14.3
+httpx==0.28.1
+psutil==7.2.2
+prometheus-client==0.25.0
+requests==2.33.1
+PyYAML==6.0.3
+tiktoken==0.12.0
+
+# ---- dev extra（测试与 lint 工具链）----
+pytest==9.0.3
+pytest-asyncio==1.3.0
+pytest-cov==7.1.0
+ruff==0.15.11
+respx==0.23.1
+mcp==1.30.0
+
+# ---- 强耦合传递依赖（爆雷前科或与核心行为直接耦合）----
+langgraph-checkpoint==4.2.0
+openai==2.24.0
+typing-extensions==4.15.0

@@ -145,13 +145,20 @@
 
 ---
 
+### 加固收尾（2026-09-28 完成，属 Phases 收尾的工程加固）
+
+- ✅ **constraints.txt 依赖锁合面**：全部直接依赖 + dev 工具链 + 强耦合传递依赖 pin 到实测绿版本；CI 全部安装步骤（lint/unit/integration/regression/coverage）统一带 `-c constraints.txt`，本地与 CI 解析同一合面——根治 ISSUE-023/024 类"上游发新版 → CI 无故全红"漂移
+- ✅ **CI integration 层 job**：原 job 仅 PR/dispatch 触发（本仓库直推 master，等于从不运行）；现随每次 push 运行，且 `OPENAI_BASE_URL` 指向不可达端口——integration 层承诺全 mock，打真网即红，"CI 绿但 integration 假 mock"盲区关死
+- ✅ **删除 `config/settings.py` shim**：与 `settings/` 包同名并存（包优先加载，shim 是死文件，已用 `sys.modules` 验证），却是 py3.10 mock 字符串目标事故的混乱根源；删除后所有导入解析到包，规范写入 CLAUDE.md
+
+---
+
 ### 后续 Backlog（不承诺排期）
 
 - **Task 系统 v2**（本体正在用 `isTodoV2Enabled()` 把 Todo 升级为 Task：TaskCreate/List/Update + 子代理任务委托）
 - 子代理白名单双份 `ALLOWED_TOOLS`（`agent_spawn.py` 内 SpawnAgentTool/SpawnParallelTool 各一份）提取为共享常量——首次需要给子代理开放新工具时顺手做
 - `ScheduleCronTool` 定时任务、Agent Teams
 - CLAUDE.md `@import`、MCP resources/OAuth、扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
-- CI 依赖 constraints 文件（根治 ISSUE-024 类漂移，建议随 Phase 2 顺手做）
 
 ---
 
@@ -159,7 +166,7 @@
 
 | 风险 | 对策 |
 |---|---|
-| 依赖漂移再度引爆 CI（click/ruff 前科） | 新依赖严格 pin + 尽快上 constraints；DoD 含 CI 绿 |
+| 依赖漂移再度引爆 CI（click/ruff 前科） | ~~尽快上 constraints~~ 已上（2026-09-28）：constraints.txt 锁合面 + CI 全步骤接入，升级依赖走显式流程（改 pin → 全绿 → 盯 CI） |
 | TodoWrite 与 `add` reducer 语义冲突（ISSUE-014 同类） | todo 字段全量替换、图级测试锁死"不被复制" |
 | MCP SDK 迭代快 + Windows stdio 差异 | pin 版本；E2E 真跑 Windows；连接进统一清理表 |
 | 权限系统与 safety.py 双轨打架 | 单一裁决点收口，白名单定位为硬底线写进 CLAUDE.md |
