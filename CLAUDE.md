@@ -8,6 +8,7 @@
 - THINK→PLAN→ACT→OBSERVE 四阶段状态机循环
 - 支持 Claude/OpenAI/DeepSeek/Gemini/Ollama 五种模型提供商
 - 22个内置工具：文件操作、命令执行、Web搜索、Agent协作、任务清单；另有 MCP 动态工具（mcp__ 前缀）
+- Hooks（PreToolUse/PostToolUse/Stop）与权限（四模式+allow/ask/deny）都在 ToolRegistry.execute 单一裁决点收口
 - 子 Agent 并行执行 + 文件锁机制
 - SQLite 会话持久化 + REPL 交互
 
@@ -36,6 +37,14 @@
 - 子代理白名单定义在 `SpawnAgentTool.ALLOWED_TOOLS` 类常量（非硬编码）
 - 子代理模式使用 `contextvars` 实现 asyncio 协程级隔离，无竞态条件
 - 子代理禁止 `run_command`、`spawn_agent`、`spawn_parallel`
+
+### Hooks 与权限约束
+
+- 挂点只在 `ToolRegistry.execute()`（与降级管理器同位置）；子代理跳过双门（有自己的白名单）
+- 裁决顺序固定 deny > ask > allow > 模式默认，改顺序前先跑 test_manager.py 的顺序测试
+- hook 命令经 shell 执行且超时强杀——hook 是用户受信配置，不走安全白名单（白名单管 LLM）
+- 权限 ask / MCP 确认 / 路径确认都汇入 pending_confirmation_path，前缀路由收敛在 utils/confirmations.py，加新前缀先改这里
+- 新的退出资源（连接/子进程）必须进 run_graph 的 finally
 
 ### MCP 约束
 

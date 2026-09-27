@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-09-27 (P1 快赢包 + P2 MCP 客户端落地；CI 修复 ISSUE-023/024)
+> 最后更新: 2026-09-27 (P1 快赢包 + P2 MCP 客户端 + P3 Hooks/权限落地；CI 修复 ISSUE-023/024)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -145,6 +145,38 @@
 - 项目混用两种 logger：`logging.getLogger`（标准）不支持 kwargs 风格
   `logger.warning("...", server=x)`（StructuredLogger 专属）——新模块一律
   `utils.logger.get_logger`，本轮在 manager 实踩 TypeError。
+
+## 2026-09-27 P3 Hooks + 细粒度权限落地（PLAN_对标ClaudeCode差距收敛 Phase 3）
+
+### 交付
+- `src/mini_claude/hooks/`：config（hooks.json 加载合并）+ runner（shell 子进程、
+  stdin JSON、超时强杀收尸）+ dispatcher（PreToolUse 阻断/PostToolUse 替换/Stop 通知）
+- `src/mini_claude/permissions/`：四模式（default/accept_edits/plan/bypass，shift+tab 循环）
+  + allow/ask/deny 规则（glob 匹配主参数：run_command→command、文件工具→path）
+- 双门收口在 ToolRegistry.execute 单一裁决点（权限门→降级→PreHook→执行→PostHook），
+  子代理跳过双门；deny 直接返回 Error 文本让 LLM 自纠，ask 抛 PermissionAskRequired
+  走 WAITING_CONFIRMATION 通道（键 perm:<tool>:<arg>）
+- 确认键前缀路由收敛到 utils/confirmations.py（普通路径 / mcp: / perm:）
+- /permissions（查看/切模式）+ /hooks（查看配置）命令；HOOKS_ENABLED/PERMISSIONS_ENABLED 开关
+
+### 关键决策
+1. 裁决顺序 deny > ask > allow > 模式默认（ask 保守优先于 allow）——首版写成
+   allow 先于 ask，被顺序测试当场抓红后改正（测试先行的价值实证）。
+2. hook runner 绝不抛异常：spawn 失败/超时/编码全部转非零 outcome，
+   阻断语义只认 exit 2 与 JSON decision=block，其他一律放行+记日志。
+3. 三种确认（路径/MCP/权限）共用 pending_confirmation_path 状态机，
+   前缀分发收敛一处，REPL 'yes' 分支零感知。
+
+### 验证
+- 新增 81 测（hooks 24 / permissions 27 / registry 双门 7 / 确认通道 4 / 命令 7 / ... ）
+- CI 等效全量（无 .env）：见提交记录（收集 1955）
+- 真 Key E2E：① deny 规则拦 weather——回答含"权限拒绝（匹配 deny 规则: weather）"；
+  ② PreToolUse hook 真阻断 run_command——回答含"被 PreToolUse hook 阻断：E2E-HOOK-BLOCK"；
+  ③ accept_edits 行为由单测锁定
+
+### 实踩教训
+- E2E 里让 LLM"执行 echo-denied*"验证 deny 不可靠——LLM 会改写命令串导致 glob 不命中；
+  按工具名 deny（如 weather）才是确定性验证。
 
 ## 2026-09-13 mini-claude ISSUE-017~021 五连修
 

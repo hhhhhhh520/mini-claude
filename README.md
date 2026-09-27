@@ -5,7 +5,7 @@
 **迷你版 Claude Code** — 工具调用 + 主从多 Agent 并发，在一个 CLI 里跑完整开发循环。
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
-[![Tests](https://img.shields.io/badge/Tests-1874%20collected-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-1955%20collected-brightgreen)](tests/)
 [![Tools](https://img.shields.io/badge/Tools-22-orange)](#可用工具22个)
 [![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
 
@@ -25,7 +25,9 @@
 - **任务清单**：`todo_write` 维护会话 todo，多步任务进度实时渲染（对齐 Claude Code TodoWrite）
 - **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md` 与工作区 `CLAUDE.md` 作为持久约定（`CLAUDE_MD_ENABLED` 可关）
 - **MCP 支持**：接入 Model Context Protocol 服务器（stdio），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道（对齐 Claude Code 生态）
-- **测试规模**：1874 个测试用例（2026-09-27 实测收集数）
+- **Hooks**：PreToolUse/PostToolUse/Stop 三事件，用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换），超时强杀
+- **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则（glob 匹配主参数），deny > ask > allow > 模式默认
+- **测试规模**：1955 个测试用例（2026-09-27 实测收集数）
 
 ## 安装
 
@@ -165,6 +167,34 @@ Use 'force_write' to overwrite.
 | `aggregate_results` | 汇总所有任务结果 |
 | `list_locks` | 查看所有活跃的文件锁 |
 | `force_write` | 强制写入文件（忽略冲突） |
+
+## Hooks 与权限
+
+**Hooks**（`~/.mini-claude/hooks.json` 或 `<工作区>/.mini-claude/hooks.json`）：
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "run_command|write_file",
+       "hooks": [{"type": "command", "command": "check.bat", "timeout": 15}]}
+    ]
+  }
+}
+```
+
+- payload 走 stdin（`{event, tool_name, tool_input, thread_id}`）；`PreToolUse` exit 2 或输出 `{"decision":"block","reason":...}` 阻断执行，`PostToolUse` 输出 `{"replacement": "..."}` 替换结果，`Stop` 在回合结束时触发
+- 超时强杀；hook 失败不阻断主链路；子代理不触发
+
+**权限**（`~/.mini-claude/settings.json` 或 `<工作区>/.mini-claude/settings.json`）：
+
+```json
+{"permissions": {"allow": ["run_command:git *"], "deny": ["run_command:rm *"], "ask": ["write_file:*"]}}
+```
+
+- 四模式 shift+tab 循环或 `/permissions <mode>`：default / accept_edits / plan（只读）/ bypass
+- 裁决顺序 deny > ask > allow > 模式默认；ask 走确认通道（回复 yes 会话内放行）
+- `/permissions` 查看状态，`/hooks` 查看已配 hook
 
 ## MCP 支持
 

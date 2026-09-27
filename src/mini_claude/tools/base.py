@@ -194,7 +194,11 @@ class ToolRegistry:
         }
 
     async def execute(self, name: str, params: Dict[str, Any]) -> str:
-        """Execute a tool by name with audit logging, caching, dependency checking, and tracing."""
+        """Execute a tool by name with audit logging, caching, dependency checking, and tracing.
+
+        P3 单一裁决点：权限门（deny/ask）→ PreToolUse hook → 执行 → PostToolUse hook。
+        子代理跳过双门（子代理有自己的工具白名单体系，且不在子代理中执行用户 hook）。
+        """
         from ..utils.logger import get_logger, get_audit_logger
         from ..config.settings import settings
         from ..monitoring.tracing import trace_tool_call
@@ -202,6 +206,24 @@ class ToolRegistry:
 
         logger = get_logger("mini_claude.tools.registry")
         audit = get_audit_logger()
+
+        from .file_ops import is_subagent_mode
+
+        subagent = is_subagent_mode()
+
+        # --- 权限门（P3-2）：deny 拦下 / ask 抛确认异常 ---
+        if not subagent:
+            perm = _gate_permission_manager()
+            if perm is not None:
+                decision = perm.decide(name, params)
+                if decision.action == "deny":
+                    logger.info("tool denied by permission", tool_name=name, reason=decision.reason)
+                    return f"Error: 权限拒绝（{decision.reason}）。如需执行请让用户调整权限规则或退出 plan 模式。"
+                if decision.action == "ask":
+                    from ..permissions.manager import PermissionAskRequired
+                    from ..permissions.rules import primary_arg
+
+                    raise PermissionAskRequired(name, primary_arg(name, params))
 
         # Degradation check: skip tool if it has too many recent failures
         degr_manager = get_degradation_manager()
@@ -214,6 +236,15 @@ class ToolRegistry:
         tool = self.get(name)
         if not tool:
             raise ValueError(f"Unknown tool: {name}")
+
+        # --- PreToolUse hook（P3-1）：阻断则不执行 ---
+        if not subagent:
+            hooks = _gate_hook_dispatcher()
+            if hooks is not None:
+                block_reason = await hooks.dispatch_pre_tool_use(name, params)
+                if block_reason:
+                    logger.info("tool blocked by PreToolUse hook", tool_name=name)
+                    return f"Error: 被 PreToolUse hook 阻断：{block_reason}"
 
         # Check dependencies before execution
         graph = self._get_dependency_graph()
@@ -280,6 +311,17 @@ class ToolRegistry:
                         duration_ms=duration_ms,
                     )
 
+                # --- PostToolUse hook（P3-1）：可替换输出 ---
+                if not subagent:
+                    hooks = _gate_hook_dispatcher()
+                    if hooks is not None:
+                        replacement = await hooks.dispatch_post_tool_use(name, params, result)
+                        if replacement is not None:
+                            logger.info("tool output replaced by PostToolUse hook", tool_name=name)
+                            result = replacement
+                            if span:
+                                span.set_attribute("tool.result_replaced", True)
+
                 logger.debug("Tool executed", tool_name=name, duration_ms=round(duration_ms, 2))
                 return result
 
@@ -316,3 +358,20 @@ def register_tool(tool: BaseTool):
     """Decorator/function to register a tool."""
     tool_registry.register(tool)
     return tool
+
+
+def _gate_permission_manager():
+    """延迟解析权限管理器（P3-2）。
+
+    函数内 import 避免循环依赖；独立函数便于测试注入（monkeypatch 本函数）。
+    """
+    from ..permissions.manager import get_permission_manager
+
+    return get_permission_manager()
+
+
+def _gate_hook_dispatcher():
+    """延迟解析 hook 分发器（P3-1），同上。"""
+    from ..hooks.dispatcher import get_hook_dispatcher
+
+    return get_hook_dispatcher()

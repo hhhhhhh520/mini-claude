@@ -105,6 +105,10 @@ class BaseEnvironmentSettings(BaseSettings):
     # MCP (P2): stdio server auto-connect on REPL startup
     mcp_enabled: bool = Field(default=True)
 
+    # Hooks & permissions (P3)
+    hooks_enabled: bool = Field(default=True)
+    permissions_enabled: bool = Field(default=True)
+
     # Config Hot Reload settings
     config_watch_enabled: bool = Field(default=False)
     config_watch_debounce_seconds: float = Field(default=1.0)

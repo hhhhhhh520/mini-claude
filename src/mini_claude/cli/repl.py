@@ -36,6 +36,22 @@ def _(event):
     event.app.exit(exception=EOFError, style="class:aborting")
 
 
+@bindings.add("s-tab")
+def _(event):
+    """Shift+Tab：循环切换权限模式（P3-2，对齐 Claude Code）。"""
+    try:
+        from ..permissions.manager import get_permission_manager
+        from ..permissions.mode import describe
+
+        mode = get_permission_manager().cycle_mode()
+        # 在输入区上方给一行非侵入提示（append_to_buffer 不打断输入）
+        event.app.invalidate()
+        event.app.output.write(f"\r\n[mode] {mode.value} — {describe(mode)}\r\n")
+        event.app.output.flush()
+    except Exception as e:
+        logger.debug("mode cycle failed", error=str(e))
+
+
 # Custom style
 style = Style.from_dict(
     {
@@ -251,16 +267,14 @@ class REPLSession:
                 user_lower = user_input.strip().lower()
                 if user_lower in ("yes", "y", "确认", "同意"):
                     if self.pending_confirmation_path:
-                        from ..mcp.manager import approve_confirmation_key
+                        from ..utils.confirmations import route_confirmation_key
                         from ..utils.safety import approve_path
 
                         key = self.pending_confirmation_path
-                        if approve_confirmation_key(key):
-                            # mcp:<server>:<tool> 键：放行该 MCP 工具（会话内有效）
-                            display.console.print(f"[green]OK {key}[/]")
-                        else:
+                        if not route_confirmation_key(key):
+                            # 非前缀键 = 普通路径放行
                             approve_path(key)
-                            display.console.print(f"[green]OK {key}[/]")
+                        display.console.print(f"[green]OK {key}[/]")
                         self.pending_confirmation_path = None
                         user_input = "请继续执行之前的任务"
 
@@ -300,6 +314,22 @@ class REPLSession:
 
                     if settings.auto_save_enabled:
                         self._auto_save_session(settings)
+
+                    # Stop hook（P3-1）：回合结束触发，只通知不阻断
+                    try:
+                        from ..hooks.dispatcher import get_hook_dispatcher
+
+                        stop_reason = result.get("stop_reason")
+                        reason = (
+                            stop_reason.value if hasattr(stop_reason, "value") else "task_complete"
+                        )
+                        await get_hook_dispatcher().dispatch_stop(
+                            reason=reason,
+                            last_message=self._get_response_text(result),
+                            thread_id=self.thread_id,
+                        )
+                    except Exception as stop_err:
+                        logger.debug("stop hook failed", error=str(stop_err))
 
                 except Exception as e:
                     from rich.markup import escape

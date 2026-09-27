@@ -77,7 +77,9 @@ class HelpCommandHandler(CommandHandler):
 /config-watch [start|stop|status] - Manage config file watching
 /skills - List all available skills
 /skill <name> [args] - Invoke a skill
-/mcp [connect|disconnect|reload] - Manage MCP servers and tools"""
+/mcp [connect|disconnect|reload] - Manage MCP servers and tools
+/permissions [mode] - View or switch permission mode (shift+tab cycles)
+/hooks - View configured hooks (PreToolUse/PostToolUse/Stop)"""
 
         ctx.display.console.print(Panel.fit(help_text, title="Help"))
         return CommandResult(handled=True)

@@ -15,6 +15,7 @@ from ._shared import (
     llm_provider,
 )
 from ...mcp.bridge import McpConfirmationRequired
+from ...permissions.manager import PermissionAskRequired
 
 
 def convert_message(msg) -> Dict[str, str]:
@@ -339,6 +340,27 @@ async def execute_single_tool(
         return new_messages, {
             "stop_reason": StopReason.WAITING_CONFIRMATION,
             "pending_confirmation_path": f"mcp:{e.server}:{e.tool}",
+        }
+
+    except PermissionAskRequired as e:
+        # 权限裁决为 ask（P3-2）：同一确认通道，键 perm:<tool>:<arg>。
+        from ._shared import StopReason
+
+        logger.debug("permission ask required", tool=e.tool, arg=e.arg)
+        arg_hint = f"\n参数：{e.arg}" if e.arg else ""
+        new_messages.append(
+            HumanMessage(
+                content=(
+                    f"权限确认请求：工具 {e.tool}{arg_hint}\n\n"
+                    "该调用命中 ask 权限规则。请回复 'yes' 或 'y' 放行"
+                    "（本次会话内对同参数不再询问），或拒绝并改用其他方式。"
+                ),
+                name=tool_name,
+            )
+        )
+        return new_messages, {
+            "stop_reason": StopReason.WAITING_CONFIRMATION,
+            "pending_confirmation_path": f"perm:{e.tool}:{e.arg}",
         }
 
     except (FileNotFoundError, PermissionError, OSError) as e:
