@@ -177,6 +177,7 @@ class REPLSession:
             await self._run_graph_loop()
         finally:
             from ..agent.graph import close_checkpoint_connections
+            from ..mcp.manager import close_mcp_connections
             from ..tools.bash import cleanup_all_background_processes, get_background_process_count
 
             if get_background_process_count() > 0:
@@ -184,6 +185,23 @@ class REPLSession:
                 await cleanup_all_background_processes()
 
             await close_checkpoint_connections()
+            # MCP 连接同样非 daemon 级资源（stdio 子进程 + anyio 任务），
+            # 漏关会挂解释器——与 checkpoint 同级的退出纪律。
+            await close_mcp_connections()
+
+    async def _connect_mcp_servers(self):
+        """启动时自动连接 mcp.json 配置的 server（失败逐个提示，不阻断）。"""
+        from ..mcp.manager import auto_connect_on_startup
+
+        try:
+            connected, errors = await auto_connect_on_startup()
+        except Exception as e:
+            display.show_error(f"MCP 自动连接失败：{e}")
+            return
+        for name, err in errors.items():
+            display.console.print(f"[yellow]MCP server {name} 连接失败：{err}[/]")
+        if connected:
+            display.console.print(f"[dim]MCP 已连接: {', '.join(connected)}[/]")
 
     async def _run_graph_loop(self):
         """REPL 主循环本体；资源清理由 run_graph 的 finally 统一负责。"""
@@ -193,6 +211,9 @@ class REPLSession:
 
         self.running = True
         display.welcome()
+
+        # MCP 自动连接（P2）：配置了 mcp.json 就在启动时连接；失败不阻断主链路
+        await self._connect_mcp_servers()
 
         # Check for previous session
         has_previous = await self._check_previous_session()
@@ -230,10 +251,16 @@ class REPLSession:
                 user_lower = user_input.strip().lower()
                 if user_lower in ("yes", "y", "确认", "同意"):
                     if self.pending_confirmation_path:
+                        from ..mcp.manager import approve_confirmation_key
                         from ..utils.safety import approve_path
 
-                        approve_path(self.pending_confirmation_path)
-                        display.console.print(f"[green]OK {self.pending_confirmation_path}[/]")
+                        key = self.pending_confirmation_path
+                        if approve_confirmation_key(key):
+                            # mcp:<server>:<tool> 键：放行该 MCP 工具（会话内有效）
+                            display.console.print(f"[green]OK {key}[/]")
+                        else:
+                            approve_path(key)
+                            display.console.print(f"[green]OK {key}[/]")
                         self.pending_confirmation_path = None
                         user_input = "请继续执行之前的任务"
 

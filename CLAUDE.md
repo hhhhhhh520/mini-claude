@@ -7,7 +7,7 @@
 **核心特性**:
 - THINK→PLAN→ACT→OBSERVE 四阶段状态机循环
 - 支持 Claude/OpenAI/DeepSeek/Gemini/Ollama 五种模型提供商
-- 22个工具：文件操作、命令执行、Web搜索、Agent协作、任务清单
+- 22个内置工具：文件操作、命令执行、Web搜索、Agent协作、任务清单；另有 MCP 动态工具（mcp__ 前缀）
 - 子 Agent 并行执行 + 文件锁机制
 - SQLite 会话持久化 + REPL 交互
 
@@ -36,6 +36,14 @@
 - 子代理白名单定义在 `SpawnAgentTool.ALLOWED_TOOLS` 类常量（非硬编码）
 - 子代理模式使用 `contextvars` 实现 asyncio 协程级隔离，无竞态条件
 - 子代理禁止 `run_command`、`spawn_agent`、`spawn_parallel`
+
+### MCP 约束
+
+- SDK 严格 pin `mcp>=1.30.0,<2.0.0`——2.x 改了公开 API（FastMCP→MCPServer），未验证不跟（ISSUE-024 同款纪律）
+- MCP 工具默认走确认通道（McpConfirmationRequired → WAITING_CONFIRMATION → 'yes' 放行）；`trusted: true` 的 server 自动放行
+- 连接的 stdio 子进程 + anyio 任务非 daemon 级资源：`run_graph` 的 finally 必须调 `close_mcp_connections()`
+- 子代理白名单（两处 ALLOWED_TOOLS）不得加入 mcp__ 工具
+- 放行记录只存会话内存，重启后重新确认——这是刻意设计，别"优化"成持久化
 
 ### Checkpoint 与会话
 

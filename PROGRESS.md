@@ -1,7 +1,7 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-09-27 (P1 快赢包落地：todo_write 任务清单 + CLAUDE.md 项目记忆自动加载；CI 修复 ISSUE-023/024)
+> 最后更新: 2026-09-27 (P1 快赢包 + P2 MCP 客户端落地；CI 修复 ISSUE-023/024)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -112,6 +112,39 @@
 - 教训×2：① f-string 提示词里写字面 `{content...}` 会被当格式化字段，
   必须双写 `{{...}}`（本轮实踩，收集期 NameError）；② 测试断言子串时注意
   active_form 包含 content 的情况。
+
+## 2026-09-27 P2 MCP 客户端落地（PLAN_对标ClaudeCode差距收敛 Phase 2）
+
+### 交付
+- `src/mini_claude/mcp/`：`config.py`（mcp.json 加载/合并/校验，形态对齐 Claude Code）、
+  `bridge.py`（远端工具→BaseTool 适配，`mcp__<server>__<tool>` 命名 + 确认门槛）、
+  `manager.py`（AsyncExitStack 托管连接生命周期，connect_all 单点失败不扩散）
+- 确认通道：复用路径确认状态机——`McpConfirmationRequired` → execute_single_tool 转
+  `WAITING_CONFIRMATION` + `pending_confirmation_path="mcp:<server>:<tool>"` →
+  REPL 'yes' 分支经 `approve_confirmation_key` 放行（会话内存，重启重问）
+- `/mcp [connect|disconnect|reload]` 命令 + REPL 启动自动连接（失败逐个提示不阻断）+
+  finally `close_mcp_connections()`（stdio 子进程非 daemon，与 checkpoint 同级退出纪律）
+- pyproject：`mcp` extra + dev 同步；子代理白名单不收 mcp 工具（守卫测试锁定）
+
+### 关键决策
+1. **SDK pin 1.x**（`>=1.30.0,<2.0.0`）：mcp 2.x 刚改公开 API（FastMCP→MCPServer），
+   实测 import 即报错并附迁移指南——ISSUE-024 教训直接复用，未验证不跟。
+2. **bridge 不 import SDK**：session 鸭子类型，缺 SDK 时模块可导入、单测可跑；
+   只有 manager 的 `_open_connection` 真用 SDK，缺件给中文指引（McpSDKMissingError）。
+3. **状态复用而非新造**：确认走 pending_confirmation_path（mcp: 前缀区分），
+   放行/拒约/observe 保留全都不动既有状态机。
+
+### 验证
+- 新增 43 测（config 11 / bridge 10 / manager 13 / 命令 6 / act 确认通道 3）。
+- **真 stdio E2E ×2（Windows 实测）**：仓库内 echo_server.py（官方 SDK FastMCP）真子进程
+  连接→发现→注册→确认门槛拦截→放行调用→int 参数往返→干净注销/重连
+- CI 等效全量（无 .env）：1793 passed / 40 skipped / 0 failed（收集 1874）。dev extras 已含 mcp，CI 三平台真跑 E2E。
+- 真 Key E2E：ask --full --json 下真 LLM 调用 mcp__e2e__echo 回显成功，stdout 纯净（--json 重定向含 MCP 连接提示）。
+
+### 实踩教训
+- 项目混用两种 logger：`logging.getLogger`（标准）不支持 kwargs 风格
+  `logger.warning("...", server=x)`（StructuredLogger 专属）——新模块一律
+  `utils.logger.get_logger`，本轮在 manager 实踩 TypeError。
 
 ## 2026-09-13 mini-claude ISSUE-017~021 五连修
 

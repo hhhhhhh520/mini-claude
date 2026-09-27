@@ -14,6 +14,7 @@ from ._shared import (
     logger,
     llm_provider,
 )
+from ...mcp.bridge import McpConfirmationRequired
 
 
 def convert_message(msg) -> Dict[str, str]:
@@ -316,6 +317,28 @@ async def execute_single_tool(
         return new_messages, {
             "stop_reason": StopReason.WAITING_CONFIRMATION,
             "pending_confirmation_path": e.path,
+        }
+
+    except McpConfirmationRequired as e:
+        # MCP 工具未放行：复用路径确认的状态机通道（P2）。
+        # pending_confirmation_path 存 mcp:<server>:<tool>，REPL 'yes' 分支
+        # 经 approve_confirmation_key 放行。
+        from ._shared import StopReason
+
+        logger.debug("MCP confirmation required", server=e.server, tool=e.tool)
+        new_messages.append(
+            HumanMessage(
+                content=(
+                    f"MCP 工具确认请求：{e.server}/{e.tool}\n\n"
+                    "该 MCP 工具本次会话尚未放行。请回复 'yes' 或 'y' 放行"
+                    "（本次会话内不再询问），或拒绝并改用其他方式。"
+                ),
+                name=tool_name,
+            )
+        )
+        return new_messages, {
+            "stop_reason": StopReason.WAITING_CONFIRMATION,
+            "pending_confirmation_path": f"mcp:{e.server}:{e.tool}",
         }
 
     except (FileNotFoundError, PermissionError, OSError) as e:

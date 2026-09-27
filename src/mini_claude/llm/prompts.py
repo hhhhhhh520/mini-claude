@@ -414,6 +414,9 @@ You have access to the following tools:
 ### Task Checklist
 - todo_write(todos): Maintain the session task checklist. Pass the COMPLETE list each time; items are {{content, status: pending|in_progress|completed, active_form?}}. Exactly ONE item must be in_progress while you work. Use it for multi-step tasks (3+ steps) so the user sees progress; skip it for trivial requests. Pass an empty list to clear it.
 
+### MCP Tools (dynamic)
+- Tools named mcp__SERVER__TOOL come from connected MCP servers (user can manage via /mcp). When one matches the task, use it like any other tool. Calling an unapproved MCP tool will pause for user confirmation - that is expected, tell the user to reply yes to allow it.
+
 ## Rules:
 1. ALWAYS use tools (read_file, write_file, edit_file) for file operations
 2. NEVER output shell commands like `cat`, `echo`, `ls` - use tools instead

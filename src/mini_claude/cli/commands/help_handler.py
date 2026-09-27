@@ -76,7 +76,8 @@ class HelpCommandHandler(CommandHandler):
 /reload-config - Reload configuration from .env file
 /config-watch [start|stop|status] - Manage config file watching
 /skills - List all available skills
-/skill <name> [args] - Invoke a skill"""
+/skill <name> [args] - Invoke a skill
+/mcp [connect|disconnect|reload] - Manage MCP servers and tools"""
 
         ctx.display.console.print(Panel.fit(help_text, title="Help"))
         return CommandResult(handled=True)

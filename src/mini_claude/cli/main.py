@@ -171,6 +171,24 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
         if not output_json:
             display.user_message(prompt)
             display.show_thinking()
+
+        # MCP 自动连接（P2）：配置了 mcp.json 就连接，单命令模式也能用远端工具；
+        # 失败只提示不阻断。--json 下提示必须走 stderr（stdout 只留最终 JSON 一行）
+        try:
+            from ..mcp.manager import auto_connect_on_startup
+
+            _out = (
+                contextlib.redirect_stdout(_sys.stderr) if output_json else contextlib.nullcontext()
+            )
+            with _out:
+                connected, errors = await auto_connect_on_startup()
+                for name, err in errors.items():
+                    display.console.print(f"[yellow]MCP server {name} 连接失败：{err}[/]")
+                if connected:
+                    display.console.print(f"[dim]MCP 已连接: {', '.join(connected)}[/]")
+        except Exception as e:
+            display.show_error(f"MCP 自动连接失败：{e}")
+
         graph = build_agent_graph_no_checkpoint()
         try:
             # --json 下图节点里的 display（工具调用/流式）会直打 stdout，

@@ -37,9 +37,14 @@ dev = [
     "pytest-cov>=4.0.0",
     "ruff>=0.4.0",
     "respx>=0.21.0",
+    "mcp>=1.30.0,<2.0.0",
 ]
 web = [
     "ddgs>=6.0.0",
+]
+mcp = [
+    # pin 1.x：2.x 改了公开 API（FastMCP→MCPServer 等），未验证不跟（ISSUE-024 同款纪律）
+    "mcp>=1.30.0,<2.0.0",
 ]
 vector = [
     "chromadb>=0.4.0",

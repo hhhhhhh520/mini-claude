@@ -5,7 +5,7 @@
 **迷你版 Claude Code** — 工具调用 + 主从多 Agent 并发，在一个 CLI 里跑完整开发循环。
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
-[![Tests](https://img.shields.io/badge/Tests-1831%20collected-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-1874%20collected-brightgreen)](tests/)
 [![Tools](https://img.shields.io/badge/Tools-22-orange)](#可用工具22个)
 [![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
 
@@ -24,7 +24,8 @@
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
 - **任务清单**：`todo_write` 维护会话 todo，多步任务进度实时渲染（对齐 Claude Code TodoWrite）
 - **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md` 与工作区 `CLAUDE.md` 作为持久约定（`CLAUDE_MD_ENABLED` 可关）
-- **测试规模**：1831 个测试用例（2026-09-27 实测收集数）
+- **MCP 支持**：接入 Model Context Protocol 服务器（stdio），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道（对齐 Claude Code 生态）
+- **测试规模**：1874 个测试用例（2026-09-27 实测收集数）
 
 ## 安装
 
@@ -164,6 +165,28 @@ Use 'force_write' to overwrite.
 | `aggregate_results` | 汇总所有任务结果 |
 | `list_locks` | 查看所有活跃的文件锁 |
 | `force_write` | 强制写入文件（忽略冲突） |
+
+## MCP 支持
+
+REPL 启动时自动连接 `mcp.json` 里配置的 server（stdio），远端工具以 `mcp__<server>__<tool>` 注册进工具系统，LLM 可直接调用。
+
+```bash
+pip install -e ".[mcp]"        # 先装 SDK（pin 1.x）
+```
+
+配置文件（`~/.mini-claude/mcp.json` 或 `<工作区>/.mini-claude/mcp.json`，后者覆盖前者同名项，形态对齐 Claude Code）：
+
+```json
+{
+  "mcpServers": {
+    "fs": { "command": "uvx", "args": ["mcp-server-fs"], "trusted": false }
+  }
+}
+```
+
+- **确认通道**：未放行的 MCP 工具调用会暂停等待用户回复 `yes`（会话内放行）；`"trusted": true` 的 server 自动放行
+- **REPL 命令**：`/mcp` 看状态，`/mcp connect <name>` / `disconnect <name>` / `reload` 手动管理
+- 子代理默认不可见 MCP 工具；`MCP_ENABLED=false` 可整体关闭
 
 ## 配置
 
