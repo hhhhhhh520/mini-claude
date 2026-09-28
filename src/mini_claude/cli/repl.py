@@ -362,9 +362,7 @@ class REPLSession:
                         effective_input,
                         thread_id=self.thread_id,
                         hook_context="\n\n".join(
-                            part
-                            for part in (self._session_hook_context, up_context)
-                            if part
+                            part for part in (self._session_hook_context, up_context) if part
                         ),
                     )
 
