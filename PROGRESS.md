@@ -375,6 +375,51 @@
   被迫走真实 provider 分支（无 key 即炸）——图级 fake 测试统一旁路降级管理器
 - E2E 里按快照内容（而非列表序号）选取 fork 边界，避免对 checkpoint 排序的隐式依赖
 
+## 2026-09-28 批次 A+B 全功能实测（脚本驱动真实 REPL）——抓到并修复 2 个真实缺陷
+
+### 实测方式
+脚本驱动真实 REPL 主循环（`issues/e2e_driver.py`，本地保留不入库）：真实 LLM
+（qwen3.8-flash 真 key）+ 真实 checkpointer + 真实 hook 子进程 + 真实 MCP server
+（进程内 uvicorn 挂 FastMCP streamable_http_app 回环 + stdio echo_server 子进程），
+12 条脚本化输入走完整产品路径；ask 模式单独验证工具循环。单元测试全绿 ≠ 产品能跑，
+这轮实测的价值就是把"全绿"打回原形两次。
+
+### 实测结果（全部真实发生）
+- Hooks 四尾事件 **全部真实触发**（hook_events.log 物证）：SessionStart（MCP 连接后）、
+  SubagentStart（spawn_agent 派生时）、PreCompact（/compact 前）、SessionEnd（finally）
+- MCP：产品启动路径自动连接 HTTP + stdio 双 server（"MCP 已连接: remote, local"）；
+  LLM 自主调用 mcp__remote__echo（HTTP，中文往返）✓、mcp_read_resource ✓、
+  mcp__local__add=7（stdio）✓
+- Task v2：task_create ×2、task_update(owner=subagent_001) 委派、task_list、
+  spawn_agent + get_result 子代理闭环 ✓；ask 模式 store 路径（两轮工具循环）✓
+- /add-dir：注册第二工作目录 + 新根内 read_file 免确认直读 ✓
+- /compact：39 条消息 → 6 条（tokens 1282→333），自定义指令"只保留任务相关"生效
+  （压缩后任务信息保留、非指令关注细节按指令丢弃），tasks/todos 随迁 ✓（修复①）
+
+### 缺陷① /compact 播种新线程丢失 tasks/todos（实测前推演发现，ISSUE-028）
+播种只写 messages——tasks/todos 是 state 跨回合字段，压缩后清单静默清空。
+修复：seed 字典随迁非空 tasks/todos；回归测试
+`test_compact_preserves_tasks_and_todos` 锁定。
+
+### 缺陷② MCP 断连收口 CancelledError 冲出 REPL 退出链路（ISSUE-029）
+run_graph finally → close_mcp_connections → stack.aclose()，stdio server 收口时
+anyio 内部取消风暴抛 CancelledError（**BaseException**，穿透 except Exception），
+Goodbye 之后甩用户一脸 traceback。两版错误修法被实测否定：
+- wait_for 包 aclose：超时取消打进 anyio cancel scope，CancelledError 照样穿透
+- 拆隔离任务 aclose：炸 "Attempted to exit cancel scope in a different task"
+  ——anyio cancel scope 必须在进入它的同一任务退出
+终版：**同任务直接 await + 吞 BaseException**（打开与关闭同在 main 任务，语义
+合法；代价是超时不可控，已写进 disconnect_server docstring）。
+回归：tests/test_mcp/test_disconnect_robustness.py（吞 CancelledError /
+aclose 同任务断言 / close_all 单点失败不拖垮）。
+教训：stdio E2E 的 fixture 只 reset 单例从没真正 aclose——清理路径要有
+"真关闭"的集成测试，不能全靠注入替身。
+
+### 模型观察（非缺陷，记录）
+- 子代理最终答复质量一般（回显"执行计划"行）——委派闭环框架侧没问题
+- 压缩后追问历史细节：模型正确执行了自定义指令的取舍，但表达绝对化
+  （"从未读取过"）——qwen3.8-flash 对摘要的引用粒度粗，属模型能力边界
+
 ## 2026-09-28 对标批次 B：Task 系统 v2 + MCP HTTP transport + resources/prompts
 
 ### 交付

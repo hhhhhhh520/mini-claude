@@ -80,6 +80,39 @@ class TestCompactCommand:
         assert session.thread_id == old_tid
 
     @pytest.mark.asyncio
+    async def test_compact_preserves_tasks_and_todos(self, session_with_graph):
+        """实际测试发现的缺陷回归锁：播种新线程必须同时带上 tasks/todos——
+        它们是 state 里的跨回合字段，只写 messages 会让压缩后清单静默清空。"""
+        from mini_claude.agent.graph import close_checkpoint_connections
+
+        # 独立图实例：给旧线程预置 tasks/todos（模拟真实会话中已提交的清单）
+        session, graph = session_with_graph
+        old_tid = session.thread_id
+        tasks = [
+            {
+                "id": "1",
+                "subject": "写模块",
+                "description": "d",
+                "status": "in_progress",
+                "blocks": [],
+                "blocked_by": [],
+                "owner": "subagent_001",
+            }
+        ]
+        todos = [{"content": "旧 todo", "status": "completed"}]
+        await graph.aupdate_state(
+            {"configurable": {"thread_id": old_tid}},
+            {"tasks": tasks, "todos": todos},
+        )
+        result = await CompactHandler().handle(_ctx(session))
+        assert result.error is None
+
+        snap = await graph.aget_state({"configurable": {"thread_id": session.thread_id}})
+        assert snap.values.get("tasks") == tasks, "tasks 必须跨压缩保留"
+        assert snap.values.get("todos") == todos, "todos 必须跨压缩保留"
+        await close_checkpoint_connections()
+
+    @pytest.mark.asyncio
     async def test_compact_seeds_new_thread(self, session_with_graph):
         """压缩结果播种到新线程：新线程可读、含摘要、旧线程保留。"""
         session, graph = session_with_graph

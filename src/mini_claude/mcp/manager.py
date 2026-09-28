@@ -15,6 +15,7 @@ SDK 版本纪律：pin 在 1.x（mcp>=1.30.0,<2.0.0）。2.x 改了公开 API
 from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple
 
+
 from ..config.settings import settings
 from ..utils.logger import get_logger
 from .bridge import register_server_tools, unregister_server_tools
@@ -166,11 +167,28 @@ class McpManager:
         return connected, errors
 
     async def disconnect_server(self, name: str) -> None:
+        """断开并收口一条连接。任何失败只记日志，不中断退出链路。
+
+        约束：aclose **必须在进入连接的同一任务里直接 await**——anyio 的
+        cancel scope 跨任务退出会炸 "Attempted to exit cancel scope in a
+        different task"（实测踩中）；wait_for/隔离任务都会改变任务归属。
+        代 价是超时不可控：若 anyio 内部取消风暴抛 CancelledError
+        （BaseException，实测踩中）或子进程僵死拖住，这里选择吞掉/
+        等待到底——REPL 退出场景下用户已按 /exit，干净地卡在收口
+        好过留下半死的 MCP 子进程。
+        """
         conn = self._connections.pop(name, None)
         if conn is None:
             return
         unregister_server_tools(name)
-        await conn.stack.aclose()
+        try:
+            await conn.stack.aclose()
+        except BaseException as e:  # noqa: BLE001 - 收口路径吞掉一切（含 CancelledError）
+            logger.warning(
+                "MCP connection close failed",
+                server=name,
+                error=f"{type(e).__name__}: {e}",
+            )
         logger.info("MCP server disconnected", server=name)
 
     async def close_all(self) -> None:

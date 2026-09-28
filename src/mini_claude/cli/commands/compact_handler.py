@@ -145,12 +145,17 @@ class CompactHandler(CommandHandler):
         compressed = [_litellm_to_langchain(m) for m in summarized]
         after_tokens = token_counter.count_messages_tokens(summarized)
 
-        # 播种新线程：空线程首次 update 即纯替换（add-reducer 对空列表）
+        # 播种新线程：空线程首次 update 即纯替换（add-reducer 对空列表）。
+        # tasks/todos 是 state 里的跨回合字段，必须随迁——只写 messages 会让
+        # 压缩后清单静默清空（实际测试抓到的缺陷，有回归测试锁定）。
         new_tid = f"{tid}_c{uuid.uuid4().hex[:8]}"
+        seed = {"messages": compressed}
+        for field in ("tasks", "todos"):
+            value = snap.values.get(field)
+            if value:
+                seed[field] = value
         try:
-            await graph.aupdate_state(
-                {"configurable": {"thread_id": new_tid}}, {"messages": compressed}
-            )
+            await graph.aupdate_state({"configurable": {"thread_id": new_tid}}, seed)
         except Exception as e:
             return CommandResult(handled=True, error=f"写入压缩历史失败：{e}")
 
