@@ -43,6 +43,7 @@
 | **主链路修复** | **checkpointer 装配错误 + 9 个图级契约测试 + 连接生命周期收尾** | **2026-09-04** |
 | **补齐 06-28 遗漏** | **4 项 ❌：python -m 带点黑名单 / 裸 & 元字符 / observe 信任边界 / 回归脚本悬空引用** | **2026-09-04** |
 | **对话正确性** | **reducer 消息重复 + summarize 用例未触发压缩（两处真逻辑缺陷）** | **2026-09-04** |
+| **对标加固** | **constraints.txt 依赖锁合面 + CI integration 层 job（不可达端点护栏）+ 删 settings.py 死 shim** | **2026-09-28** |
 
 ### ⏳ 进行中
 
@@ -60,7 +61,101 @@
 | 低 | caplog 测试顺序问题 | `init_logging()` 设 `propagate=False` 致后跑的 36 个 `test_prompts` 收不到 caplog；`pytest tests/test_utils tests/test_llm/test_prompts.py` 可复现 |
 | 低 | reflect_node 异常吞没 | 非关键节点，但应至少记 ERROR 日志 |
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（`observe.py`、`web_fetch.py` 等核心路径优先） |
-| 低 | 同步 HTTP | `web_fetch/weather/web_search` 阻塞事件循环，并行 agent 下互拖；`httpx async` 或文档声明 |
+| 低 | ~~同步 HTTP~~ | 已结（2026-09-28）：web 三件套全部异步化（httpx 共享 client + to_thread），见当日节 |
+
+## 2026-09-28 目标批次①：web 三件套异步化 + 白名单去重 + coverage job 激活（对标 Claude Code）
+
+### 交付
+- **web_fetch/web_search/weather 异步化**（对标本体的非阻塞 web 工具）：
+  - fetch/weather：requests → `httpx.AsyncClient`，手动重定向逐跳 SSRF 检查保持；
+    错误映射换 httpx 异常族
+  - search：ddgs 是同步库，整块 `asyncio.to_thread` 卸载（线程池零阻塞）
+  - **新增 `tools/_http.py` 共享 client**：实测 `httpx.AsyncClient()` 每次构造会
+    **同步加载 SSL 证书库 ~0.22s**（Windows），发生在事件循环上等于每次 web 调用
+    全局冻结所有协程——比同步 requests 更隐蔽；共享实例摊薄成本 + 连接复用，
+    关闭挂进 repl/ask 既有 finally 清理链（CLAUDE.md 退出纪律）
+  - fetch 的 SSRF 检查（含 getaddrinfo）经 `asyncio.to_thread`，DNS 慢解析不再卡 loop
+- **子代理白名单去重**：`SUBAGENT_ALLOWED_TOOLS` 单一事实源，SpawnAgentTool/
+  SpawnParallelTool 共用（PLAN backlog 项兑现）
+- **coverage job 激活**：原 `if: pull_request` 与 integration 同款"从不运行"盲区；
+  现随 push 跑，marker 表达式对齐 unit job（旧表达式会连真网 e2e 一起跑，
+  激活即翻车）；基线实测 **70%**（branch coverage），`fail_under=60` 留足余量
+
+### 验证
+- 先红后绿：新增 6 测（`test_tools/test_web_async.py`）——两个并发不阻塞测试在旧实现下
+  红（fetch 串行特征 0.8s+ / search 实测 1.2s），行为契约保持（SSRF 重定向拦截、
+  正文解析、wttr.in JSON）
+- 两层回归：不可达端点 1923/0 + 151/0；真 key 同数全绿；ruff 双检干净
+- 真网 E2E：web_fetch 真实抓取 docs.python.org 异步页解析正常；web_search 在本机
+  网络不可用（ddgs 后端 Brave/DDG/Google 全部超时——环境所限非代码问题，旧实现
+  同样不通），Agent 优雅降级直接 fetch 已知 URL
+
+### 实踩教训
+- httpx.AsyncClient 构造的 SSL 证书库加载是**同步阻塞**（Windows ~0.22s）：
+  "换成 async 库"不等于"非阻塞"，构造/析构同样要审
+- 重定向拦截测试在旧 requests 路径的 stub 必须用 CaseInsensitiveDict
+  （requests 的 headers 本就是大小写不敏感），否则 302 的 Location 查找失真
+
+## 2026-09-28 目标批次②：Hooks 事件面对齐 Claude Code（3→6 事件）
+
+### 交付
+- **UserPromptSubmit**：exit 2 / `decision=block` 拦截本轮输入（REPL 跳过回合 /
+  ask exit 1）；exit 0 纯 stdout 或 `hookSpecificOutput.additionalContext` 注入
+  回合上下文——走新 `AgentState.hook_context` 字段 → `build_system_messages()`
+  前置（与系统提示同一通道，**不进持久化历史**，遵守架构红线）。ask 与 REPL
+  双入口接线；ask 拦截置于 display 之前（被拦截输入不显示 Thinking），且直接
+  print 错误（_show_error 会附误导性"模型调用失败"提示）
+- **Notification**：工具请求确认（路径/MCP/权限三通道汇合点）时触发，只通知不判断
+- **SubagentStop**：子代理写入完成收工前触发，exit 2 / decision=block → 原因作为
+  消息喂回、子代理继续（max_iterations 兜底）；hook 异常不阻断收工
+- `VALID_EVENTS` 扩到 6；测试 20 条先红后绿（事件裁决语义 12 + agent 接线 8）
+
+### 验证
+- 两层回归四场景全绿：不可达端点+严格 msgpack 1943/0 + 151/0；真 key 同数
+- 真 key E2E：hooks.json 配 `echo` hook → 真实 LLM 准确答出注入的暗号
+  （注入链路端到端）；`exit 2` hook → ask 打印拦截错误并 exit 1
+- `hook_context` 为**全量替换语义**：每轮增量必须带值（空串=清空），
+  否则 checkpoint 沿用旧值——已写入 CLAUDE.md 红线
+
+### 实踩教训
+- **相对导入层级**：`agent/nodes/` 下引 hooks 要 `...hooks.dispatcher`（三级）——
+  写成两级会解析到不存在的 `agent.hooks`，且被自己写的 try/except 吞掉，
+  表现为"hook 静默失效"（测试当场抓住）
+- 测试 patch 函数级 `from x import y` 的导入，目标必须是**源模块** `x`，
+  patch 使用方模块属性打不进去（observe 的 SubagentStop 桩最初就打偏了）
+
+## 2026-09-28 目标批次③：CLAUDE.md @import + CLAUDE.local.md + Stop hook 阻断续跑
+
+### 交付
+- **@import 语法**（`utils/claudemd.py`）：`@path` / `@./x`（相对包含文件目录）、
+  `@~/x`（用户主目录）、`@/abs`；嵌套跟随最多 5 跳（对齐本体"5 hops"）；
+  visited 防环；缺失/路径非法原文保留；代码文件引原始内容；正则用
+  `(?<![\w@])` 负向断言防 user@example.com 误伤（全角标点后可引用）
+- **CLAUDE.local.md**：项目级个人补充（一般 gitignore），加载顺序
+  用户级 → 项目 CLAUDE.md → CLAUDE.local.md
+- 总字符预算改为**全局共享递减**：三份入口 + 全部 import 展开共同消耗
+  CLAUDE_MD_MAX_TOTAL_CHARS，超大引用被截断停机（防撑爆）
+- **Stop hook 阻断续跑**：`dispatch_stop` 返回 (blocked, reason)，
+  exit 2 / decision=block → repl 自动以原因作为继续指令再跑一回合；
+  payload 带 `stop_hook_active` 供 hook 自查（对齐本体防死循环约定），
+  repl 侧"单回合只续跑一次"硬顶；继续回合的 Stop hook 仍触发但不再续跑
+- 唯一记录在案的事件语义分歧就此清零（六事件全部具备本体的阻断语义）
+
+### 验证
+- 先红后绿：claudemd 新增 11 测（相对/裸 @/嵌套/深度上限/`@~/`/绝对路径/
+  防环/缺失保留/代码文件/CLAUDE.local.md×2）+ Stop 阻断契约 5 测
+- 链路零成本验证：workspace 配 @import + CLAUDE.local.md → load_claude_md
+  展开标记齐全且顺序正确
+- 两层回归四场景 + ruff 双检（数值见提交信息）
+- 模型层说明：小模型对注入约定的服从度有限（已有记录），链路正确性
+  以函数级断言为准
+
+### 实踩教训
+- heredoc 写含 \n 转义的测试代码再次损坏字符串——老老实实 Read+Edit
+  （纪律条目第二次被自己验证）
+| 高 | 工具结果回传格式 | ~~`HumanMessage`→`ToolMessage`~~ 已结（2026-09-28，ISSUE-026） |
+| 中 | checkpoint msgpack 白名单 | ~~StopReason 未注册~~ 已结（2026-09-28，ISSUE-027，CI 已开严格模式） |
+| 低 | LiteLLM cost map SSL 噪音 | 远程拉取证书验证失败回退本地备份（等待已无，纯警告）；可设 LITELLM_LOCAL_MODEL_COST_MAP=True 消音 |
 
 > 2026-09-13 已结：ISSUE-015（ask 退出码）、ISSUE-016（health/tool-deps 退出码）、
 > ISSUE-017/018/020/021（ask-json/debug/后台清理/转义/tool-deps-json）、ISSUE-019（pip/区外脚本）。
@@ -72,6 +167,51 @@
 > 2026-09-17 提交前审查（pre-commit-audit 三层 subagent）修复：`.env.example` 默认值注释矛盾、
 > README `--full` "恢复"不实、litellm 启动拉远程 cost map 空等 8 秒、3 处 hint 未 escape、
 > health 测试真联网（81 秒→毫秒）、`TestAPIKeyValidation` 未隔离本机 .env（假红）。
+
+## 2026-09-28 真机核心体验实测（真 key，qwen3.8-flash @ TokenRhythm 网关）
+
+| 演示 | 结果 | 用时 |
+|---|---|---|
+| ask 简单问答（流式） | ✅ 回答正确 | 12.9s（含启动） |
+| ask 工具调用（建文件+运行） | ⚠️ write_file 成功且内容正确；第 2 轮 run_command 泄漏为文本未执行（ISSUE-026） | 16.8s |
+| ask 多步任务（两文件+列目录） | ⚠️ 两个 write_file 成功；第 3 轮 list_dir 泄漏（同 ISSUE-026）；todo 未触发属模型判断 | 13.6s |
+| ask --json（纯问答） | ✅ 单行纯净 JSON | 12.1s |
+| ask --json（工具任务） | ✅ 内部调 list_dir，stdout 仍单行纯净 JSON | — |
+| CLAUDE.md 项目记忆 | ✅ 注入链路零成本逐环验证（开关/路径/系统消息第 2 条）；演示中小模型未执行约定标记——机制通，执行力看模型 | — |
+| 多轮+rewind 真 key E2E | ✅ 无复制/分叉正确/连接收口 ALL PASS（18.8s） | — |
+
+**结论**：单轮问答、单工具、--json、会话记忆/rewind 全部可用；多轮工具链被 ISSUE-026 卡脖子
+（第 2 轮起工具调用退化为正文），是该模型下核心体验的最大短板，修复方案已入档待实施。
+
+## 2026-09-28 ISSUE-026/027 修复：工具结果 ToolMessage 协议 + checkpoint serde 白名单
+
+### 交付
+- **ISSUE-026（协议正确性）**：工具结果从 HumanMessage(role=user) 全部改回
+  `ToolMessage`(role=tool + tool_call_id + status)；assistant 历史消息携带 tool_calls
+  不再剥离（`convert_message` 线格式转换）；`execute_single_tool` 全部 9 分支协议化，
+  确认挂起标 success 防 observe 误判；`parse_tool_calls` 空 id 回退；子代理收集器、
+  REPL/token 统计同步适配；ask 单发路径重写为完整工具循环（旧实现第二次调用不带
+  tools 且重复 append assistant）
+- **ISSUE-027（前向兼容）**：`build_agent_graph` 显式 serde 白名单
+  `('mini_claude.agent.state','StopReason')`；CI unit/integration 两 job 注入
+  `LANGGRAPH_STRICT_MSGPACK=true`——未注册类型从此 CI 直接红（本地全量严格模式验证过）
+- 新增 14 条测试先红后绿：单元协议 12（`test_tool_result_protocol.py`）+
+  图级线格式捕获 2（`test_tool_protocol_wire.py`，fake provider 记录第二轮实际收到的
+  消息序列——**能抓到"多轮泄漏"的那类测试**）+ serde 2（`test_checkpoint_serde.py`）
+
+### 验证
+- 不可达端点 + 无 .env + 严格 msgpack：CI 筛选层 1917 passed / 0 failed；
+  integration 层 151 passed / 1 skipped（收集 1984→1998）
+- 真 key 两层同数全绿（1917/0 + 151/0）
+- **真网多步任务验收**（此前泄漏同款任务）：6+ 轮工具调用全部真实执行
+  （write_file/run_command/read_file/todo_write×4），零 `<tool_call>` 正文泄漏，
+  todo 四轮流转正确，38s 完成——单轮体验短板变长板
+
+### 实踩教训
+- act_node 一次调用只发一次 LLM 请求，"多轮"发生在图迭代间——写线格式测试要
+  两次调用 act_node 前传 state（或跑图），不能指望单次调用返回两轮
+- `_is_tool_error_message` 泛化时确认挂起不能标 status="error"，否则确认流程
+  被当成错误进 handle_error（协议字段有语义，不能凭直觉标）
 
 ## 2026-09-27 P1 快赢包落地：todo_write + CLAUDE.md 项目记忆（PLAN_对标ClaudeCode差距收敛 Phase 1）
 
@@ -234,6 +374,88 @@
 - 全量回归中网络型测试可能把降级管理器推到 fallback 模型，后续 fake-LLM 图测试
   被迫走真实 provider 分支（无 key 即炸）——图级 fake 测试统一旁路降级管理器
 - E2E 里按快照内容（而非列表序号）选取 fork 边界，避免对 checkpoint 排序的隐式依赖
+
+## 2026-09-28 对标批次 A：/compact + Hooks 尾部四事件 + /add-dir（事件面收尾 6→10）
+
+### 交付
+- **A1 /compact 手动压缩**（`cli/commands/compact_handler.py`）：复用 act 自动压缩的
+  `summarize_messages` 引擎，新增 `custom_instructions` 参数透传 `/compact <指令>`；
+  PreCompact hook 在压缩前触发（trigger=manual）
+- **A2 Hooks 尾部四事件**（SessionStart/SessionEnd/PreCompact/SubagentStart，6→10）：
+  全部非阻断；SessionStart 的 stdout/additionalContext 注入会话级上下文（repl 存
+  `_session_hook_context`，每回合与 UserPromptSubmit 上下文合并进 hook_context——
+  全量替换语义不破坏）；接线点 SessionStart→repl 主循环前（MCP 连接后）、
+  SessionEnd→run_graph finally（资源收口前）、PreCompact→handle_token_budget
+  自动摘要前（trigger=auto，新增 thread_id 参数）、SubagentStart→agent_spawn 派生前；
+  ask 模式同样接 SessionStart/SessionEnd（一次执行即一会话）
+- **A3 /add-dir 多工作目录**（`add_dir_handler.py` + `safety.py` 多根注册表）：
+  `_additional_roots` 存 resolve() 后真实路径（8.3 短路径先例），
+  `validate_path` 三处 workspace 比较点以 OR 并入额外根（带 os.sep 守卫——
+  根 `D:\proj` 不得放行 `D:\projects`）；主 workspace 比较逻辑逐字节不动，
+  PROTECTED_PATHS 与穿越检查不放松
+
+### 关键架构决策：压缩结果播种新 thread
+`messages` 挂裸 `operator.add`，`aupdate_state` 走同一 reducer 只能**拼接**，永远无法
+缩减持久化历史（act 内自动压缩只作用于当次 prompt，不回写 checkpoint）。/compact 的
+做法：压缩结果写入全新 thread_id（空线程 add([]) 即纯替换），会话切换过去，旧线程
+checkpoint 链保留可追溯，`_rewind_configurable` 跨线程作废。已写入 CLAUDE.md 红线。
+
+### 验证（全部实测）
+- CI 筛选层：**2000 passed / 40 skipped / 41 deselected**（2:35；新增 41 条
+  = compact+tail_events 23 + multi_root/add_dir 18，收集 2081）
+- integration 层：151 passed / 1 skipped（23s）
+- 不可达端点模拟 CI（.env 移走 + 127.0.0.1:9 + 严格 msgpack）：两层同样全绿
+  （2000/40 + 151/1），.env 已还原
+- ruff check/format 全绿
+
+### 实踩教训
+- `settings.hooks_enabled` **默认 True**（base_settings.py）——"关闭态"测试必须显式
+  钉死 `hooks_off` fixture，不能赌默认值
+- 四目录合跑一次疑似挂起（墙钟 25 分钟 CPU 仅 28s），按目录二分全部正常（最快 8.6s），
+  复跑组合 106s 绿——**偶发系统负载**，非代码问题；但由此发现各目录单独耗时基线
+  （hooks+cli+utils 105s / agent 8.6s），异常时可先二分再怀疑改动
+- `python -c` 带中文字面量做断言在 Windows（argv 编码）会假阴性——验证文件内容用
+  sed/grep 可见输出，别赌 `python -c` 的中文比较
+- heredoc 写文件禁令再验证一次：本次 PLAN 用 heredoc 侥幸没坏（纯文本替换），
+  但断言工具链虚惊一场——维持"写代码一律 Read+Edit"纪律
+
+## 2026-09-28 CI 信任链加固三件套（constraints / integration job / settings shim）
+
+### 背景
+勘误复盘（2026-09-27）暴露三类结构性隐患：① 依赖无上界（ISSUE-023 ruff、ISSUE-024 click
+前科）；② integration 层在 CI 从不运行（job 仅 PR/dispatch 触发，而本仓库直推 master）——
+"CI 绿但 integration 假 mock"盲区正是从这里漏网；③ `config/settings.py` shim 与
+`settings/` 包同名并存，是 py3.10 mock 事故的混乱根源。
+
+### 交付
+- `constraints.txt`（新增）：18 个直接依赖 + 6 个 dev 工具 + 3 个强耦合传递依赖
+  （langgraph-checkpoint/openai/typing-extensions）pin 到实测绿版本；升级=显式动作
+  （改 pin → 本地全绿 → 推送盯 CI），纪律写进文件头
+- CI（test.yml）：5 处安装步骤统一 `-c constraints.txt`（lint 的 ruff 版本同样收敛到
+  单一事实源）；paths 触发器补 constraints.txt；**integration job 重做**——needs 从
+  unit-tests 提前到 lint（并行提速）、触发放开到 push/PR/dispatch、加
+  `OPENAI_BASE_URL=http://127.0.0.1:9` 不可达端点护栏（integration 层承诺全 mock，
+  打真网即红）、`-m "not e2e"` 剔除真网用例（旧 job 若真在 CI 跑过，会连 2 条 e2e
+  一起跑而翻车）
+- 删除 `config/settings.py` 死 shim：`sys.modules` 实证包优先加载（`settings/__init__.py`），
+  shim 独有符号（config 回调注册族）全仓零引用；"禁止再造同名 shim"写入 CLAUDE.md
+
+### 验证（四场景全绿）
+- 不可达端点 + 无 .env（= CI 环境）：CI 筛选层 1903 passed / 0 failed（2:32）；
+  integration 层（= 新 CI job 原命令）149 passed / 1 skipped / 2 e2e 按设计剔除（0:35）
+- 真 key：CI 筛选层 1903 passed / 0 failed（3:01）；integration 层 149 passed / 1 skipped（0:30）
+- `pip install --dry-run -e ".[dev]" -c constraints.txt` 解析通过；ruff check/format
+  全过（pinned 0.15.11，204 文件已格式化）
+
+### 实踩教训
+- `import a.b.c as m` 拿到的未必是模块：`config/__init__` re-export 了 `settings` 实例，
+  父包属性被实例遮蔽——判断同名 shim 是否死代码要看 `sys.modules[...].__file__`，
+  不能看 import 是否报错
+- venv 里的依赖 ≠ CI 装的依赖（prometheus-client 本地根本没装、click 本地 8.1.8/CI 8.2.x）：
+  "本地绿"与"CI 绿"之间此前没有共同合面，constraints 补的就是这个合面
+- integration job 首跑：pytest 149/0 全绿但 job 退出 1——单层覆盖率 32.79% 必不达全局
+  `fail_under=60`；本地验证命令没带 `--cov` 故未暴露。教训：**验证 CI 命令要逐字复刻**
+  （含 cov 参数），修复用 `--cov-fail-under=0` 豁免单层门槛（run 36342879145 复跑全绿）
 
 ## 2026-09-13 mini-claude ISSUE-017~021 五连修
 
@@ -662,7 +884,7 @@ T009「REPL 启动」记为「❌ prompt_toolkit 非交互终端崩溃」而放�
 | 会话恢复 | 启动时提示用户 | 不自动恢复（避免 surprise），不静默跳过（避免丢失上下文） | 2026-06-26 |
 | 工具降级 | 集成到 ToolRegistry.execute | 所有调用路径统一受保护，连续失败 3 次自动跳过 | 2026-06-26 |
 | EnhancedMemory | 不集成 | CLI 工具不需要跨会话语义搜索，SessionManager 已够用 | 2026-06-26 |
-| 同步 HTTP | 不修 | web_fetch/weather/web_search 阻塞事件循环，但单用户 CLI 影响有限 | 2026-06-26 |
+| 同步 HTTP | ~~不修~~ → 已异步化（httpx 共享 client + to_thread，多 Agent 并行不互拖） | 原判"单用户 CLI 影响有限"低估了并发卖点下的互拖；2026-09-28 推翻旧决策 | 2026-06-26 → 2026-09-28 |
 | SSRF 防护 | 补全 IPv6 映射 + 十进制 IP | DNS rebinding 改动大，标记后续优化 | 2026-06-26 |
 | 后台进程跟踪 | PID 基础跟踪 + 清理函数 | 完整生命周期管理改动过大，当前方案够用 | 2026-06-26 |
 | Windows 8.3 路径 | fixture 规范化 + safety.py 用 workspace_real 比较 | 短路径展开不是 symlink，不应拦截 | 2026-06-26 |

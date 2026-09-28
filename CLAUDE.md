@@ -27,6 +27,7 @@
 ### 文件操作安全
 
 - `edit_file` 使用 `check_file_write`（非 `check_file_read`），阻止编辑工作区外文件
+- 多工作目录（`/add-dir`）：额外根注册在 `safety._additional_roots`（会话级），`validate_path` 三处 workspace 比较点以 OR 并入；主 workspace 的既有比较逻辑不动，额外根走 `_within_roots`（**必须带 os.sep 守卫**——根 `D:\proj` 不得放行 `D:\projects`）；PROTECTED_PATHS 与穿越检查不因多根放松
 - `web_fetch` 阻断 SSRF：禁止 localhost、私有 IP、link-local、file:// 协议；域名通过 `socket.getaddrinfo()` 预解析 IP 防 DNS 重绑定；手动重定向循环（最多 5 跳），每跳校验目标地址
 - 文件写入使用 temp+rename 原子操作，防止进程崩溃导致文件损坏
 - Windows symlink 检查使用 `pathlib.resolve()`，正确处理 8.3 短名称
@@ -40,7 +41,7 @@
 
 ### Hooks 与权限约束
 
-- Hooks 事件面六事件（PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop）；hook 失败/超时不阻断主链路（UserPromptSubmit/SubagentStop 的 exit 2 阻断除外）
+- Hooks 事件面十事件（PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop/SessionStart/SessionEnd/PreCompact/SubagentStart）；hook 失败/超时不阻断主链路（UserPromptSubmit/SubagentStop 的 exit 2 阻断除外）。尾部四事件均非阻断：SessionStart 的 stdout/`hookSpecificOutput.additionalContext` 注入会话级上下文（repl 存 `_session_hook_context`，每回合与 UserPromptSubmit 上下文合并进 `hook_context`）；SessionEnd/PreCompact/SubagentStart 只触发不判断
 - `AgentState.hook_context` 是**全量替换语义**：`create_turn_increment` 每轮必须带值（空串=清空上一轮注入），act 经 `build_system_messages(hook_context=...)` 前置、不进持久化历史——漏带值会让 checkpoint 沿用旧回合的注入
 
 - 挂点只在 `ToolRegistry.execute()`（与降级管理器同位置）；子代理跳过双门（有自己的白名单）
@@ -88,6 +89,8 @@
 ## LangGraph 约束
 
 - `AgentState.messages` 是 `Annotated[List[BaseMessage], add]`（累加语义）：节点**只能返回增量**，返回全量列表会把已有消息再拼一份（用户消息被复制、SystemMessage 错位——2026-09-04 修过一次，见 issues/ISSUE-014）
+- **缩减持久化历史只有一条路：播种新 thread**（`/compact` 的做法）：messages 挂裸 `add`，`aupdate_state` 走同一 reducer 只能拼接；压缩结果写入全新 thread_id 即纯替换，旧线程 checkpoint 链保留，会话切换后 `_rewind_configurable` 必须作废。act 内 `handle_token_budget` 的自动压缩只作用于当次 prompt，**不回写 checkpoint**
+- 摘要/截断产物的近端尾部可能切在 assistant(tool_calls) 与 tool 结果中间——持久化前必须修剪孤儿 tool 结果（`compact_handler._drop_orphan_tool_results`），否则违反下一条线格式红线
 - **工具结果一律 `ToolMessage` 回传（role=tool + tool_call_id + status），禁止 HumanMessage 文本**；assistant 历史消息必须携带 tool_calls 不许剥（ISSUE-026：Qwen 类网关按消息形状判定函数调用模式，形状偏离即从第二轮起退化为 `<tool_call>` 正文）。确认挂起标 `status="success"`（挂起不是执行错误）；改工具循环必须含"真 key 多步任务 E2E 无泄漏"验收
 - checkpoint 序列化类型必须注册 serde 白名单（`graph.py` JsonPlusSerializer `allowed_msgpack_modules`），CI 已开 `LANGGRAPH_STRICT_MSGPACK=true`——往 state 塞新自定义类型时同步注册，否则 CI 硬失败（ISSUE-027）
 - 系统提示与 skills **不写入** `state["messages"]`：由 `act_node` 在每次 LLM 调用时经 `build_system_messages()` 前置（不进持久化历史、不被摘要/截断吃掉）

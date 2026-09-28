@@ -169,7 +169,9 @@ def get_command_registry() -> CommandRegistry:
         from . import profile_handler, session_handler, metrics_handler
         from . import cache_handler, config_handler, log_handler
         from . import (
+            add_dir_handler,
             alert_handler,
+            compact_handler,
             help_handler,
             skill_handler,
             mcp_handler,
@@ -190,6 +192,8 @@ def get_command_registry() -> CommandRegistry:
             mcp_handler.McpCommandHandler,
             permission_handler.PermissionCommandHandler,
             rewind_handler.RewindHandler,
+            compact_handler.CompactHandler,
+            add_dir_handler.AddDirHandler,
         ]:
             _registry.register(handler_class())
 

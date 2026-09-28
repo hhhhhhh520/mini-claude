@@ -127,7 +127,7 @@ async def act_node(state: AgentState) -> dict:
         # Token budget check
         token_counter = setup_token_counter()
         messages, litellm_messages = await handle_token_budget(
-            messages, litellm_messages, token_counter
+            messages, litellm_messages, token_counter, thread_id=state.get("thread_id", "")
         )
 
         # 系统提示与 skills 不进受压缩/持久化的对话历史，而是在每次 LLM 调用时前置：

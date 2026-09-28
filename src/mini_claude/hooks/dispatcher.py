@@ -9,6 +9,9 @@
   exit 0 纯 stdout 或 hookSpecificOutput.additionalContext 注入回合上下文
 - Notification：只触发不判断（确认请求等需用户注意的时刻）
 - SubagentStop：exit 2 / decision=block 阻断子代理收工（原因喂回继续）
+- SessionStart：非阻断，stdout/additionalContext 注入会话级上下文（v1 简化：
+  本体可阻断启动，这里选择不拦截）
+- SessionEnd / PreCompact / SubagentStart：只触发不判断
 """
 
 import json
@@ -240,6 +243,89 @@ class HookDispatcher:
             if outcome.exit_code != 0:
                 logger.warning("SubagentStop hook non-blocking error", exit_code=outcome.exit_code)
         return False, ""
+
+    async def dispatch_session_start(
+        self, source: str, thread_id: str = ""
+    ) -> Tuple[bool, str, str]:
+        """SessionStart：会话启动（source: startup/resume）。
+
+        v1 语义：非阻断（不拦截会话启动）；exit 0 纯 stdout 或
+        hookSpecificOutput.additionalContext → 会话级上下文（经 hook_context
+        通道每回合前置给 LLM，同 UserPromptSubmit 的注入通道）。
+        """
+        if not getattr(settings, "hooks_enabled", False):
+            return False, "", ""
+        outcomes = await self._run_all(
+            "SessionStart", "", {"source": source, "thread_id": thread_id}
+        )
+        context_parts: List[str] = []
+        for outcome in outcomes:
+            if outcome.timed_out:
+                logger.warning("SessionStart hook timed out")
+                continue
+            if outcome.stdout.strip().startswith("{"):
+                try:
+                    data = json.loads(outcome.stdout)
+                except json.JSONDecodeError:
+                    data = {}
+                hook_out = data.get("hookSpecificOutput") or {}
+                if hook_out.get("hookEventName") == "SessionStart" and isinstance(
+                    hook_out.get("additionalContext"), str
+                ):
+                    context_parts.append(hook_out["additionalContext"])
+                    continue
+            if outcome.exit_code == 0 and outcome.stdout.strip():
+                context_parts.append(outcome.stdout.strip())
+            elif outcome.exit_code != 0:
+                logger.warning("SessionStart hook non-blocking error", exit_code=outcome.exit_code)
+        return False, "", "\n\n".join(context_parts)
+
+    async def dispatch_session_end(self, reason: str, thread_id: str = "") -> None:
+        """SessionEnd：会话结束（reason: exit 等），只触发不判断，任何异常都吞掉。"""
+        if not getattr(settings, "hooks_enabled", False):
+            return
+        try:
+            await self._run_all("SessionEnd", "", {"reason": reason, "thread_id": thread_id})
+        except Exception as e:
+            logger.warning("SessionEnd hook dispatch failed", error=str(e))
+
+    async def dispatch_pre_compact(
+        self, trigger: str, custom_instructions: str = "", thread_id: str = ""
+    ) -> None:
+        """PreCompact：压缩前触发（trigger: manual/auto），只通知不判断。"""
+        if not getattr(settings, "hooks_enabled", False):
+            return
+        try:
+            await self._run_all(
+                "PreCompact",
+                "",
+                {
+                    "trigger": trigger,
+                    "custom_instructions": custom_instructions,
+                    "thread_id": thread_id,
+                },
+            )
+        except Exception as e:
+            logger.warning("PreCompact hook dispatch failed", error=str(e))
+
+    async def dispatch_subagent_start(
+        self, agent_id: str, agent_task: str, thread_id: str = ""
+    ) -> None:
+        """SubagentStart：子代理创建时触发，只通知不判断。"""
+        if not getattr(settings, "hooks_enabled", False):
+            return
+        try:
+            await self._run_all(
+                "SubagentStart",
+                "",
+                {
+                    "agent_id": agent_id,
+                    "agent_task": agent_task[:500],
+                    "thread_id": thread_id,
+                },
+            )
+        except Exception as e:
+            logger.warning("SubagentStart hook dispatch failed", error=str(e))
 
 
 _dispatcher: Optional[HookDispatcher] = None

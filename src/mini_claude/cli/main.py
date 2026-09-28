@@ -224,10 +224,29 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
                 _show_error(e)
             raise SystemExit(1)
         finally:
+            # SessionEnd hook：ask 会话收尾（资源清理前触发）
+            try:
+                from ..hooks.dispatcher import get_hook_dispatcher
+
+                await get_hook_dispatcher().dispatch_session_end(reason="exit", thread_id="ask")
+            except Exception as se_err:
+                logger.debug("session end hook failed", error=str(se_err))
             await _cleanup_background()
 
     async def run_single():
         llm = LLMProvider(model)
+
+        # SessionStart hook（P5 尾部事件）：ask 的一次执行即一个会话，
+        # 与 REPL 同语义——非阻断，stdout/additionalContext 并入本次上下文
+        start_context = ""
+        try:
+            from ..hooks.dispatcher import get_hook_dispatcher
+
+            _, _, start_context = await get_hook_dispatcher().dispatch_session_start(
+                source="startup", thread_id="ask"
+            )
+        except Exception as ss_err:
+            logger.debug("session start hook failed", error=str(ss_err))
 
         # UserPromptSubmit hook（P5）：与 REPL 同语义——阻断则失败退出，
         # 注入上下文作为本次请求的 system 前缀。置于 display 之前：
@@ -262,12 +281,13 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
         litellm_tools = convert_tools_to_litellm(tools)
 
         messages = [{"role": "user", "content": prompt}]
-        if up_context:
+        hook_context = "\n\n".join(part for part in (start_context, up_context) if part)
+        if hook_context:
             messages.insert(
                 0,
                 {
                     "role": "system",
-                    "content": f"以下内容来自 UserPromptSubmit hook（仅本次有效）：\n\n{up_context}",
+                    "content": f"以下内容来自 hooks（仅本次有效）：\n\n{hook_context}",
                 },
             )
 

@@ -94,6 +94,8 @@ class HelpCommandHandler(CommandHandler):
 /skill <name> [args] - Invoke a skill
 /mcp [connect|disconnect|reload] - Manage MCP servers and tools
 /rewind [n] - List turn checkpoints or rewind to #n (fork re-run)
+/compact [指令] - Compact conversation history (custom summary focus optional)
+/add-dir [dir] - Add a working directory for this session (no args: list roots)
 /permissions [mode] - View or switch permission mode (shift+tab cycles)
 /hooks - View configured hooks (PreToolUse/PostToolUse/Stop)"""
 

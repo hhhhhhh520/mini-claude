@@ -196,6 +196,17 @@ class SpawnAgentTool(BaseTool):
 
         # Spawn the agent
         try:
+            # SubagentStart hook（P5 尾部事件）：子代理创建时触发，只通知不判断，
+            # 任何异常吞掉不阻断派生链路
+            try:
+                from ..hooks.dispatcher import get_hook_dispatcher
+
+                await get_hook_dispatcher().dispatch_subagent_start(
+                    agent_id=agent_id, agent_task=task
+                )
+            except Exception:
+                pass
+
             await subagent_manager.spawn(agent_id, subagent_task)
             return f"Spawned sub-agent: {agent_id}\nTask: {task}"
         except Exception as e:

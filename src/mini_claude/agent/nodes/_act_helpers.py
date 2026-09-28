@@ -67,6 +67,7 @@ async def handle_token_budget(
     messages: List,
     litellm_messages: List[Dict],
     token_counter,
+    thread_id: str = "",
 ) -> Tuple[List, List[Dict]]:
     """Handle token budget check and apply strategy if needed.
 
@@ -74,6 +75,7 @@ async def handle_token_budget(
         messages: LangChain messages
         litellm_messages: LiteLLM format messages
         token_counter: TokenCounter instance
+        thread_id: 会话线程 ID（PreCompact hook 的 payload 字段）
 
     Returns:
         Tuple of (updated_messages, updated_litellm_messages)
@@ -93,6 +95,17 @@ async def handle_token_budget(
         if token_counter.strategy == TokenLimitStrategy.SUMMARIZE:
             # Try LLM summarization first
             logger.debug(f"act_node: token at {usage_percent}%, attempting summarization")
+            # PreCompact hook（auto）：自动摘要压缩前触发，只通知不判断。
+            # 注意相对导入是三级（agent/nodes → hooks），两级会解析到不存在的
+            # mini_claude.agent.hooks 且被下面的 try 吞掉。
+            try:
+                from ...hooks.dispatcher import get_hook_dispatcher
+
+                await get_hook_dispatcher().dispatch_pre_compact(
+                    trigger="auto", thread_id=thread_id
+                )
+            except Exception as hook_err:
+                logger.debug("pre_compact hook failed", error=str(hook_err))
             try:
 
                 async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:

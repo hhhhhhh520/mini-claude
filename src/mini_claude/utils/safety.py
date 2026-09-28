@@ -6,6 +6,7 @@ import shlex
 import time
 import unicodedata
 import threading
+from pathlib import Path
 from typing import Tuple, Set, Dict, List, Any, Optional, TypedDict
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -872,10 +873,58 @@ class PathConfirmationRequired(Exception):
         super().__init__(f"Path requires confirmation: {path} - {reason}")
 
 
+# ---- 多工作目录注册表（/add-dir，会话级，对标 Claude Code） ----
+# 只存 resolve() 后的真实路径：比较统一走真实形态（Windows 8.3 短路径
+# 先例——RUNNER~1 与 runneradmin 必须判等）。
+_additional_roots: List[str] = []
+
+
+def _within_roots(path_real: str, roots: List[str]) -> bool:
+    """带分隔符守卫的前缀比较：根 D:\\proj 不得放行 D:\\projects。"""
+    for root in roots:
+        if path_real == root or path_real.startswith(root + os.sep):
+            return True
+    return False
+
+
+def add_workspace_root(path: str) -> Tuple[bool, str]:
+    """注册额外工作目录（会话级，/add-dir 命令入口）。
+
+    必须是已存在的目录；重复注册幂等。返回 (ok, reason)。
+    """
+    try:
+        p = Path(path).expanduser()
+    except (OSError, RuntimeError, ValueError) as e:
+        return False, f"路径无效：{path}（{e}）"
+    if not p.exists():
+        return False, f"目录不存在：{path}"
+    if not p.is_dir():
+        return False, f"不是目录：{path}"
+    resolved = str(p.resolve())
+    if resolved in _additional_roots:
+        return True, "already"
+    _additional_roots.append(resolved)
+    return True, "OK"
+
+
+def get_workspace_roots() -> List[str]:
+    """当前会话的全部工作根（主 workspace 在前，额外根按注册序）。"""
+    primary = str(Path(os.path.abspath(settings.workspace_root)).resolve())
+    return [primary] + list(_additional_roots)
+
+
+def reset_workspace_roots() -> None:
+    """清空额外工作根（测试与收口用）。"""
+    _additional_roots.clear()
+
+
 def validate_path(
     path: str, workspace: str = None, allow_outside: bool = False, require_confirmation: bool = True
 ) -> Tuple[bool, str]:
     """Validate a file path is within workspace.
+
+    多工作目录（/add-dir）：除主 workspace 外，任何已注册的额外根同样放行；
+    主 workspace 的既有比较逻辑逐字节保留，额外根以 OR 并入三处检查点。
 
     Args:
         path: The path to validate
@@ -935,7 +984,9 @@ def validate_path(
         # Compare resolved forms to handle Windows 8.3 short names
         # (RUNNER~1 -> runneradmin) which are NOT actual symlinks.
         if path_real != path_abs:
-            if not allow_outside and not path_real.startswith(workspace_real):
+            if not allow_outside and not (
+                path_real.startswith(workspace_real) or _within_roots(path_real, _additional_roots)
+            ):
                 return False, f"Symlink points outside workspace: {path} -> {path_real}"
         # If path is outside workspace but NOT a symlink, fall through to
         # the drive letter check below which may raise PathConfirmationRequired.
@@ -949,7 +1000,10 @@ def validate_path(
         # Check for absolute Windows paths
         if re.match(r"^[a-zA-Z]:", normalized):
             drive_path = os.path.abspath(path)
-            if not allow_outside and not drive_path.startswith(workspace_abs):
+            if not allow_outside and not (
+                drive_path.startswith(workspace_abs)
+                or _within_roots(str(Path(drive_path).resolve()), _additional_roots)
+            ):
                 # Check if already approved
                 if is_path_approved(drive_path):
                     return True, "OK"
@@ -968,7 +1022,9 @@ def validate_path(
             return False, f"Access to protected path denied: {protected}"
 
     # 6. Check path is within workspace (skip if allow_outside)
-    if not allow_outside and not path_real.startswith(workspace_abs):
+    if not allow_outside and not (
+        path_real.startswith(workspace_abs) or _within_roots(path_real, _additional_roots)
+    ):
         # Check if already approved
         if is_path_approved(path_real):
             return True, "OK"

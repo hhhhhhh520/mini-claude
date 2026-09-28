@@ -92,6 +92,9 @@ class REPLSession:
         self._active_skill_args = ""
         # P4-1 /rewind：待分叉快照的 configurable（含 checkpoint_id），下轮用后即清
         self._rewind_configurable = None
+        # SessionStart hook 注入的会话级上下文（每回合与 UserPromptSubmit
+        # 上下文合并进 hook_context；hook_context 是全量替换语义，每轮必带）
+        self._session_hook_context = ""
 
     def _get_profile_manager(self) -> UserProfileManager:
         """Get or create profile manager."""
@@ -194,6 +197,17 @@ class REPLSession:
         try:
             await self._run_graph_loop()
         finally:
+            # SessionEnd hook：退出路径最先触发（此时 checkpoint/MCP 尚可用），
+            # 只通知不判断；之后才做各类资源收口
+            try:
+                from ..hooks.dispatcher import get_hook_dispatcher
+
+                await get_hook_dispatcher().dispatch_session_end(
+                    reason="exit", thread_id=self.thread_id
+                )
+            except Exception as e:
+                logger.debug("session end hook failed", error=str(e))
+
             from ..agent.graph import close_checkpoint_connections
             from ..mcp.manager import close_mcp_connections
             from ..tools._http import close_shared_client
@@ -236,6 +250,7 @@ class REPLSession:
         await self._connect_mcp_servers()
 
         # Check for previous session
+        resumed = False
         has_previous = await self._check_previous_session()
         if has_previous:
             try:
@@ -244,6 +259,7 @@ class REPLSession:
                 )
                 if choice.strip().lower() in ("", "y", "yes", "是"):
                     display.console.print("[dim]正在恢复会话...[/]")
+                    resumed = True
                     # Continue with existing checkpoint - graph will auto-load state
                 else:
                     # Start fresh - use a new thread_id to avoid loading old checkpoint
@@ -251,6 +267,21 @@ class REPLSession:
                     display.console.print("[dim]开始新会话[/]")
             except Exception as e:
                 logger.debug("session recovery prompt failed", error=str(e))
+
+        # SessionStart hook（P5 尾部事件）：MCP 自动连接后、主循环前触发，
+        # 非阻断；stdout/additionalContext 注入会话级上下文（走 hook_context
+        # 通道每回合前置，全量替换语义——见 AgentState.hook_context 注释）
+        try:
+            from ..hooks.dispatcher import get_hook_dispatcher
+
+            _, _, start_ctx = await get_hook_dispatcher().dispatch_session_start(
+                source="resume" if resumed else "startup", thread_id=self.thread_id
+            )
+            if start_ctx:
+                self._session_hook_context = start_ctx
+                display.console.print("[dim]SessionStart hook 注入了会话上下文[/]")
+        except Exception as e:
+            logger.debug("session start hook failed", error=str(e))
 
         graph = get_agent_graph()
 
@@ -328,7 +359,13 @@ class REPLSession:
                     from ..agent.state import create_turn_increment
 
                     turn_state = create_turn_increment(
-                        effective_input, thread_id=self.thread_id, hook_context=up_context
+                        effective_input,
+                        thread_id=self.thread_id,
+                        hook_context="\n\n".join(
+                            part
+                            for part in (self._session_hook_context, up_context)
+                            if part
+                        ),
                     )
 
                     configurable = {"thread_id": self.thread_id}

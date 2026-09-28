@@ -29,6 +29,10 @@ VALID_EVENTS = (
     "UserPromptSubmit",
     "Notification",
     "SubagentStop",
+    "SessionStart",
+    "SessionEnd",
+    "PreCompact",
+    "SubagentStart",
 )
 DEFAULT_TIMEOUT = 30.0
 _MAX_TIMEOUT = 300.0

@@ -368,6 +368,7 @@ class TokenCounter:
         keep_last: int = 4,  # Keep recent context
         max_summary_tokens: int = 500,
         return_summary_only: bool = False,
+        custom_instructions: str = "",
     ) -> tuple[List[Dict[str, Any]], Optional[str]]:
         """Summarize old messages to reduce token count.
 
@@ -382,6 +383,8 @@ class TokenCounter:
             keep_last: Number of messages to keep from end (recent context)
             max_summary_tokens: Maximum tokens for the summary
             return_summary_only: If True, only return the summary text (no compressed messages)
+            custom_instructions: 用户自定义压缩指令（/compact 的自由参数），
+                非空时追加进摘要提示词
 
         Returns:
             Tuple of (compressed message list, summary text or None)
@@ -423,6 +426,9 @@ class TokenCounter:
 5. 摘要长度控制在 {max_summary_tokens} tokens 以内
 
 直接输出摘要内容，不要添加任何前缀或解释。"""
+
+        if custom_instructions.strip():
+            summary_prompt += f"\n\n用户额外要求（压缩时重点保留）：\n{custom_instructions.strip()}"
 
         try:
             # Call LLM to generate summary
