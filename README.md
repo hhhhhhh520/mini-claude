@@ -5,7 +5,7 @@
 **迷你版 Claude Code** — 工具调用 + 主从多 Agent 并发，在一个 CLI 里跑完整开发循环。
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
-[![Tests](https://img.shields.io/badge/Tests-1998%20collected-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-2024%20collected-brightgreen)](tests/)
 [![Tools](https://img.shields.io/badge/Tools-24-orange)](#可用工具24个)
 [![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
 
@@ -25,12 +25,12 @@
 - **任务清单**：`todo_write` 维护会话 todo，多步任务进度实时渲染（对齐 Claude Code TodoWrite）
 - **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md` 与工作区 `CLAUDE.md` 作为持久约定（`CLAUDE_MD_ENABLED` 可关）
 - **MCP 支持**：接入 Model Context Protocol 服务器（stdio），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道（对齐 Claude Code 生态）
-- **Hooks**：PreToolUse/PostToolUse/Stop 三事件，用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换），超时强杀
+- **Hooks**：PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop 六事件（对齐 Claude Code 事件面），用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换 / additionalContext 注入），超时强杀
 - **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则（glob 匹配主参数），deny > ask > allow > 模式默认
 - **会话回退**：`/rewind` 列出回合边界 checkpoint，从任意回合分叉重跑（基于 LangGraph 时间旅行）
 - **后台任务**：`run_background` 输出落盘，`task_output`/`task_kill` 读取与终止（对齐 BashOutput/KillShell）
 - **模型热切换**：`/model <name>` 会话内即时切换（含子代理），`.env` 默认值不动
-- **测试规模**：1998 个测试用例（2026-09-28 实测收集数）
+- **测试规模**：2024 个测试用例（2026-09-28 实测收集数）
 
 ## 安装
 
@@ -184,12 +184,18 @@ Use 'force_write' to overwrite.
     "PreToolUse": [
       {"matcher": "run_command|write_file",
        "hooks": [{"type": "command", "command": "check.bat", "timeout": 15}]}
+    ],
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "inject-context.sh"}]}
+    ],
+    "SubagentStop": [
+      {"hooks": [{"type": "command", "command": "review-gate.sh"}]}
     ]
   }
 }
 ```
 
-- payload 走 stdin（`{event, tool_name, tool_input, thread_id}`）；`PreToolUse` exit 2 或输出 `{"decision":"block","reason":...}` 阻断执行，`PostToolUse` 输出 `{"replacement": "..."}` 替换结果，`Stop` 在回合结束时触发
+- payload 走 stdin；`PreToolUse` exit 2 或输出 `{"decision":"block","reason":...}` 阻断执行，`PostToolUse` 输出 `{"replacement": "..."}` 替换结果，`Stop` 在回合结束时触发；`UserPromptSubmit`（stdin 含 `prompt`）exit 2 / decision=block 拦截本轮输入，exit 0 的 stdout 或 `hookSpecificOutput.additionalContext` 注入本回合 system 上下文（不进持久化历史）；`Notification` 在工具请求确认时触发（stdin 含 `message`）；`SubagentStop`（stdin 含 `agent_id/agent_task/result_summary`）exit 2 / decision=block 让子代理带着原因继续（受迭代上限兜底）
 - 超时强杀；hook 失败不阻断主链路；子代理不触发
 
 **权限**（`~/.mini-claude/settings.json` 或 `<工作区>/.mini-claude/settings.json`）：

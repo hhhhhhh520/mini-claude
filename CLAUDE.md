@@ -40,6 +40,9 @@
 
 ### Hooks 与权限约束
 
+- Hooks 事件面六事件（PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop）；hook 失败/超时不阻断主链路（UserPromptSubmit/SubagentStop 的 exit 2 阻断除外）
+- `AgentState.hook_context` 是**全量替换语义**：`create_turn_increment` 每轮必须带值（空串=清空上一轮注入），act 经 `build_system_messages(hook_context=...)` 前置、不进持久化历史——漏带值会让 checkpoint 沿用旧回合的注入
+
 - 挂点只在 `ToolRegistry.execute()`（与降级管理器同位置）；子代理跳过双门（有自己的白名单）
 - 裁决顺序固定 deny > ask > allow > 模式默认，改顺序前先跑 test_manager.py 的顺序测试
 - hook 命令经 shell 执行且超时强杀——hook 是用户受信配置，不走安全白名单（白名单管 LLM）

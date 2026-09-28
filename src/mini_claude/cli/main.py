@@ -228,6 +228,31 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
 
     async def run_single():
         llm = LLMProvider(model)
+
+        # UserPromptSubmit hook（P5）：与 REPL 同语义——阻断则失败退出，
+        # 注入上下文作为本次请求的 system 前缀。置于 display 之前：
+        # 被拦截的输入不应显示"Thinking..."
+        try:
+            from ..hooks.dispatcher import get_hook_dispatcher
+
+            (
+                up_blocked,
+                up_reason,
+                up_context,
+            ) = await get_hook_dispatcher().dispatch_user_prompt_submit(prompt, thread_id="ask")
+        except Exception as up_err:
+            logger.debug("user prompt submit hook failed", error=str(up_err))
+            up_blocked, up_reason, up_context = False, "", ""
+        if up_blocked:
+            # 直接打印而非 _show_error：hook 拦截不是模型故障，
+            # _show_error 会附带误导性的"模型调用失败"下一步提示
+            err = f"输入被 UserPromptSubmit hook 拦截：{up_reason}"
+            if output_json:
+                print(json.dumps({"error": err}, ensure_ascii=False))
+            else:
+                print(f"Error: {err}")
+            raise SystemExit(1)
+
         if not output_json:
             display.user_message(prompt)
             display.show_thinking()
@@ -237,6 +262,14 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
         litellm_tools = convert_tools_to_litellm(tools)
 
         messages = [{"role": "user", "content": prompt}]
+        if up_context:
+            messages.insert(
+                0,
+                {
+                    "role": "system",
+                    "content": f"以下内容来自 UserPromptSubmit hook（仅本次有效）：\n\n{up_context}",
+                },
+            )
 
         try:
             # ISSUE-026：完整函数调用循环——assistant 消息原样携带 tool_calls、

@@ -75,13 +75,18 @@ def get_degradation_manager() -> DegradationManager:
     return _degradation_manager
 
 
-def build_system_messages() -> list:
-    """构造前置给 LLM 的系统消息（LiteLLM 格式）：系统提示 + 可用 skills.
+def build_system_messages(hook_context: str = "") -> list:
+    """构造前置给 LLM 的系统消息（LiteLLM 格式）：系统提示 + CLAUDE.md + skills + hook 注入.
 
     刻意**不写入** state["messages"]：messages 字段是 `Annotated[List, add]`
     累加语义，把系统提示塞进去再由 think 返回全量列表，会导致用户消息被复制、
     SystemMessage 落到 HumanMessage 之后（见 ISSUE：reducer 消息重复）。
     系统提示应在每次 LLM 调用时前置，永远完整、永远在最前、不进持久化历史。
+
+    Args:
+        hook_context: UserPromptSubmit hook 注入的回合级上下文（空串=无注入）。
+            与系统提示同一前置通道：每次 LLM 调用都在场、当回合结束即失效
+            （下一轮增量带空串清空），不进持久化历史。
     """
     provider = settings.get_model_provider()
     system_msgs = [{"role": "system", "content": get_system_prompt(provider)}]
@@ -105,6 +110,16 @@ def build_system_messages() -> list:
                 )
         except Exception as e:
             logger.debug("claudemd injection failed", error=str(e))
+
+    # UserPromptSubmit hook 注入的回合级上下文（P5 对齐 Claude Code）
+    hook_ctx = (hook_context or "").strip()
+    if hook_ctx:
+        system_msgs.append(
+            {
+                "role": "system",
+                "content": ("以下内容来自 UserPromptSubmit hook（仅本回合有效）：\n\n" + hook_ctx),
+            }
+        )
 
     # Inject skills as a dedicated system message（小模型更关注近期上下文，
     # 但系统消息本就整体前置，这里保持与旧行为一致的完整 skill 说明）。

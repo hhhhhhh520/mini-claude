@@ -133,7 +133,10 @@ async def act_node(state: AgentState) -> dict:
         # 系统提示与 skills 不进受压缩/持久化的对话历史，而是在每次 LLM 调用时前置：
         # 永远完整（不会被摘要/截断吃掉）、永远在最前、且不参与 add-reducer，
         # 从根上避免 think 注入系统消息导致的重复与顺序错乱。
-        litellm_messages = build_system_messages() + litellm_messages
+        # hook_context（UserPromptSubmit 注入）同通道：回合级、不进持久化历史。
+        litellm_messages = (
+            build_system_messages(hook_context=state.get("hook_context") or "") + litellm_messages
+        )
 
         try:
             degr_manager = get_degradation_manager()
@@ -209,6 +212,21 @@ async def act_node(state: AgentState) -> dict:
                 # Merge early_return fields if present
                 if early_return:
                     result.update(early_return)
+
+                    # Notification hook（P5 对齐 Claude Code）：需要用户注意的时刻
+                    # （工具请求确认）触发，只通知不判断，任何异常吞掉不阻断主链路
+                    if early_return.get("stop_reason") == StopReason.WAITING_CONFIRMATION:
+                        try:
+                            last = new_messages[-1] if new_messages else None
+                            notice = getattr(last, "content", "") or "工具请求确认"
+                            from ...hooks.dispatcher import get_hook_dispatcher
+
+                            await get_hook_dispatcher().dispatch_notification(
+                                str(notice)[:300],
+                                thread_id=state.get("thread_id", ""),
+                            )
+                        except Exception as hook_err:
+                            logger.debug("notification hook failed", error=str(hook_err))
 
                 # 工具执行产生的状态增量（如 todo_write 全量清单）。
                 # todos 是全量替换语义（无 reducer），direct update 覆盖旧值。

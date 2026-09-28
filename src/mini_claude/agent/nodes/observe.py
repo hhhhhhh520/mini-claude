@@ -207,11 +207,46 @@ async def observe_node(state: AgentState) -> dict:
             if span:
                 span.set_attribute("stop_reason", "continue")
 
-            # 子代理模式：写入操作后停止
+            # 子代理模式：写入操作后停止（SubagentStop hook 可阻断收工，P5 对齐）
             if state.get("is_subagent", False):
                 for msg in reversed(messages):
                     if _is_tool_result_message(msg):
                         if msg.name in ["write_file", "edit_file"]:
+                            # SubagentStop hook：exit 2 / decision=block → 不收工，
+                            # 原因作为消息喂回让子代理继续（受 max_iterations 兜底；
+                            # hook 自身异常不阻断收工——和 Notification 同级纪律）
+                            try:
+                                from ...hooks.dispatcher import get_hook_dispatcher
+
+                                (
+                                    blocked,
+                                    reason,
+                                ) = await get_hook_dispatcher().dispatch_subagent_stop(
+                                    agent_id=state.get("thread_id", ""),
+                                    agent_task=state.get("current_task", ""),
+                                    result_summary=str(msg.content)[:500],
+                                    thread_id=state.get("thread_id", ""),
+                                )
+                            except Exception as hook_err:
+                                logger.debug("subagent stop hook failed", error=str(hook_err))
+                                blocked, reason = False, ""
+                            if blocked:
+                                logger.debug(
+                                    "observe_node: subagent stop blocked by hook", reason=reason
+                                )
+                                if span:
+                                    span.set_attribute("subagent_stop_blocked", True)
+                                return {
+                                    "messages": [
+                                        HumanMessage(
+                                            content=(
+                                                f"SubagentStop hook 阻断收工，请继续完成任务：{reason}"
+                                            ),
+                                            name="subagent_stop_hook",
+                                        )
+                                    ],
+                                    "stop_reason": StopReason.CONTINUE,
+                                }
                             logger.debug("observe_node: subagent completed write operation")
                             if span:
                                 span.set_attribute("stop_reason", "subagent_complete")

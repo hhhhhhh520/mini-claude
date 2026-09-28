@@ -142,6 +142,11 @@ class AgentState(TypedDict):
     # 不能挂 add reducer——act 节点返回的 todos 直接覆盖旧值。
     todos: List[Dict[str, Any]]
 
+    # UserPromptSubmit hook 注入的回合级上下文（P5 对齐 Claude Code）。
+    # 全量替换语义：act 经 build_system_messages() 前置给 LLM（不进持久化
+    # 历史），每轮增量必须带值（空串=清空），否则 checkpoint 会沿用旧值。
+    hook_context: str
+
 
 def create_initial_state(
     user_input: str,
@@ -184,13 +189,16 @@ def create_initial_state(
         reflection_notes=[],
         lessons_learned=[],
         improvement_suggestions=[],
+        hook_context="",
         execution_plan=None,
         current_step_index=0,
         todos=[],
     )
 
 
-def create_turn_increment(user_input: str, thread_id: str = "default") -> AgentState:
+def create_turn_increment(
+    user_input: str, thread_id: str = "default", hook_context: str = ""
+) -> AgentState:
     """创建**单回合增量**状态（P4-1）。
 
     REPL 每轮只传新消息 + 本回合初始字段，历史由 checkpointer 携带。
@@ -199,6 +207,9 @@ def create_turn_increment(user_input: str, thread_id: str = "default") -> AgentS
 
     刻意**不包含 todos**：todo 清单是跨回合状态，增量里带空列表会把
     上回合的进度清掉；fork 回旧快照时也应保留快照当时的 todos。
+
+    hook_context 刻意**每轮都带**（默认空串）：它是回合级状态，空串即
+    显式清空上一轮的注入；act 经 build_system_messages 前置，不进持久化历史。
 
     与 checkpoint_id 配合即 /rewind 的分叉重跑。
     """
@@ -220,6 +231,7 @@ def create_turn_increment(user_input: str, thread_id: str = "default") -> AgentS
         reflection_notes=[],
         lessons_learned=[],
         improvement_suggestions=[],
+        hook_context=hook_context,
         execution_plan=None,
         current_step_index=0,
     )

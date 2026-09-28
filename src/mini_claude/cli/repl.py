@@ -294,6 +294,27 @@ class REPLSession:
                     self._active_skill = None
                     self._active_skill_args = ""
 
+                # UserPromptSubmit hook（P5 对齐）：exit 2 / decision=block 拦截本轮
+                # 输入（reason 展示给用户）；stdout / additionalContext 注入回合上下文
+                try:
+                    from ..hooks.dispatcher import get_hook_dispatcher
+
+                    (
+                        up_blocked,
+                        up_reason,
+                        up_context,
+                    ) = await get_hook_dispatcher().dispatch_user_prompt_submit(
+                        user_input, thread_id=self.thread_id
+                    )
+                except Exception as up_err:
+                    logger.debug("user prompt submit hook failed", error=str(up_err))
+                    up_blocked, up_reason, up_context = False, "", ""
+                if up_blocked:
+                    from rich.markup import escape
+
+                    display.show_error(f"输入被 UserPromptSubmit hook 拦截：{up_reason}")
+                    continue
+
                 # Process with LangGraph
                 display.user_message(user_input)
                 display._streamed = False  # Reset streaming flag each turn
@@ -306,7 +327,9 @@ class REPLSession:
                     # /rewind 时 config 带 checkpoint_id，从快照分叉重跑。
                     from ..agent.state import create_turn_increment
 
-                    turn_state = create_turn_increment(effective_input, thread_id=self.thread_id)
+                    turn_state = create_turn_increment(
+                        effective_input, thread_id=self.thread_id, hook_context=up_context
+                    )
 
                     configurable = {"thread_id": self.thread_id}
                     if self._rewind_configurable is not None:

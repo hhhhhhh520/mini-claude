@@ -22,7 +22,14 @@ from ..utils.logger import get_logger
 
 logger = get_logger("mini_claude.hooks.config")
 
-VALID_EVENTS = ("PreToolUse", "PostToolUse", "Stop")
+VALID_EVENTS = (
+    "PreToolUse",
+    "PostToolUse",
+    "Stop",
+    "UserPromptSubmit",
+    "Notification",
+    "SubagentStop",
+)
 DEFAULT_TIMEOUT = 30.0
 _MAX_TIMEOUT = 300.0
 
