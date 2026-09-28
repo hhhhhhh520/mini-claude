@@ -27,12 +27,12 @@
 - **MCP 支持**：接入 Model Context Protocol 服务器（stdio + streamable HTTP），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道；resources/prompts 经 `mcp_list_resources`/`mcp_read_resource`/`mcp_list_prompts`/`mcp_get_prompt` 只读访问（对齐 Claude Code 生态）
 - **Hooks**：PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop/SessionStart/SessionEnd/PreCompact/SubagentStart 十事件（对齐 Claude Code 事件面），用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换 / additionalContext 注入），超时强杀
 - **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则（glob 匹配主参数），deny > ask > allow > 模式默认
-- **会话回退**：`/rewind` 列出回合边界 checkpoint，从任意回合分叉重跑（基于 LangGraph 时间旅行）
-- **上下文压缩**：`/compact [指令]` 手动压缩会话历史（LLM 摘要 + 新线程播种，旧 checkpoint 链保留；自定义指令透传摘要提示词），自动压缩超预算时先触发 PreCompact hook
+- **会话回退**：`/rewind` 列出回合边界 checkpoint，支持 `[chat|code|both]` 三种范围——对话分叉重跑之外还能**恢复文件**（write/edit/force_write 的修改按快照时间戳回放：改写恢复、新建删除；会话内日志，侧门修改除外）
+- **上下文压缩**：`/compact [指令]` 手动压缩会话历史（LLM 摘要 + 新线程播种，旧 checkpoint 链保留；自定义指令透传摘要提示词）；**auto-compact** 回合前预算超限自动压缩落盘（`AUTO_COMPACT_ENABLED` 可关，60s 冷却）
 - **多工作目录**：`/add-dir <目录>` 会话级追加工作根（路径校验对所有已注册根放行，保护路径与穿越检查不放松）
 - **后台任务**：`run_background` 输出落盘，`task_output`/`task_kill` 读取与终止（对齐 BashOutput/KillShell）
 - **模型热切换**：`/model <name>` 会话内即时切换（含子代理），`.env` 默认值不动
-- **测试规模**：2136 个测试用例（2026-09-28 实测收集数）
+- **测试规模**：2164 个测试用例（2026-09-28 实测收集数）
 
 ## 安装
 
@@ -197,7 +197,7 @@ Use 'force_write' to overwrite.
 }
 ```
 
-- payload 走 stdin；`PreToolUse` exit 2 或输出 `{"decision":"block","reason":...}` 阻断执行，`PostToolUse` 输出 `{"replacement": "..."}` 替换结果，`Stop` 在回合结束时触发；`UserPromptSubmit`（stdin 含 `prompt`）exit 2 / decision=block 拦截本轮输入，exit 0 的 stdout 或 `hookSpecificOutput.additionalContext` 注入本回合 system 上下文（不进持久化历史）；`Notification` 在工具请求确认时触发（stdin 含 `message`）；`SubagentStop`（stdin 含 `agent_id/agent_task/result_summary`）exit 2 / decision=block 让子代理带着原因继续（受迭代上限兜底）
+- payload 走 stdin；`PreToolUse` exit 2 或输出 `{"decision":"block","reason":...}` 阻断执行，结构化裁决 `{"hookSpecificOutput":{"permissionDecision":"allow|deny","updatedInput":{...}}}` 可免确认/拒绝/**改写工具入参**，payload 含 session_id/permission_mode/cwd（子进程另有 `$CLAUDE_PROJECT_DIR`）；`PostToolUse` 输出 `{"replacement": "..."}` 替换结果，`Stop` 在回合结束时触发；`UserPromptSubmit`（stdin 含 `prompt`）exit 2 / decision=block 拦截本轮输入，exit 0 的 stdout 或 `hookSpecificOutput.additionalContext` 注入本回合 system 上下文（不进持久化历史）；`Notification` 在工具请求确认时触发（stdin 含 `message`）；`SubagentStop`（stdin 含 `agent_id/agent_task/result_summary`）exit 2 / decision=block 让子代理带着原因继续（受迭代上限兜底）
 - 尾部四事件均非阻断：`SessionStart`（stdin 含 `source: startup/resume`）stdout/`additionalContext` 注入**会话级**上下文（此后每回合都前置）；`SessionEnd`（stdin 含 `reason`）在 REPL 退出收口前触发；`PreCompact`（stdin 含 `trigger: manual/auto`）在 `/compact` 与自动摘要压缩前触发；`SubagentStart`（stdin 含 `agent_id/agent_task`）在子代理派生时触发
 - 超时强杀；hook 失败不阻断主链路；子代理不触发
 

@@ -2,7 +2,13 @@
 
 语义（对齐 Claude Code hooks）：
 - PreToolUse：exit 0 放行；exit 2 阻断（stderr 为原因）；stdout JSON
-  {"decision":"block","reason":...} 也阻断；其他非零/超时 = 非阻断错误（放行+记日志）
+  {"decision":"block","reason":...} 也阻断；结构化裁决
+  {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":
+  "allow"|"deny"|"ask","updatedInput":{...},"permissionDecisionReason":"..."}}——
+  deny 阻断、allow 免确认（跳过权限 ask）、updatedInput 改写工具入参；
+  permissionDecision="ask"（强制确认）v1 不支持，按放行处理并记日志
+  （已知分歧点）。updatedInput 改写结果会喂给权限系统与工具执行。
+  其他非零/超时 = 非阻断错误（放行+记日志）
 - PostToolUse：stdout JSON {"replacement": "..."} 替换工具输出；不可阻断
 - Stop：exit 2 / decision=block 阻断回合结束（原因喂回续跑，单回合硬顶一次）
 - UserPromptSubmit：exit 2 / decision=block 阻断该输入（stderr/reason 展示给用户）；
@@ -15,7 +21,8 @@
 """
 
 import json
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..config.settings import settings
 from ..utils.logger import get_logger
@@ -23,6 +30,20 @@ from .config import HookConfig, load_hooks_config
 from .runner import run_hook_command
 
 logger = get_logger("mini_claude.hooks.dispatcher")
+
+
+@dataclass
+class HookVerdict:
+    """PreToolUse 结构化裁决（对齐 Claude Code 三值语义 + 入参改写）。
+
+    blocked: 阻断原因（None=放行）
+    allow: hook 显式放行（跳过权限 ask——本体 permissionDecision="allow"）
+    updated_input: hook 改写后的工具入参（None=不改写；会喂给权限系统与执行）
+    """
+
+    blocked: Optional[str] = None
+    allow: bool = False
+    updated_input: Optional[Dict[str, Any]] = None
 
 
 class HookDispatcher:
@@ -53,37 +74,64 @@ class HookDispatcher:
 
     async def dispatch_pre_tool_use(
         self, tool_name: str, tool_input: Dict, thread_id: str = ""
-    ) -> Optional[str]:
-        """返回阻断原因（str）或 None（放行）。"""
+    ) -> HookVerdict:
+        """PreToolUse 结构化裁决（对齐 Claude Code）。
+
+        多条 hook 的合并规则：任一 deny/exit2/block → 阻断（先到先得）；
+        否则取最后一条 updatedInput（后写覆盖）；allow 只有在无阻断时生效。
+        """
         if not getattr(settings, "hooks_enabled", False):
-            return None
+            return HookVerdict()
         outcomes = await self._run_all(
-            "PreToolUse", tool_name, {"tool_input": tool_input, "thread_id": thread_id}
+            "PreToolUse",
+            tool_name,
+            {
+                "tool_input": tool_input,
+                "thread_id": thread_id,
+                "session_id": thread_id,
+                "permission_mode": getattr(settings, "permission_mode", ""),
+                "cwd": self._cwd or "",
+            },
         )
+        verdict = HookVerdict()
         for outcome in outcomes:
             if outcome.timed_out:
                 logger.warning("PreToolUse hook timed out", tool=tool_name)
                 continue
-            # stdout JSON decision=block（优先级高于 exit code 语义）
             if outcome.stdout.strip().startswith("{"):
                 try:
-                    import json
-
                     data = json.loads(outcome.stdout)
-                    if data.get("decision") == "block":
-                        return str(data.get("reason", "被 PreToolUse hook 阻断"))
                 except json.JSONDecodeError:
-                    pass
+                    data = {}
+                if data.get("decision") == "block":
+                    verdict.blocked = str(data.get("reason", "被 PreToolUse hook 阻断"))
+                    return verdict
+                hook_out = data.get("hookSpecificOutput") or {}
+                decision = hook_out.get("permissionDecision")
+                if decision == "deny":
+                    verdict.blocked = str(
+                        hook_out.get("permissionDecisionReason")
+                        or "被 PreToolUse hook 拒绝（deny）"
+                    )
+                    return verdict
+                if decision == "allow":
+                    verdict.allow = True
+                elif decision == "ask":
+                    # 本体支持强制确认；v1 未接线，按放行处理（已知分歧点）
+                    logger.debug("PreToolUse permissionDecision=ask not supported, allowing")
+                updated = hook_out.get("updatedInput") or data.get("updatedInput")
+                if isinstance(updated, dict):
+                    verdict.updated_input = updated
             if outcome.exit_code == 2:
-                reason = outcome.stderr.strip() or "被 PreToolUse hook 阻断"
-                return reason
+                verdict.blocked = outcome.stderr.strip() or "被 PreToolUse hook 阻断"
+                return verdict
             if outcome.exit_code != 0:
                 logger.warning(
                     "PreToolUse hook non-blocking error",
                     tool=tool_name,
                     exit_code=outcome.exit_code,
                 )
-        return None
+        return verdict
 
     async def dispatch_post_tool_use(
         self, tool_name: str, tool_input: Dict, tool_result: str, thread_id: str = ""

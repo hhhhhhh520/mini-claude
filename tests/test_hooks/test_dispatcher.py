@@ -39,7 +39,7 @@ class TestPreToolUse:
             return_value=SimpleNamespace(exit_code=0, stdout="", stderr="", timed_out=False)
         )
         d = _make_dispatcher({"PreToolUse": [_rule("", "ok")]}, runner)
-        assert await d.dispatch_pre_tool_use("read_file", {}) is None
+        assert (await d.dispatch_pre_tool_use("read_file", {})).blocked is None
         runner.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -50,8 +50,8 @@ class TestPreToolUse:
             )
         )
         d = _make_dispatcher({"PreToolUse": [_rule("", "x")]}, runner)
-        reason = await d.dispatch_pre_tool_use("run_command", {"command": "rm"})
-        assert reason is not None and "policy says no" in reason
+        verdict = await d.dispatch_pre_tool_use("run_command", {"command": "rm"})
+        assert verdict.blocked is not None and "policy says no" in verdict.blocked
 
     @pytest.mark.asyncio
     async def test_json_decision_block(self):
@@ -64,8 +64,8 @@ class TestPreToolUse:
             )
         )
         d = _make_dispatcher({"PreToolUse": [_rule("", "x")]}, runner)
-        reason = await d.dispatch_pre_tool_use("run_command", {})
-        assert reason is not None and "json block" in reason
+        verdict = await d.dispatch_pre_tool_use("run_command", {})
+        assert verdict.blocked is not None and "json block" in verdict.blocked
 
     @pytest.mark.asyncio
     async def test_other_nonzero_exit_does_not_block(self):
@@ -73,7 +73,7 @@ class TestPreToolUse:
             return_value=SimpleNamespace(exit_code=3, stdout="", stderr="oops", timed_out=False)
         )
         d = _make_dispatcher({"PreToolUse": [_rule("", "x")]}, runner)
-        assert await d.dispatch_pre_tool_use("read_file", {}) is None
+        assert (await d.dispatch_pre_tool_use("read_file", {})).blocked is None
 
     @pytest.mark.asyncio
     async def test_timeout_does_not_block(self):
@@ -81,7 +81,7 @@ class TestPreToolUse:
             return_value=SimpleNamespace(exit_code=0, stdout="", stderr="", timed_out=True)
         )
         d = _make_dispatcher({"PreToolUse": [_rule("", "slow")]}, runner)
-        assert await d.dispatch_pre_tool_use("read_file", {}) is None
+        assert (await d.dispatch_pre_tool_use("read_file", {})).blocked is None
 
     @pytest.mark.asyncio
     async def test_matcher_regex_selects_tools(self):
@@ -92,15 +92,102 @@ class TestPreToolUse:
         )
         d = _make_dispatcher({"PreToolUse": [_rule("write_file|edit_file", "x")]}, runner)
         # matcher 命中 → 阻断
-        assert await d.dispatch_pre_tool_use("write_file", {"path": "a"}) is not None
+        assert (await d.dispatch_pre_tool_use("write_file", {"path": "a"})).blocked is not None
         # matcher 未命中 → 完全不执行 hook
-        assert await d.dispatch_pre_tool_use("read_file", {}) is None
+        assert (await d.dispatch_pre_tool_use("read_file", {})).blocked is None
         assert runner.await_count == 1
 
     @pytest.mark.asyncio
     async def test_no_matching_hooks_returns_none(self):
         d = _make_dispatcher({})
-        assert await d.dispatch_pre_tool_use("read_file", {}) is None
+        assert (await d.dispatch_pre_tool_use("read_file", {})).blocked is None
+
+
+class TestPreToolUseVerdict:
+    """收敛批次①：结构化裁决（permissionDecision 三态 + updatedInput + payload 增强）"""
+
+    @pytest.mark.asyncio
+    async def test_permission_decision_allow(self):
+        runner = AsyncMock(
+            return_value=SimpleNamespace(
+                exit_code=0,
+                stdout=json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "PreToolUse",
+                            "permissionDecision": "allow",
+                        }
+                    }
+                ),
+                stderr="",
+                timed_out=False,
+            )
+        )
+        d = _make_dispatcher({"PreToolUse": [_rule("", "x")]}, runner)
+        v = await d.dispatch_pre_tool_use("run_command", {})
+        assert v.blocked is None and v.allow is True
+
+    @pytest.mark.asyncio
+    async def test_permission_decision_deny_blocks_with_reason(self):
+        runner = AsyncMock(
+            return_value=SimpleNamespace(
+                exit_code=0,
+                stdout=json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "PreToolUse",
+                            "permissionDecision": "deny",
+                            "permissionDecisionReason": "高危命令",
+                        }
+                    }
+                ),
+                stderr="",
+                timed_out=False,
+            )
+        )
+        d = _make_dispatcher({"PreToolUse": [_rule("", "x")]}, runner)
+        v = await d.dispatch_pre_tool_use("run_command", {})
+        assert v.blocked is not None and "高危命令" in v.blocked and v.allow is False
+
+    @pytest.mark.asyncio
+    async def test_updated_input_from_hook_specific_output(self):
+        runner = AsyncMock(
+            return_value=SimpleNamespace(
+                exit_code=0,
+                stdout=json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "PreToolUse",
+                            "updatedInput": {"command": "git status"},
+                        }
+                    }
+                ),
+                stderr="",
+                timed_out=False,
+            )
+        )
+        d = _make_dispatcher({"PreToolUse": [_rule("", "x")]}, runner)
+        v = await d.dispatch_pre_tool_use("run_command", {"command": "rm -rf"})
+        assert v.updated_input == {"command": "git status"}
+
+    @pytest.mark.asyncio
+    async def test_payload_enrichment(self):
+        """payload 补齐本体字段：session_id/permission_mode/cwd"""
+        calls = []
+
+        async def runner(command, payload, timeout=None, cwd=None):
+            calls.append(payload)
+            return SimpleNamespace(exit_code=0, stdout="", stderr="", timed_out=False)
+
+        d = HookDispatcher(
+            HookConfig(entries={"PreToolUse": [_rule("", "x")]}),
+            runner=runner,
+            cwd="D:\proj",
+        )
+        await d.dispatch_pre_tool_use("run_command", {}, thread_id="t1")
+        assert calls[0]["session_id"] == "t1"
+        assert calls[0]["cwd"] == "D:\proj"
+        assert "permission_mode" in calls[0]
 
 
 class TestPostToolUse:

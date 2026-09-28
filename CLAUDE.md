@@ -26,6 +26,8 @@
 
 ### 文件操作安全
 
+- `/rewind` 的代码回退依赖 `utils/file_history.py` 会话日志：**只有走 `_atomic_write` 的三个工具（write/edit/force_write）被记录**，run_command 等侧门修改与跨会话修改不在恢复范围（诚实边界，勿对外夸大）；日志同路径只记最早一次、回放即消费；`_atomic_write` 里 `record_before_write` 必须在任何写动作之前，且失败静默（旁路设施不弄断写入）
+
 - `edit_file` 使用 `check_file_write`（非 `check_file_read`），阻止编辑工作区外文件
 - 多工作目录（`/add-dir`）：额外根注册在 `safety._additional_roots`（会话级），`validate_path` 三处 workspace 比较点以 OR 并入；主 workspace 的既有比较逻辑不动，额外根走 `_within_roots`（**必须带 os.sep 守卫**——根 `D:\proj` 不得放行 `D:\projects`）；PROTECTED_PATHS 与穿越检查不因多根放松
 - `web_fetch` 阻断 SSRF：禁止 localhost、私有 IP、link-local、file:// 协议；域名通过 `socket.getaddrinfo()` 预解析 IP 防 DNS 重绑定；手动重定向循环（最多 5 跳），每跳校验目标地址
@@ -40,6 +42,9 @@
 - 子代理禁止 `run_command`、`spawn_agent`、`spawn_parallel`
 
 ### Hooks 与权限约束
+
+- ToolRegistry.execute 裁决链顺序（收敛批次①）：**PreToolUse hook 先于权限门**——hook 可 deny 阻断、`permissionDecision=allow` 免确认（跳过 ask）、`updatedInput` 改写入参（喂给权限匹配与执行）；hook 的 allow 只有前置于权限门才有意义，改顺序前先想清楚
+- `permissionDecision="ask"`（强制确认）v1 不支持，按放行处理（已知分歧点）；payload 带 session_id/permission_mode/cwd，子进程有 `$CLAUDE_PROJECT_DIR`
 
 - Hooks 事件面十事件（PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop/SessionStart/SessionEnd/PreCompact/SubagentStart）；hook 失败/超时不阻断主链路（UserPromptSubmit/SubagentStop 的 exit 2 阻断除外）。尾部四事件均非阻断：SessionStart 的 stdout/`hookSpecificOutput.additionalContext` 注入会话级上下文（repl 存 `_session_hook_context`，每回合与 UserPromptSubmit 上下文合并进 `hook_context`）；SessionEnd/PreCompact/SubagentStart 只触发不判断
 - `AgentState.hook_context` 是**全量替换语义**：`create_turn_increment` 每轮必须带值（空串=清空上一轮注入），act 经 `build_system_messages(hook_context=...)` 前置、不进持久化历史——漏带值会让 checkpoint 沿用旧回合的注入

@@ -63,6 +63,12 @@ def _atomic_write(path: str, content: str) -> None:
 
     This prevents file corruption if the process crashes mid-write.
     """
+    # 收敛批次③：写前记录原始状态（/rewind 代码回退的数据底座）。
+    # 同路径只记最早一次；日志是旁路设施，失败不弄断写入。
+    from ..utils.file_history import record_before_write
+
+    record_before_write(path)
+
     dir_name = os.path.dirname(path) or "."
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
     try:

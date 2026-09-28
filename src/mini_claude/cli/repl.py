@@ -95,6 +95,8 @@ class REPLSession:
         # SessionStart hook 注入的会话级上下文（每回合与 UserPromptSubmit
         # 上下文合并进 hook_context；hook_context 是全量替换语义，每轮必带）
         self._session_hook_context = ""
+        # auto-compact 限频时间戳（冷静期 60s，防止连续压缩空转）
+        self._last_auto_compact_ts = 0.0
 
     def _get_profile_manager(self) -> UserProfileManager:
         """Get or create profile manager."""
@@ -238,6 +240,61 @@ class REPLSession:
         if connected:
             display.console.print(f"[dim]MCP 已连接: {', '.join(connected)}[/]")
 
+    async def _maybe_auto_compact(self, graph) -> None:
+        """auto-compact（收敛批次②）：回合前预算检查，超限即压缩落盘。
+
+        判据复用 act 的 check_budget（同一 warn 阈值，先于 act 的 per-call
+        摘要触发）；压缩复用 /compact 的播种方案（tasks/todos 随迁），压缩
+        成功后会话切到新线程。任何失败静默跳过（下一回合再试），不阻断输入。
+        """
+        import time as _time
+
+        from ..config.settings import settings as _settings
+
+        if not getattr(_settings, "auto_compact_enabled", False):
+            return
+        if self._last_auto_compact_ts and _time.time() - self._last_auto_compact_ts < 60:
+            return  # 限频：一分钟的冷静期，防止连续压缩空转
+
+        from ..agent.nodes._act_helpers import convert_message, setup_token_counter
+
+        try:
+            snap = await graph.aget_state({"configurable": {"thread_id": self.thread_id}})
+        except Exception as e:
+            logger.debug("auto-compact state read failed", error=str(e))
+            return
+        messages = snap.values.get("messages") or []
+        if len(messages) < 6:
+            return
+
+        token_counter = setup_token_counter()
+        litellm_messages = [convert_message(m) for m in messages]
+        try:
+            check = token_counter.check_budget(
+                litellm_messages, reserved_output=_settings.token_reserved_output
+            )
+        except Exception as e:
+            logger.debug("auto-compact budget check failed", error=str(e))
+            return
+        if check.get("ok") and check.get("action") != "warn":
+            return
+
+        try:
+            from .commands.compact_handler import compact_session
+
+            new_tid, report = await compact_session(graph, self.thread_id, trigger="auto")
+        except Exception as e:
+            logger.warning("auto-compact failed", error=str(e))
+            return
+        if new_tid is None:
+            return
+
+        self.thread_id = new_tid
+        self._rewind_configurable = None
+        self._last_auto_compact_ts = _time.time()
+        display.console.print(f"[yellow][auto-compact] {report}[/]")
+        display.console.print(f"[dim]会话已切换到新线程 {new_tid}（持久历史已缩减）[/]")
+
     async def _run_graph_loop(self):
         """REPL 主循环本体；资源清理由 run_graph 的 finally 统一负责。"""
         from ..agent.graph import get_agent_graph
@@ -324,6 +381,11 @@ class REPLSession:
                     effective_input = f"{user_input}{skill_context}"
                     self._active_skill = None
                     self._active_skill_args = ""
+
+                # auto-compact（收敛批次②）：回合前预算检查，超限即压缩落盘
+                # （播种新线程）。act 内的摘要只作用于当次 prompt，这里才是
+                # 真正缩减持久历史的地方（对齐 Claude Code auto-compact）。
+                await self._maybe_auto_compact(graph)
 
                 # UserPromptSubmit hook（P5 对齐）：exit 2 / decision=block 拦截本轮
                 # 输入（reason 展示给用户）；stdout / additionalContext 注入回合上下文

@@ -104,6 +104,12 @@ async def test_web_fetch_concurrent_not_blocking(monkeypatch):
     # 预热默认线程池：SSRF 检查经 asyncio.to_thread 卸载，冷启动首个线程有
     # ~0.2s 抖动，不预热会污染并发计时（与被测行为无关的测试噪声）
     await asyncio.to_thread(int)
+    # 预热共享 httpx client：构造会同步加载 SSL 证书库（Windows ~0.2-0.4s，
+    # 随磁盘/Defender 状态漂移），冷构造恰好落在首个 execute 的阻塞段会把
+    # 两次并发 sleep 串行化（实测 0.81s 假阳性）——与被测的并发语义无关
+    from mini_claude.tools._http import get_shared_client
+
+    get_shared_client()
     start = time.perf_counter()
     results = await asyncio.gather(
         tool.execute("https://example.com/a"),

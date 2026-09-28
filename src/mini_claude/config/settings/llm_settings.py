@@ -80,6 +80,10 @@ class LLMSettings(BaseSettings):
     token_warn_ratio: float = Field(default=0.55)
     token_strategy: str = Field(default="summarize")
     token_reserved_output: int = Field(default=4096)
+    # auto-compact（收敛批次②）：REPL 回合前预算超限即压缩并落盘（播种新线程）。
+    # act 内的 handle_token_budget 摘要只作用于当次 prompt，不回写 checkpoint——
+    # 真正缩减持久历史只有这条路（对齐 Claude Code auto-compact）。
+    auto_compact_enabled: bool = Field(default=True)
 
     # LLM output settings
     llm_max_tokens: int = Field(default=16384)  # Max output tokens for LLM calls

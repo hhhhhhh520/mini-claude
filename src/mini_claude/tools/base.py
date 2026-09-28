@@ -196,7 +196,9 @@ class ToolRegistry:
     async def execute(self, name: str, params: Dict[str, Any]) -> str:
         """Execute a tool by name with audit logging, caching, dependency checking, and tracing.
 
-        P3 单一裁决点：权限门（deny/ask）→ PreToolUse hook → 执行 → PostToolUse hook。
+        P3 单一裁决点 + 收敛批次①：PreToolUse hook（可 deny/allow/updatedInput）
+        → 权限门（deny/ask；hook allow 跳过 ask）→ 执行 → PostToolUse hook。
+        hook 的 updatedInput 先行改写入参，喂给权限匹配与执行。
         子代理跳过双门（子代理有自己的工具白名单体系，且不在子代理中执行用户 hook）。
         """
         from ..utils.logger import get_logger, get_audit_logger
@@ -211,8 +213,25 @@ class ToolRegistry:
 
         subagent = is_subagent_mode()
 
-        # --- 权限门（P3-2）：deny 拦下 / ask 抛确认异常 ---
+        # --- PreToolUse hook（先于权限门：allow 免确认、updatedInput 改写入参）---
+        hook_allow = False
         if not subagent:
+            hooks = _gate_hook_dispatcher()
+            if hooks is not None:
+                verdict = await hooks.dispatch_pre_tool_use(name, params)
+                if verdict.blocked:
+                    logger.info("tool blocked by PreToolUse hook", tool_name=name)
+                    return f"Error: 被 PreToolUse hook 阻断：{verdict.blocked}"
+                if verdict.updated_input is not None:
+                    logger.info(
+                        "tool input rewritten by PreToolUse hook",
+                        tool_name=name,
+                    )
+                    params = verdict.updated_input
+                hook_allow = verdict.allow
+
+        # --- 权限门（P3-2）：deny 拦下 / ask 抛确认异常；hook allow 免确认 ---
+        if not subagent and not hook_allow:
             perm = _gate_permission_manager()
             if perm is not None:
                 decision = perm.decide(name, params)
@@ -236,15 +255,6 @@ class ToolRegistry:
         tool = self.get(name)
         if not tool:
             raise ValueError(f"Unknown tool: {name}")
-
-        # --- PreToolUse hook（P3-1）：阻断则不执行 ---
-        if not subagent:
-            hooks = _gate_hook_dispatcher()
-            if hooks is not None:
-                block_reason = await hooks.dispatch_pre_tool_use(name, params)
-                if block_reason:
-                    logger.info("tool blocked by PreToolUse hook", tool_name=name)
-                    return f"Error: 被 PreToolUse hook 阻断：{block_reason}"
 
         # Check dependencies before execution
         graph = self._get_dependency_graph()

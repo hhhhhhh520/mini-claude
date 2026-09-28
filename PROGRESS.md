@@ -375,6 +375,52 @@
   被迫走真实 provider 分支（无 key 即炸）——图级 fake 测试统一旁路降级管理器
 - E2E 里按快照内容（而非列表序号）选取 fork 边界，避免对 checkpoint 排序的隐式依赖
 
+## 2026-09-28 对标收敛批次①：差距分析 Top3 落地（updatedInput / auto-compact 落盘 / rewind 代码回退）
+
+### 背景
+差距分析（对话记录）锁定"已有功能的深度差距"性价比前三：
+①hook 能拦不能改/不能放；②auto-compact 只作用于当次 prompt 不落盘；
+③/rewind 只回退对话不回退代码。本批次全部收敛。
+
+### 交付
+- **① PreToolUse 结构化裁决**（`HookVerdict{blocked, allow, updated_input}`）：
+  - stdout JSON `hookSpecificOutput.permissionDecision` 三态——deny 阻断、
+    **allow 免确认**（跳过权限 ask）、ask v1 不支持按放行（已知分歧点）；
+    `updatedInput` **改写工具入参**，喂给权限匹配与执行（base.py 裁决链改为
+    hook 前置于权限门——hook allow 才有意义）
+  - payload 补本体字段：session_id/permission_mode/cwd；runner 注入
+    `$CLAUDE_PROJECT_DIR`
+- **② auto-compact 落盘**：`compact_session()` 从 CompactHandler 提取为共用
+  核心；REPL 每回合前 `_maybe_auto_compact`——check_budget 超 warn 阈值即
+  压缩播种新线程（tasks/todos 随迁，ISSUE-028 方案复用），60s 冷静期限频，
+  `AUTO_COMPACT_ENABLED` 开关（默认开）。act 内 per-call 摘要保留为兜底
+- **③ /rewind 代码回退**：`utils/file_history.py` 会话级文件日志——
+  `_atomic_write`（write/edit/force_write 唯一汇聚点）写前记录原始状态，
+  同路径只记最早一次；`/rewind <n> [chat|code|both]`（默认 chat 保持兼容）
+  按快照 created_at 时间戳回放：改写恢复、新建删除、失败条目留待重试；
+  回放即消费（单向回退）。诚实边界：进程内日志，跨会话与 run_command
+  侧门修改不在恢复范围（模块 docstring 声明）
+
+### 顺手修的测试健壮性
+`test_web_fetch_concurrent_not_blocking` 假阳性（0.81s 假串行）：共享
+httpx client 冷构造的 SSL 证书库加载（0.2-0.4s，随磁盘/Defender 状态漂移）
+恰好落在首个 execute 的阻塞段，把并发 sleep 串行化。干净 HEAD 复现排除
+回归后，测试计时前预热共享 client（与 to_thread 预热同理）。三连跑全绿。
+
+### 验证
+- 定向：hooks+registry+compact+auto-compact+rewind+file_history 471→477 全绿
+- 全量两层四场景 + ruff：CI 筛选层 **2083 passed / 40 skipped**（收集 2164，
+  正常与不可达×严格 msgpack 一致）、integration 层 **152 passed / 1 skipped**、
+  ruff check/format 全绿
+
+### 实踩教训
+- `await x().y` 优先级：先取属性再 await——迁移断言要加括号
+- LangGraph 快照时间戳在 `StateSnapshot.created_at`（文档化字段），
+  metadata 里没有可靠的 ts；边界取不到时兜底"当前时间"= 安全侧（不恢复）
+- anyio 的上一课再现：同族"平台约束"（cancel scope 同任务 / SSL 构造阻塞）
+  单元替身测不出来，只能实测暴露
+- 测试的计时断言要把"被测行为之外的一切成本"预热隔离，否则阈值没有余量
+
 ## 2026-09-28 批次 A+B 全功能实测（脚本驱动真实 REPL）——抓到并修复 2 个真实缺陷
 
 ### 实测方式

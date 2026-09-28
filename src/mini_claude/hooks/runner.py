@@ -47,6 +47,9 @@ async def run_hook_command(
     """
     env = dict(os.environ)
     env.update(_CHILD_UTF8_ENV)
+    # 对齐 Claude Code：hook 脚本可经 $CLAUDE_PROJECT_DIR 定位项目根
+    if cwd:
+        env["CLAUDE_PROJECT_DIR"] = str(cwd)
 
     try:
         proc = await asyncio.create_subprocess_shell(

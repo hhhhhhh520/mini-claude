@@ -17,7 +17,7 @@ aupdate_state 走同一 reducer 只能**拼接**，永远无法缩减持久化�
 
 import json
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from .base import CommandHandler, CommandResult
 
@@ -83,6 +83,81 @@ def _litellm_to_langchain(m: Dict[str, Any]):
     return HumanMessage(content=str(content))
 
 
+async def compact_session(
+    graph,
+    thread_id: str,
+    custom_instructions: str = "",
+    trigger: str = "manual",
+) -> Tuple[Optional[str], str]:
+    """压缩核心（/compact 与 auto-compact 共用，收敛批次②提取）。
+
+    做 graph 级的事：PreCompact hook → LLM 摘要 → 修剪孤儿 tool 结果 →
+    播种新线程（messages + 非空 tasks/todos 随迁）。
+
+    Returns:
+        (new_thread_id, 报告文本)；new_thread_id=None 表示未压缩
+        （报告说明原因）。调用方负责把会话切到新线程。
+    """
+    cfg = {"configurable": {"thread_id": thread_id}}
+    snap = await graph.aget_state(cfg)
+    messages = list(snap.values.get("messages") or [])
+    if len(messages) < _MIN_MESSAGES_TO_COMPACT:
+        return None, f"当前会话历史 {len(messages)} 条消息，无需压缩。"
+
+    # PreCompact hook：压缩前触发，只通知不判断
+    try:
+        from ...hooks.dispatcher import get_hook_dispatcher
+
+        await get_hook_dispatcher().dispatch_pre_compact(
+            trigger=trigger, custom_instructions=custom_instructions, thread_id=thread_id
+        )
+    except Exception:
+        pass
+
+    from ...agent.nodes._act_helpers import convert_message, setup_token_counter
+    from ...agent.nodes._shared import llm_provider
+
+    token_counter = setup_token_counter()
+    litellm_messages = [convert_message(m) for m in messages]
+    before_tokens = token_counter.count_messages_tokens(litellm_messages)
+
+    async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:
+        return await llm_provider.chat(messages=messages, **kwargs)
+
+    try:
+        summarized, _summary_text = await token_counter.summarize_messages(
+            litellm_messages,
+            llm_chat_func=llm_chat_for_summary,
+            custom_instructions=custom_instructions,
+        )
+    except Exception as e:
+        raise RuntimeError(f"压缩失败：{e}") from e
+
+    if summarized == litellm_messages:
+        return None, "历史不足以压缩（摘要引擎未缩短），保持原样。"
+
+    summarized = _drop_orphan_tool_results(summarized)
+    compressed = [_litellm_to_langchain(m) for m in summarized]
+    after_tokens = token_counter.count_messages_tokens(summarized)
+
+    # 播种新线程：空线程首次 update 即纯替换（add-reducer 对空列表）。
+    # tasks/todos 是 state 里的跨回合字段，必须随迁——只写 messages 会让
+    # 压缩后清单静默清空（实际测试抓到的缺陷，有回归测试锁定）。
+    new_tid = f"{thread_id}_c{uuid.uuid4().hex[:8]}"
+    seed = {"messages": compressed}
+    for field in ("tasks", "todos"):
+        value = snap.values.get(field)
+        if value:
+            seed[field] = value
+    await graph.aupdate_state({"configurable": {"thread_id": new_tid}}, seed)
+
+    return (
+        new_tid,
+        f"已压缩：{len(messages)} 条消息 → {len(compressed)} 条，"
+        f"tokens 约 {before_tokens} → {after_tokens}。",
+    )
+
+
 class CompactHandler(CommandHandler):
     """手动压缩会话历史命令。"""
 
@@ -91,90 +166,37 @@ class CompactHandler(CommandHandler):
     async def handle(self, ctx) -> CommandResult:
         graph = _get_session_graph()
         tid = ctx.thread_id
-        cfg = {"configurable": {"thread_id": tid}}
-
-        try:
-            snap = await graph.aget_state(cfg)
-        except Exception as e:
-            return CommandResult(handled=True, error=f"读取会话状态失败：{e}")
-
-        messages = list(snap.values.get("messages") or [])
-        if len(messages) < _MIN_MESSAGES_TO_COMPACT:
-            return CommandResult(
-                handled=True,
-                message=f"当前会话历史 {len(messages)} 条消息，无需压缩（/compact 适用于长对话）。",
-            )
-
         custom_instructions = (ctx.args or "").strip()
 
-        # PreCompact hook（manual）：压缩前触发，只通知不判断
         try:
-            from ...hooks.dispatcher import get_hook_dispatcher
-
-            await get_hook_dispatcher().dispatch_pre_compact(
-                trigger="manual", custom_instructions=custom_instructions, thread_id=tid
-            )
-        except Exception:
-            pass
-
-        from ...agent.nodes._act_helpers import convert_message, setup_token_counter
-        from ...agent.nodes._shared import llm_provider
-
-        token_counter = setup_token_counter()
-        litellm_messages = [convert_message(m) for m in messages]
-        before_tokens = token_counter.count_messages_tokens(litellm_messages)
-
-        async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:
-            return await llm_provider.chat(messages=messages, **kwargs)
-
-        try:
-            summarized, _summary_text = await token_counter.summarize_messages(
-                litellm_messages,
-                llm_chat_func=llm_chat_for_summary,
-                custom_instructions=custom_instructions,
+            new_tid, report = await compact_session(
+                graph, tid, custom_instructions=custom_instructions, trigger="manual"
             )
         except Exception as e:
-            return CommandResult(handled=True, error=f"压缩失败：{e}")
+            return CommandResult(handled=True, error=str(e))
 
-        if summarized == litellm_messages:
-            return CommandResult(
-                handled=True, message="历史不足以压缩（摘要引擎未缩短），保持原样。"
-            )
-
-        summarized = _drop_orphan_tool_results(summarized)
-        compressed = [_litellm_to_langchain(m) for m in summarized]
-        after_tokens = token_counter.count_messages_tokens(summarized)
-
-        # 播种新线程：空线程首次 update 即纯替换（add-reducer 对空列表）。
-        # tasks/todos 是 state 里的跨回合字段，必须随迁——只写 messages 会让
-        # 压缩后清单静默清空（实际测试抓到的缺陷，有回归测试锁定）。
-        new_tid = f"{tid}_c{uuid.uuid4().hex[:8]}"
-        seed = {"messages": compressed}
-        for field in ("tasks", "todos"):
-            value = snap.values.get(field)
-            if value:
-                seed[field] = value
-        try:
-            await graph.aupdate_state({"configurable": {"thread_id": new_tid}}, seed)
-        except Exception as e:
-            return CommandResult(handled=True, error=f"写入压缩历史失败：{e}")
+        if new_tid is None:
+            return CommandResult(handled=True, message=report)
 
         # 会话切到新线程；旧线程的 rewind 游标跨线程无效，必须作废
         ctx.session.thread_id = new_tid
         ctx.session._rewind_configurable = None
-        ctx.session.messages = [
-            {
-                "role": "assistant" if getattr(m, "type", "") == "ai" else "user",
-                "content": str(getattr(m, "content", "")),
-            }
-            for m in compressed
-        ]
+        try:
+            snap = await graph.aget_state({"configurable": {"thread_id": new_tid}})
+            ctx.session.messages = [
+                {
+                    "role": "assistant" if getattr(m, "type", "") == "ai" else "user",
+                    "content": str(getattr(m, "content", "")),
+                }
+                for m in (snap.values.get("messages") or [])
+            ]
+        except Exception:
+            pass
 
         return CommandResult(
             handled=True,
             message=(
-                f"已压缩：{len(messages)} 条消息 → {len(compressed)} 条，"
-                f"tokens 约 {before_tokens} → {after_tokens}。\n"
+                f"{report}\n"
                 f"会话已切换到新线程 {new_tid}（旧线程历史保留在 checkpoint 链中）。"
                 + (f"\n压缩指令已生效：{custom_instructions}" if custom_instructions else "")
             ),
