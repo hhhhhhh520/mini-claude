@@ -145,3 +145,79 @@ class TestBuildSystemMessagesInjection:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestImports:
+    """@import 语法（P5 对齐 Claude Code）：@path / @./x / @~/x / @/abs，
+    嵌套跟随最多 5 跳，环与缺失文件安全。"""
+
+    def test_relative_import_expanded(self, home, workspace):
+        (workspace / "inc.md").write_text("IMPORTED-RULE", encoding="utf-8")
+        (workspace / "CLAUDE.md").write_text("HEADER\n- @./inc.md\nTAIL", encoding="utf-8")
+        combined = load_claude_md(str(workspace), home_dir=str(home))
+        assert "IMPORTED-RULE" in combined
+        assert "HEADER" in combined and "TAIL" in combined
+
+    def test_bare_at_token_relative(self, home, workspace):
+        (workspace / "inc.md").write_text("BARE-IMPORTED", encoding="utf-8")
+        (workspace / "CLAUDE.md").write_text("@inc.md", encoding="utf-8")
+        assert "BARE-IMPORTED" in load_claude_md(str(workspace), home_dir=str(home))
+
+    def test_nested_imports_followed(self, home, workspace):
+        (workspace / "b.md").write_text("LEVEL-B", encoding="utf-8")
+        (workspace / "a.md").write_text("LEVEL-A\n@./b.md", encoding="utf-8")
+        (workspace / "CLAUDE.md").write_text("@./a.md", encoding="utf-8")
+        combined = load_claude_md(str(workspace), home_dir=str(home))
+        assert "LEVEL-A" in combined and "LEVEL-B" in combined
+
+    def test_import_depth_capped_at_5_hops(self, home, workspace):
+        # f1 ←CLAUDE.md；逐级 @ 引用：第 5 跳（f5）在场，第 6 跳（f6）不再跟随
+        (workspace / "CLAUDE.md").write_text("@./f1.md", encoding="utf-8")
+        for i in range(1, 8):
+            nxt = f"@./f{i + 1}.md" if i < 7 else ""
+            (workspace / f"f{i}.md").write_text(
+                f"DEPTH{i}" + (f"\n{nxt}" if nxt else ""), encoding="utf-8"
+            )
+        combined = load_claude_md(str(workspace), home_dir=str(home))
+        assert "DEPTH4" in combined and "DEPTH5" in combined
+        assert "DEPTH6" not in combined and "DEPTH7" not in combined
+
+    def test_tilde_home_import(self, home, workspace):
+        (home / "personal.md").write_text("HOME-IMPORTED", encoding="utf-8")
+        (workspace / "CLAUDE.md").write_text("@~/personal.md", encoding="utf-8")
+        assert "HOME-IMPORTED" in load_claude_md(str(workspace), home_dir=str(home))
+
+    def test_absolute_import(self, home, workspace, tmp_path):
+        (tmp_path / "abs.md").write_text("ABS-IMPORTED", encoding="utf-8")
+        (workspace / "CLAUDE.md").write_text(f"@{tmp_path / 'abs.md'}", encoding="utf-8")
+        assert "ABS-IMPORTED" in load_claude_md(str(workspace), home_dir=str(home))
+
+    def test_cycle_does_not_hang(self, home, workspace):
+        (workspace / "a.md").write_text("CYC-A\n@./b.md", encoding="utf-8")
+        (workspace / "b.md").write_text("CYC-B\n@./a.md", encoding="utf-8")
+        (workspace / "CLAUDE.md").write_text("@./a.md", encoding="utf-8")
+        combined = load_claude_md(str(workspace), home_dir=str(home))
+        assert "CYC-A" in combined and "CYC-B" in combined
+
+    def test_missing_import_kept_verbatim(self, home, workspace):
+        (workspace / "CLAUDE.md").write_text("KEEP @./nope.md AS-IS", encoding="utf-8")
+        assert "KEEP @./nope.md AS-IS" in load_claude_md(str(workspace), home_dir=str(home))
+
+    def test_code_file_import_raw(self, home, workspace):
+        (workspace / "util.py").write_text("def helper():\n    return 1", encoding="utf-8")
+        (workspace / "CLAUDE.md").write_text("参考：@./util.py", encoding="utf-8")
+        combined = load_claude_md(str(workspace), home_dir=str(home))
+        assert "def helper():" in combined
+
+
+class TestClaudeLocalMd:
+    def test_project_local_loaded_after_project(self, home, workspace):
+        (workspace / "CLAUDE.md").write_text("PROJ-PART", encoding="utf-8")
+        (workspace / "CLAUDE.local.md").write_text("LOCAL-PART", encoding="utf-8")
+        combined = load_claude_md(str(workspace), home_dir=str(home))
+        assert "LOCAL-PART" in combined
+        assert combined.index("PROJ-PART") < combined.index("LOCAL-PART")
+
+    def test_local_missing_is_fine(self, home, workspace):
+        (workspace / "CLAUDE.md").write_text("ONLY-PROJ", encoding="utf-8")
+        assert "ONLY-PROJ" in load_claude_md(str(workspace), home_dir=str(home))

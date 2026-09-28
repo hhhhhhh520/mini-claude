@@ -4,7 +4,7 @@
 - PreToolUse：exit 0 放行；exit 2 阻断（stderr 为原因）；stdout JSON
   {"decision":"block","reason":...} 也阻断；其他非零/超时 = 非阻断错误（放行+记日志）
 - PostToolUse：stdout JSON {"replacement": "..."} 替换工具输出；不可阻断
-- Stop：只触发不判断
+- Stop：exit 2 / decision=block 阻断回合结束（原因喂回续跑，单回合硬顶一次）
 - UserPromptSubmit：exit 2 / decision=block 阻断该输入（stderr/reason 展示给用户）；
   exit 0 纯 stdout 或 hookSpecificOutput.additionalContext 注入回合上下文
 - Notification：只触发不判断（确认请求等需用户注意的时刻）
@@ -108,16 +108,51 @@ class HookDispatcher:
                     pass
         return replacement
 
-    async def dispatch_stop(self, reason: str, last_message: str, thread_id: str = "") -> None:
-        """Stop 事件：只触发不判断，任何异常都吞掉。"""
+    async def dispatch_stop(
+        self,
+        reason: str,
+        last_message: str,
+        thread_id: str = "",
+        stop_hook_active: bool = False,
+    ) -> Tuple[bool, str]:
+        """Stop 事件：exit 2 / decision=block → 阻断回合结束（原因喂回续跑）。
+
+        stop_hook_active：本次停止是否已由上一次 Stop hook 续跑导致——
+        传入 payload 供 hook 自查（对齐 Claude Code 防死循环约定），
+        repl 侧另有"单回合只续跑一次"的硬顶。
+        """
         if not getattr(settings, "hooks_enabled", False):
-            return
+            return False, ""
         try:
-            await self._run_all(
-                "Stop", "", {"reason": reason, "last_message": last_message, "thread_id": thread_id}
+            outcomes = await self._run_all(
+                "Stop",
+                "",
+                {
+                    "reason": reason,
+                    "last_message": last_message,
+                    "thread_id": thread_id,
+                    "stop_hook_active": stop_hook_active,
+                },
             )
         except Exception as e:
             logger.warning("Stop hook dispatch failed", error=str(e))
+            return False, ""
+        for outcome in outcomes:
+            if outcome.timed_out:
+                logger.warning("Stop hook timed out")
+                continue
+            if outcome.stdout.strip().startswith("{"):
+                try:
+                    data = json.loads(outcome.stdout)
+                except json.JSONDecodeError:
+                    data = {}
+                if data.get("decision") == "block":
+                    return True, str(data.get("reason", "被 Stop hook 阻断"))
+            if outcome.exit_code == 2:
+                return True, outcome.stderr.strip() or "被 Stop hook 阻断"
+            if outcome.exit_code != 0:
+                logger.warning("Stop hook non-blocking error", exit_code=outcome.exit_code)
+        return False, ""
 
     async def dispatch_user_prompt_submit(
         self, prompt: str, thread_id: str = ""

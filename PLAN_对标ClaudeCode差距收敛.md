@@ -162,7 +162,7 @@
 - ~~web 三件套异步化~~ 已完成（2026-09-28：httpx 共享 client + ddgs to_thread；注意 AsyncClient 构造的 SSL 证书库同步加载 ~0.2s，必须用进程级共享实例）
 - **Task 系统 v2**（本体正在用 `isTodoV2Enabled()` 把 Todo 升级为 Task：TaskCreate/List/Update + 子代理任务委托）
 - `ScheduleCronTool` 定时任务、Agent Teams
-- CLAUDE.md `@import`、MCP resources/OAuth、扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
+- ~~CLAUDE.md `@import`~~ 已完成（2026-09-28：@path/@./x/@~/x/@abs 五跳防环 + CLAUDE.local.md）；MCP resources/OAuth、扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
 
 ---
 

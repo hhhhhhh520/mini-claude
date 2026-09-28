@@ -197,3 +197,57 @@ class TestSubagentStop:
         d = HookDispatcher(_cfg("SubagentStop"), runner=run)
         blocked, reason = await d.dispatch_subagent_stop("a1", "写模块", "done", "t")
         assert blocked is True and "结果不完整" in reason
+
+
+class TestStopBlock:
+    """Stop hook 阻断续跑（P5 对齐 Claude Code）：exit 2 / decision=block 阻断回合结束"""
+
+    @pytest.mark.asyncio
+    async def test_exit2_blocks_stop(self, hooks_on):
+        run, calls = _runner(
+            [SimpleNamespace(exit_code=2, stdout="", stderr="还有收尾没做\n", timed_out=False)]
+        )
+        d = HookDispatcher(_cfg("Stop"), runner=run)
+        blocked, reason = await d.dispatch_stop(
+            "task_complete", "回复内容", thread_id="t", stop_hook_active=False
+        )
+        assert blocked is True and "还有收尾没做" in reason
+        assert calls[0]["stop_hook_active"] is False
+
+    @pytest.mark.asyncio
+    async def test_payload_carries_stop_hook_active_flag(self, hooks_on):
+        run, calls = _runner([])
+        d = HookDispatcher(_cfg("Stop"), runner=run)
+        blocked, _ = await d.dispatch_stop(
+            "task_complete", "回复", thread_id="t", stop_hook_active=True
+        )
+        assert blocked is False
+        assert calls[0]["stop_hook_active"] is True
+
+    @pytest.mark.asyncio
+    async def test_exit0_allows_stop(self, hooks_on):
+        run, _ = _runner([SimpleNamespace(exit_code=0, stdout="", stderr="", timed_out=False)])
+        d = HookDispatcher(_cfg("Stop"), runner=run)
+        blocked, reason = await d.dispatch_stop("task_complete", "回复", thread_id="t")
+        assert blocked is False and reason == ""
+
+    @pytest.mark.asyncio
+    async def test_json_decision_block(self, hooks_on):
+        out = SimpleNamespace(
+            exit_code=0,
+            stdout=json.dumps({"decision": "block", "reason": "任务没做完"}),
+            stderr="",
+            timed_out=False,
+        )
+        run, _ = _runner([out])
+        d = HookDispatcher(_cfg("Stop"), runner=run)
+        blocked, reason = await d.dispatch_stop("task_complete", "回复", thread_id="t")
+        assert blocked is True and "任务没做完" in reason
+
+    @pytest.mark.asyncio
+    async def test_hooks_disabled_allows_stop(self, monkeypatch):
+        monkeypatch.setattr(settings, "hooks_enabled", False)
+        run, calls = _runner([])
+        d = HookDispatcher(_cfg("Stop"), runner=run)
+        blocked, reason = await d.dispatch_stop("task_complete", "回复", thread_id="t")
+        assert blocked is False and calls == []

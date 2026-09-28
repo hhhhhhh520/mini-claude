@@ -336,37 +336,64 @@ class REPLSession:
                         configurable.update(self._rewind_configurable)
                         self._rewind_configurable = None
 
-                    result = await graph.ainvoke(
-                        turn_state,
-                        config={
-                            "configurable": configurable,
-                            "recursion_limit": 50,
-                        },
-                    )
-
-                    self._process_result(result)
-
-                    if not display._streamed:
-                        display.agent_message(self._get_response_text(result))
-
-                    if settings.auto_save_enabled:
-                        self._auto_save_session(settings)
-
-                    # Stop hook（P3-1）：回合结束触发，只通知不阻断
-                    try:
-                        from ..hooks.dispatcher import get_hook_dispatcher
-
-                        stop_reason = result.get("stop_reason")
-                        reason = (
-                            stop_reason.value if hasattr(stop_reason, "value") else "task_complete"
+                    # Stop hook 阻断续跑（P5 对齐 Claude Code）：exit 2 /
+                    # decision=block → 原因作为继续指令喂回图，自动再跑一回合。
+                    # 硬顶：单回合只续跑一次（stop_hook_active），防 hook 死循环；
+                    # 续跑回合的 Stop hook 仍触发（payload 带 stop_hook_active=True
+                    # 供 hook 自查），但不再续跑。
+                    stop_hook_active = False
+                    while True:
+                        result = await graph.ainvoke(
+                            turn_state,
+                            config={
+                                "configurable": configurable,
+                                "recursion_limit": 50,
+                            },
                         )
-                        await get_hook_dispatcher().dispatch_stop(
-                            reason=reason,
-                            last_message=self._get_response_text(result),
-                            thread_id=self.thread_id,
-                        )
-                    except Exception as stop_err:
-                        logger.debug("stop hook failed", error=str(stop_err))
+
+                        self._process_result(result)
+
+                        if not display._streamed:
+                            display.agent_message(self._get_response_text(result))
+
+                        if settings.auto_save_enabled:
+                            self._auto_save_session(settings)
+
+                        # Stop hook：回合结束触发
+                        try:
+                            from ..hooks.dispatcher import get_hook_dispatcher
+
+                            stop_reason = result.get("stop_reason")
+                            reason = (
+                                stop_reason.value
+                                if hasattr(stop_reason, "value")
+                                else "task_complete"
+                            )
+                            blocked, hook_reason = await get_hook_dispatcher().dispatch_stop(
+                                reason=reason,
+                                last_message=self._get_response_text(result),
+                                thread_id=self.thread_id,
+                                stop_hook_active=stop_hook_active,
+                            )
+                        except Exception as stop_err:
+                            logger.debug("stop hook failed", error=str(stop_err))
+                            blocked, hook_reason = False, ""
+
+                        if blocked and not stop_hook_active:
+                            stop_hook_active = True
+                            from rich.markup import escape
+
+                            display.console.print(
+                                f"[yellow]Stop hook 阻断回合结束，自动续跑："
+                                f"{escape(hook_reason)}[/]"
+                            )
+                            display.show_thinking()
+                            turn_state = create_turn_increment(
+                                f"Stop hook 阻断回合结束，请继续完成任务：{hook_reason}",
+                                thread_id=self.thread_id,
+                            )
+                            continue
+                        break
 
                 except Exception as e:
                     from rich.markup import escape

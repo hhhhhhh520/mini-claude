@@ -23,7 +23,7 @@
 - **工具降级**：连续失败 3 次自动跳过工具，10 分钟后自动恢复
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
 - **任务清单**：`todo_write` 维护会话 todo，多步任务进度实时渲染（对齐 Claude Code TodoWrite）
-- **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md` 与工作区 `CLAUDE.md` 作为持久约定（`CLAUDE_MD_ENABLED` 可关）
+- **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md`、工作区 `CLAUDE.md` 与 `CLAUDE.local.md` 作为持久约定；支持 `@path` 引用展开（5 跳防环，含代码文件）（`CLAUDE_MD_ENABLED` 可关）
 - **MCP 支持**：接入 Model Context Protocol 服务器（stdio），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道（对齐 Claude Code 生态）
 - **Hooks**：PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop 六事件（对齐 Claude Code 事件面），用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换 / additionalContext 注入），超时强杀
 - **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则（glob 匹配主参数），deny > ask > allow > 模式默认
