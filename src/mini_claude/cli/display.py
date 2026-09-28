@@ -209,6 +209,32 @@ class AgentDisplay:
             else:
                 self.console.print(f"  [dim]○[/] {content}")
 
+    def show_tasks(self, tasks: List[dict]):
+        """Display the v2 task list (TaskCreate/Update/List/Get).
+
+        task_create/task_update 执行当场渲染，内容是 LLM 生成的文本，
+        必须 escape（同 show_todos 的 ISSUE-020 教训）。
+        """
+        if tasks is None:
+            return
+        if not tasks:
+            self.console.print("[dim][Tasks] 任务清单为空[/]")
+            return
+        self.console.print("[bold cyan][Tasks][/]")
+        for t in tasks:
+            tid = escape(str(t.get("id", "?")))
+            subject = escape(str(t.get("subject", "")))
+            status = t.get("status", "pending")
+            owner = t.get("owner")
+            suffix = f" [dim]（owner: {escape(str(owner))}）[/]" if owner else ""
+            if status == "completed":
+                self.console.print(f"  [green]✓ #{tid}[/] [dim]{subject}[/]{suffix}")
+            elif status == "in_progress":
+                label = t.get("active_form") or subject
+                self.console.print(f"  [yellow]→ #{tid}[/] [bold]{escape(str(label))}[/]{suffix}")
+            else:
+                self.console.print(f"  [dim]○ #{tid}[/] {subject}{suffix}")
+
     def show_sub_agents(self, agents: Dict[str, dict]):
         """Display sub-agent status panel."""
         if not agents:

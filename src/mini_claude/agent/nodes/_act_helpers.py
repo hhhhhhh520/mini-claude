@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
@@ -272,6 +272,8 @@ async def execute_single_tool(
     trace_tool_call,
     new_messages: List,
     tool_call_id: str = "",
+    tasks: Optional[List[Dict]] = None,
+    state_extras: Optional[Dict] = None,
 ) -> Tuple[List, Dict]:
     """Execute a single tool call.
 
@@ -288,6 +290,10 @@ async def execute_single_tool(
         trace_tool_call: Trace function for tool calls
         new_messages: List to append result messages to
         tool_call_id: 对应 assistant.tool_calls 的 id（协议配对用）
+        tasks: 当前 state.tasks（Task v2 工具的变更基线；None 时视为空清单）
+        state_extras: 调用方（_execute_tools）的状态增量收集器——task 工具的
+            变更写进 ``state_extras["tasks"]``（全量替换语义，与 todo_write
+            的 todos 同通道），不影响返回值契约（不触发早退）
 
     Returns:
         Tuple of (updated_new_messages, state_update or None if should continue)
@@ -313,6 +319,53 @@ async def execute_single_tool(
                 )
             )
             return new_messages, None
+
+    # Task v2 工具（task_create/update/list/get）：变更基线来自 state.tasks
+    # （调用方传入），产物走 state_extras 全量替换回 state——工具拿不到
+    # state，这是既有架构的写入通道（todo_write 先例）。同时把基线同步给
+    # 模块级 store（ask 模式的唯一视图；act 每轮覆盖，rewind 分叉安全）。
+    if tool_name in ("task_create", "task_update", "task_list", "task_get"):
+        from ...tools import tasks as tasks_mod
+
+        baseline = list(tasks or [])
+        tasks_mod.set_session_tasks(baseline)
+
+        if tool_name == "task_create":
+            result_tasks, out, err = tasks_mod.apply_task_create(baseline, tool_args)
+        elif tool_name == "task_update":
+            result_tasks, out, err = tasks_mod.apply_task_update(baseline, tool_args)
+        elif tool_name == "task_list":
+            result_tasks, out, err = baseline, tasks_mod.apply_task_list(baseline), None
+        else:
+            out, err = tasks_mod.apply_task_get(baseline, tool_args.get("task_id", ""))
+            result_tasks = baseline
+
+        if err:
+            logger.warning("Task tool failed", tool=tool_name, error=err)
+            new_messages.append(
+                ToolMessage(
+                    content=err,
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                    status="error",
+                )
+            )
+            metrics_collector.record_tool_call(tool_name, success=False)
+            return new_messages, None
+
+        if state_extras is not None and result_tasks is not baseline:
+            state_extras["tasks"] = result_tasks
+            tasks_mod.set_session_tasks(result_tasks)
+        new_messages.append(
+            ToolMessage(
+                content=str(out),
+                name=tool_name,
+                tool_call_id=tool_call_id,
+                status="success",
+            )
+        )
+        metrics_collector.record_tool_call(tool_name, success=True)
+        return new_messages, None
 
     # Validate required parameters
     if tool_name in ["write_file", "edit_file"]:

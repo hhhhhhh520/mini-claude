@@ -1,9 +1,13 @@
-"""MCP 配置加载（P2）。
+"""MCP 配置加载（P2；B2 扩展 HTTP transport）。
 
 配置形态对齐 Claude Code：
-    {"mcpServers": {"<name>": {"command": "...", "args": [...], "env": {...}, "trusted": false}}}
+    stdio: {"mcpServers": {"<name>": {"command": "...", "args": [...], "env": {...}, "trusted": false}}}
+    http:  {"mcpServers": {"<name>": {"type": "http", "url": "https://...", "headers": {...}, "trusted": false}}}
 也接受无 mcpServers 包裹的扁平形态。搜索顺序：用户级 ~/.mini-claude/mcp.json
 → 项目级 <workspace_root>/.mini-claude/mcp.json（同名 server 项目级覆盖）。
+
+transport 推断：type 缺省时有 command → stdio（向后兼容）、有 url → http。
+v1 支持 stdio + streamable http；type=sse 等显式拒绝（给 warning，不静默）。
 
 server 名会进入工具名 mcp__<server>__<tool>，只允许 [a-zA-Z0-9_-]，
 非法名拒绝并给 warning（不静默改写，配置问题应让用户看见）。
@@ -20,7 +24,8 @@ from ..utils.logger import get_logger
 logger = get_logger("mini_claude.mcp.config")
 
 _NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
-_VALID_KEYS = {"command", "args", "env", "trusted"}
+_VALID_KEYS = {"command", "args", "env", "trusted", "type", "url", "headers"}
+_SUPPORTED_TRANSPORTS = ("stdio", "http")
 
 
 @dataclass
@@ -28,10 +33,13 @@ class McpServerConfig:
     """单个 MCP server 的启动配置。"""
 
     name: str
-    command: str
+    command: str = ""
     args: List[str] = field(default_factory=list)
     env: Dict[str, str] = field(default_factory=dict)
     trusted: bool = False  # True 时工具自动放行，不走确认通道
+    transport: str = "stdio"  # stdio | http
+    url: str = ""  # http transport 的 endpoint
+    headers: Dict[str, str] = field(default_factory=dict)  # http 附加头（如鉴权）
 
 
 def _candidate_paths(
@@ -96,21 +104,63 @@ def load_mcp_config(
         if unknown:
             warnings.append(f"server {name!r} 含未知字段 {sorted(unknown)}，已忽略")
 
-        command = entry.get("command")
-        if not isinstance(command, str) or not command.strip():
-            warnings.append(f"server {name!r} 缺少 command，已跳过")
+        # transport 判定：显式 type 优先；缺省按字段推断（command→stdio、url→http）
+        declared = entry.get("type")
+        has_command = isinstance(entry.get("command"), str) and entry["command"].strip()
+        has_url = isinstance(entry.get("url"), str) and entry["url"].strip()
+        if declared is not None:
+            if declared not in _SUPPORTED_TRANSPORTS:
+                warnings.append(
+                    f"server {name!r} 的 type={declared!r} 不支持"
+                    f"（v1 仅支持 {'/'.join(_SUPPORTED_TRANSPORTS)}），已跳过"
+                )
+                continue
+            transport = declared
+        elif has_url:
+            transport = "http"
+        elif has_command:
+            transport = "stdio"
+        else:
+            warnings.append(f"server {name!r} 缺少 command 或 url，已跳过")
             continue
 
-        args = entry.get("args", [])
-        env = entry.get("env", {})
-        if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
-            warnings.append(f"server {name!r} 的 args 必须是字符串数组，已跳过")
-            continue
-        if not isinstance(env, dict) or not all(
-            isinstance(k, str) and isinstance(v, str) for k, v in env.items()
-        ):
-            warnings.append(f"server {name!r} 的 env 必须是字符串到字符串的映射，已跳过")
-            continue
+        url = ""
+        headers: Dict[str, str] = {}
+        command = ""
+        args: List[str] = []
+        env: Dict[str, str] = {}
+
+        if transport == "http":
+            if not has_url:
+                warnings.append(f"server {name!r} 为 http transport 但缺少 url，已跳过")
+                continue
+            url = entry["url"]
+            if not (url.startswith("http://") or url.startswith("https://")):
+                warnings.append(f"server {name!r} 的 url 必须是 http/https：{url!r}，已跳过")
+                continue
+            raw_headers = entry.get("headers", {})
+            if not isinstance(raw_headers, dict) or not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in raw_headers.items()
+            ):
+                warnings.append(f"server {name!r} 的 headers 必须是字符串到字符串的映射，已跳过")
+                continue
+            headers = raw_headers
+        else:
+            command = entry.get("command")
+            if not isinstance(command, str) or not command.strip():
+                warnings.append(f"server {name!r} 缺少 command，已跳过")
+                continue
+
+            args = entry.get("args", [])
+            env = entry.get("env", {})
+            if not isinstance(args, list) or not all(isinstance(a, str) for a in args):
+                warnings.append(f"server {name!r} 的 args 必须是字符串数组，已跳过")
+                continue
+            if not isinstance(env, dict) or not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in env.items()
+            ):
+                warnings.append(f"server {name!r} 的 env 必须是字符串到字符串的映射，已跳过")
+                continue
 
         configs[name] = McpServerConfig(
             name=name,
@@ -118,6 +168,9 @@ def load_mcp_config(
             args=args,
             env=env,
             trusted=bool(entry.get("trusted", False)),
+            transport=transport,
+            url=url,
+            headers=headers,
         )
 
     return configs, warnings

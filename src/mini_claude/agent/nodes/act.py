@@ -192,6 +192,7 @@ async def act_node(state: AgentState) -> dict:
                     span,
                     execution_plan=updated_plan or execution_plan,
                     step_index=current_step_index,
+                    tasks=state.get("tasks") or [],
                 )
 
                 # Update plan step status based on result
@@ -394,6 +395,7 @@ async def _execute_tools(
     span,
     execution_plan: Dict = None,
     step_index: int = 0,
+    tasks: List[Dict] = None,
 ) -> tuple:
     """Execute tool calls.
 
@@ -405,17 +407,21 @@ async def _execute_tools(
         span: Tracing span
         execution_plan: Current execution plan (for progress display)
         step_index: Current step index (for progress display)
+        tasks: state.tasks 基线（Task v2 工具的变更起点；轮内有变更时
+            current_tasks 就地推进，后续调用看到前序变更）
 
     Returns:
         Tuple of (updated_messages, early_return_dict or None, step_success, state_extras)
-        state_extras: 工具执行产生的非消息状态增量（如 todo_write 的全量清单），
-        由 act_node 合并进返回值。工具本身拿不到 state，这是既有架构的写入通道。
+        state_extras: 工具执行产生的非消息状态增量（如 todo_write 的全量清单、
+        task_* 的变更后清单），由 act_node 合并进返回值。
+        工具本身拿不到 state，这是既有架构的写入通道。
     """
     from ...tools.todos import validate_todos
     from ...cli.display import display
 
     step_success = True  # Assume success unless a tool fails
     state_extras: Dict = {}
+    current_tasks = list(tasks or [])
 
     for i, tool_call in enumerate(tool_calls):
         tool_name = tool_call["name"]
@@ -449,7 +455,15 @@ async def _execute_tools(
             trace_tool_call,
             new_messages,
             tool_call_id=tool_call.get("id", ""),
+            tasks=current_tasks,
+            state_extras=state_extras,
         )
+
+        # task_*：清单变更进 state_extras 后，轮内基线就地推进 +
+        # 当场渲染（与 todo_write 的 show_todos 同款）
+        if "tasks" in state_extras:
+            current_tasks = state_extras["tasks"]
+            display.show_tasks(current_tasks)
 
         # todo_write：清单校验通过时全量替换进 state，并当场渲染给用户。
         # 校验失败时工具已返回 Error 文本回流给 LLM 自纠，state 不动。

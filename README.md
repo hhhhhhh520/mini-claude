@@ -5,8 +5,8 @@
 **迷你版 Claude Code** — 工具调用 + 主从多 Agent 并发，在一个 CLI 里跑完整开发循环。
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org)
-[![Tests](https://img.shields.io/badge/Tests-2024%20collected-brightgreen)](tests/)
-[![Tools](https://img.shields.io/badge/Tools-24-orange)](#可用工具24个)
+[![Tests](https://img.shields.io/badge/Tests-2136%20collected-brightgreen)](tests/)
+[![Tools](https://img.shields.io/badge/Tools-28-orange)](#可用工具28个)
 [![Models](https://img.shields.io/badge/Models-Claude%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-green)](#特性)
 
 </div>
@@ -22,9 +22,9 @@
 - **会话持久化**：SQLite checkpoint + 启动时恢复提示，支持 `/resume` 断点续跑
 - **工具降级**：连续失败 3 次自动跳过工具，10 分钟后自动恢复
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
-- **任务清单**：`todo_write` 维护会话 todo，多步任务进度实时渲染（对齐 Claude Code TodoWrite）
+- **任务清单**：`todo_write` 维护会话 todo；Task v2（`task_create/update/list/get`）支持多任务、依赖边（防环）与委派——主代理 `task_update(owner=<agent_id>)` 指派、子代理认领推进（对齐 Claude Code Task 系统）
 - **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md`、工作区 `CLAUDE.md` 与 `CLAUDE.local.md` 作为持久约定；支持 `@path` 引用展开（5 跳防环，含代码文件）（`CLAUDE_MD_ENABLED` 可关）
-- **MCP 支持**：接入 Model Context Protocol 服务器（stdio），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道（对齐 Claude Code 生态）
+- **MCP 支持**：接入 Model Context Protocol 服务器（stdio + streamable HTTP），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道；resources/prompts 经 `mcp_list_resources`/`mcp_read_resource`/`mcp_list_prompts`/`mcp_get_prompt` 只读访问（对齐 Claude Code 生态）
 - **Hooks**：PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop/SessionStart/SessionEnd/PreCompact/SubagentStart 十事件（对齐 Claude Code 事件面），用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换 / additionalContext 注入），超时强杀
 - **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则（glob 匹配主参数），deny > ask > allow > 模式默认
 - **会话回退**：`/rewind` 列出回合边界 checkpoint，从任意回合分叉重跑（基于 LangGraph 时间旅行）
@@ -32,7 +32,7 @@
 - **多工作目录**：`/add-dir <目录>` 会话级追加工作根（路径校验对所有已注册根放行，保护路径与穿越检查不放松）
 - **后台任务**：`run_background` 输出落盘，`task_output`/`task_kill` 读取与终止（对齐 BashOutput/KillShell）
 - **模型热切换**：`/model <name>` 会话内即时切换（含子代理），`.env` 默认值不动
-- **测试规模**：2081 个测试用例（2026-09-28 实测收集数）
+- **测试规模**：2136 个测试用例（2026-09-28 实测收集数）
 
 ## 安装
 
@@ -213,7 +213,7 @@ Use 'force_write' to overwrite.
 
 ## MCP 支持
 
-REPL 启动时自动连接 `mcp.json` 里配置的 server（stdio），远端工具以 `mcp__<server>__<tool>` 注册进工具系统，LLM 可直接调用。
+REPL 启动时自动连接 `mcp.json` 里配置的 server（stdio 或 streamable HTTP），远端工具以 `mcp__<server>__<tool>` 注册进工具系统，LLM 可直接调用。
 
 ```bash
 pip install -e ".[mcp]"        # 先装 SDK（pin 1.x）
@@ -224,13 +224,16 @@ pip install -e ".[mcp]"        # 先装 SDK（pin 1.x）
 ```json
 {
   "mcpServers": {
-    "fs": { "command": "uvx", "args": ["mcp-server-fs"], "trusted": false }
+    "fs": { "command": "uvx", "args": ["mcp-server-fs"], "trusted": false },
+    "remote": { "type": "http", "url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer ..."} }
   }
 }
 ```
 
+- **transport**：`type` 缺省时按字段推断（有 `command` → stdio 向后兼容、有 `url` → streamable HTTP）；`headers` 透传（放鉴权头）；`sse` 等其他类型 v1 显式拒绝并提示
+- **resources/prompts**：server 连接后可用 `mcp_list_resources` / `mcp_read_resource`（server + uri）与 `mcp_list_prompts` / `mcp_get_prompt`（server + name + arguments）只读访问，不走确认通道
 - **确认通道**：未放行的 MCP 工具调用会暂停等待用户回复 `yes`（会话内放行）；`"trusted": true` 的 server 自动放行
-- **REPL 命令**：`/mcp` 看状态，`/mcp connect <name>` / `disconnect <name>` / `reload` 手动管理
+- **REPL 命令**：`/mcp` 看状态（含 transport 与 endpoint），`/mcp connect <name>` / `disconnect <name>` / `reload` 手动管理
 - 子代理默认不可见 MCP 工具；`MCP_ENABLED=false` 可整体关闭
 
 ## 配置
@@ -247,7 +250,7 @@ ANTHROPIC_API_KEY=your-claude-key
 GOOGLE_API_KEY=your-gemini-key
 ```
 
-## 可用工具（24个）
+## 可用工具（28个）
 
 ### 文件操作 (8个)
 | 工具 | 功能 |
@@ -276,10 +279,14 @@ GOOGLE_API_KEY=your-gemini-key
 | `web_fetch` | 抓取网页正文（含 SSRF 防护） |
 | `weather` | 天气查询 |
 
-### 任务清单 (1个)
+### 任务清单 (5个)
 | 工具 | 功能 |
 |------|------|
 | `todo_write` | 维护会话任务清单（全量提交，清单实时渲染给用户） |
+| `task_create` | 创建任务（Task v2：编号、依赖边、可委派） |
+| `task_update` | 更新任务状态/字段/依赖边/委派 owner（`deleted` 删除） |
+| `task_list` | 列出全部任务（状态/owner/依赖） |
+| `task_get` | 查看单个任务详情 |
 
 ### Agent协作 (8个)
 | 工具 | 功能 |

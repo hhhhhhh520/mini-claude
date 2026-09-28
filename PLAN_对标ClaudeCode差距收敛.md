@@ -160,9 +160,10 @@
 
 - ~~子代理白名单双份 `ALLOWED_TOOLS` 提取为共享常量~~ 已完成（2026-09-28 `SUBAGENT_ALLOWED_TOOLS`）
 - ~~web 三件套异步化~~ 已完成（2026-09-28：httpx 共享 client + ddgs to_thread；注意 AsyncClient 构造的 SSL 证书库同步加载 ~0.2s，必须用进程级共享实例）
-- **Task 系统 v2**（本体正在用 `isTodoV2Enabled()` 把 Todo 升级为 Task：TaskCreate/List/Update + 子代理任务委托）
-- `ScheduleCronTool` 定时任务、Agent Teams
-- ~~CLAUDE.md `@import`~~ 已完成（2026-09-28：@path/@./x/@~/x/@abs 五跳防环 + CLAUDE.local.md）；MCP resources/OAuth、扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
+- ~~Task 系统 v2~~ 已完成（2026-09-28：task_create/update/list/get——编号只增不复用、依赖边双向同步防环、owner 委派子代理；state.tasks 全量替换唯一事实源，act 经 state_extras 通道回写、每轮覆盖模块级 store）
+- `ScheduleCronTool` 定时任务、Agent Teams；MCP OAuth（HTTP transport 已完成）
+- ~~CLAUDE.md `@import`~~ 已完成（2026-09-28：@path/@./x/@~/x/@abs 五跳防环 + CLAUDE.local.md）；扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
+- ~~MCP HTTP transport + resources/prompts~~ 已完成（2026-09-28：`type:http` + url/headers（type 缺省按字段推断，sse 显式拒绝）；resources/prompts 四个全局只读工具，连接时幂等注册；真 FastMCP+uvicorn 回环 E2E；OAuth 未做）
 - ~~Hooks 尾部四事件~~ 已完成（2026-09-28：SessionStart/SessionEnd/PreCompact/SubagentStart，事件面 6→10；SessionStart stdout/additionalContext 注入会话级上下文走 hook_context 通道；均已非阻断）
 - ~~/compact 手动压缩 + PreCompact hook~~ 已完成（2026-09-28：复用 summarize_messages 引擎透传自定义指令；**压缩结果播种新 thread_id**——messages 是裸 add reducer，aupdate_state 无法替换；持久化前修剪孤儿 tool 结果防 ISSUE-026 复发）
 - ~~/add-dir 多工作目录~~ 已完成（2026-09-28：safety.py 多根注册表 `_additional_roots`，validate_path 三处比较点 OR 并入；额外根带 os.sep 守卫防兄弟前缀误放行，主根行为不变）

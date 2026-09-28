@@ -84,7 +84,7 @@ class McpManager:
         return mcp
 
     async def _open_connection(self, cfg: McpServerConfig):
-        """建立 stdio 连接并完成 initialize + 工具发现。
+        """建立连接（stdio 或 streamable http）并完成 initialize + 工具发现。
 
         Returns:
             SimpleNamespace(server, session, tools, stack)
@@ -98,13 +98,24 @@ class McpManager:
                 'MCP 支持未安装。请运行: pip install -e ".[mcp]" （或 pip install "mcp>=1.30.0,<2.0.0"）'
             ) from e
 
-        from mcp import ClientSession, StdioServerParameters
-        from mcp.client.stdio import stdio_client
-
         stack = AsyncExitStack()
         try:
-            params = StdioServerParameters(command=cfg.command, args=cfg.args, env=cfg.env or None)
-            read, write = await stack.enter_async_context(stdio_client(params))
+            if cfg.transport == "http":
+                from mcp import ClientSession
+                from mcp.client.streamable_http import streamablehttp_client
+
+                read, write, _get_session_id = await stack.enter_async_context(
+                    streamablehttp_client(cfg.url, headers=cfg.headers or None)
+                )
+            else:
+                from mcp import ClientSession, StdioServerParameters
+                from mcp.client.stdio import stdio_client
+
+                params = StdioServerParameters(
+                    command=cfg.command, args=cfg.args, env=cfg.env or None
+                )
+                read, write = await stack.enter_async_context(stdio_client(params))
+
             session = await stack.enter_async_context(ClientSession(read, write))
             await session.initialize()
             tools_result = await session.list_tools()
@@ -128,6 +139,10 @@ class McpManager:
         conn = await self._open_connection(cfg)
         self._connections[name] = conn
         register_server_tools(self, conn)
+        # resources/prompts 全局工具：首次连接时幂等注册（MCP 关闭时不占列表）
+        from .global_tools import ensure_global_tools_registered
+
+        ensure_global_tools_registered()
 
         if cfg.trusted:
             for t in conn.tools:
@@ -176,10 +191,86 @@ class McpManager:
                 "connected": conn is not None,
                 "tools": len(conn.tools) if conn else 0,
                 "trusted": cfg.trusted,
+                "transport": cfg.transport,
                 "command": cfg.command,
+                "url": cfg.url,
                 "error": None,
             }
         return out
+
+    # ---------- resources / prompts（只读，不走确认通道） ----------
+
+    def _get_connection(self, server: str):
+        conn = self._connections.get(server)
+        if conn is None:
+            raise KeyError(f"MCP server '{server}' 未连接")
+        return conn
+
+    async def list_resources(self) -> List[dict]:
+        """聚合已连接 server 的资源清单。"""
+        out: List[dict] = []
+        for name, conn in self._connections.items():
+            try:
+                result = await conn.session.list_resources()
+            except Exception as e:
+                logger.warning("list_resources failed", server=name, error=str(e))
+                continue
+            for r in result.resources:
+                out.append(
+                    {
+                        "server": name,
+                        "uri": str(getattr(r, "uri", "")),
+                        "name": getattr(r, "name", "") or "",
+                        "description": getattr(r, "description", "") or "",
+                    }
+                )
+        return out
+
+    async def read_resource(self, server: str, uri: str) -> str:
+        """读一个资源，拼接文本内容；非文本部分给占位标记。"""
+        conn = self._get_connection(server)
+        result = await conn.session.read_resource(uri)
+        parts: List[str] = []
+        for c in getattr(result, "contents", []) or []:
+            text = getattr(c, "text", None)
+            if text is not None:
+                parts.append(text)
+            else:
+                parts.append(f"[{getattr(c, 'mimeType', None) or 'binary'} content]")
+        return "\n".join(p for p in parts if p) or "(资源内容为空)"
+
+    async def list_prompts(self) -> List[dict]:
+        """聚合已连接 server 的 prompt 清单。"""
+        out: List[dict] = []
+        for name, conn in self._connections.items():
+            try:
+                result = await conn.session.list_prompts()
+            except Exception as e:
+                logger.warning("list_prompts failed", server=name, error=str(e))
+                continue
+            for p in result.prompts:
+                out.append(
+                    {
+                        "server": name,
+                        "name": getattr(p, "name", "") or "",
+                        "description": getattr(p, "description", "") or "",
+                    }
+                )
+        return out
+
+    async def get_prompt(self, server: str, name: str, arguments: Optional[dict] = None) -> str:
+        """取一个 prompt，拼接 messages 为对话文本。"""
+        conn = self._get_connection(server)
+        result = await conn.session.get_prompt(name, arguments or {})
+        lines: List[str] = []
+        for m in getattr(result, "messages", []) or []:
+            role = getattr(m, "role", "user")
+            content = getattr(m, "content", None)
+            text = getattr(content, "text", None)
+            if text is None:
+                text = f"[{getattr(content, 'type', 'unknown')} content]"
+            lines.append(f"{role}: {text}")
+        return "\n".join(lines) or "(prompt 内容为空)"
 
     def approve_tool(self, server: str, tool: str) -> None:
         self._approved.add(_approve_key(server, tool))

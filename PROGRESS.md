@@ -375,6 +375,53 @@
   被迫走真实 provider 分支（无 key 即炸）——图级 fake 测试统一旁路降级管理器
 - E2E 里按快照内容（而非列表序号）选取 fork 边界，避免对 checkpoint 排序的隐式依赖
 
+## 2026-09-28 对标批次 B：Task 系统 v2 + MCP HTTP transport + resources/prompts
+
+### 交付
+- **B1 Task v2**（`tools/tasks.py`，对标 TaskCreate/Update/List/Get，规格读 free-code
+  只做参考未搬代码）：
+  - Task 形状 {id, subject, description, active_form?, status, owner?, blocks[],
+    blocked_by[]}；编号**只增不复用**（进程级高水位，删除后新建不回收旧号——
+    对话历史里旧编号引用不产生歧义）；依赖边双向同步，禁自引用/重复边/成环（DFS）
+  - 架构：**state.tasks 唯一事实源**（全量替换语义，与 todos 同纪律）。工具拿不到
+    state，act 每轮派发前把 state.tasks 传入 execute_single_tool（新参 tasks/
+    state_extras），变更经 state_extras["tasks"] 回写、轮内基线就地推进（同轮多次
+    操作可见前序变更）+ show_tasks 当场渲染；不走通用 execute_tool（特化分支）
+  - 模块级 store 只服务 ask 无 checkpoint 场景，act 每轮用 state.tasks 覆盖——
+    rewind 分叉后 store 从新状态同步，不发散
+  - 委派闭环：主代理 task_create + task_update(owner=agent_id) 指派 → spawn_agent →
+    子代理 task_list/task_get/task_update 认领推进（白名单刻意不含 task_create）
+- **B2 MCP HTTP transport**（config/manager）：
+  - 配置 `{"type":"http","url":...,"headers":{...}}`；type 缺省按字段推断
+    （command→stdio 向后兼容、url→http）；sse 等显式拒绝给 warning；url 必须
+    http/https；headers 全字符串校验
+  - `_open_connection` 按 transport 分支：http 走 SDK 1.30 的
+    `streamablehttp_client(url, headers=...)`（三返回值），session/initialize/
+    工具发现与 stdio 共路；桥接、确认通道、trusted 放行全部复用
+- **B2 resources/prompts**（`mcp/global_tools.py`）：
+  - 四个全局只读工具 mcp_list_resources/mcp_read_resource/mcp_list_prompts/
+    mcp_get_prompt，聚合已连接 server；不走确认通道；连接路径上幂等注册
+    （MCP 关闭时不占工具列表）；/mcp 状态行带 transport 与 endpoint
+  - 真 E2E：进程内 uvicorn 挂 FastMCP streamable_http_app（回环端口），
+    连接→工具发现→桥接→调用→资源→prompt(arguments 透传)→断连全链路
+
+### 验证（全部实测）
+- CI 筛选层：**2055 passed / 40 skipped / 41 deselected**（2:35；批次 B 新增 55 条，
+  收集 2136）
+- integration 层：**152 passed / 1 skipped**（26s；+1 为真 HTTP E2E，importorskip
+  门控——CI 不装 [mcp] 自动跳过）
+- 不可达端点 × 严格 msgpack 两层（.env 移走 + 127.0.0.1:9）：2055/40 + 152/1，
+  与正常环境一致，.env 已还原
+- ruff check/format 全绿
+
+### 实踩教训
+- 无 SDK 的传输层单测：`sys.modules` 注入假 `mcp` / `mcp.client.streamable_http` /
+  `mcp.client.stdio` 三个模块——**manager 里 from X import Y 的每个子模块都要有假身**，
+  漏一个就 ImportError 被兜底转成 McpSDKMissingError
+- 注入连接的测试绕过了 connect_server，生产在连接路径注册的全局工具要显式补注册
+- 测试先写后改实现时，断言要跟实现一起复核（列表渲染图标 ≠ 状态词，LLM 消费
+  的工具结果要显式状态词）
+
 ## 2026-09-28 对标批次 A：/compact + Hooks 尾部四事件 + /add-dir（事件面收尾 6→10）
 
 ### 交付

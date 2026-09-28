@@ -26,6 +26,19 @@ from .web_search import WebSearchTool
 from .web_fetch import WebFetchTool
 from .weather import WeatherTool
 from .todos import TodoWriteTool, validate_todos
+from .tasks import (
+    TaskCreateTool,
+    TaskUpdateTool,
+    TaskListTool,
+    TaskGetTool,
+    apply_task_create,
+    apply_task_update,
+    apply_task_list,
+    apply_task_get,
+    get_session_tasks,
+    set_session_tasks,
+    reset_session_tasks,
+)
 from .parallel import (
     PlanParallelTool,
     ExecuteParallelTool,
@@ -118,6 +131,18 @@ __all__ = [
     # Todos
     "TodoWriteTool",
     "validate_todos",
+    # Tasks (v2)
+    "TaskCreateTool",
+    "TaskUpdateTool",
+    "TaskListTool",
+    "TaskGetTool",
+    "apply_task_create",
+    "apply_task_update",
+    "apply_task_list",
+    "apply_task_get",
+    "get_session_tasks",
+    "set_session_tasks",
+    "reset_session_tasks",
     # Health check
     "ToolHealthChecker",
     "ToolHealthStatus",

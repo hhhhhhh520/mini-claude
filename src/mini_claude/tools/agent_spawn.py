@@ -26,6 +26,11 @@ SUBAGENT_ALLOWED_TOOLS = [
     "search_files",
     "search_content",
     "web_search",
+    # Task v2 委派闭环：主代理 task_create + owner 指派，子代理认领/推进/完工
+    # （刻意不含 task_create——子代理不建任务，避免污染主清单）
+    "task_list",
+    "task_get",
+    "task_update",
 ]
 
 

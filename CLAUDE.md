@@ -91,6 +91,7 @@
 - `AgentState.messages` 是 `Annotated[List[BaseMessage], add]`（累加语义）：节点**只能返回增量**，返回全量列表会把已有消息再拼一份（用户消息被复制、SystemMessage 错位——2026-09-04 修过一次，见 issues/ISSUE-014）
 - **缩减持久化历史只有一条路：播种新 thread**（`/compact` 的做法）：messages 挂裸 `add`，`aupdate_state` 走同一 reducer 只能拼接；压缩结果写入全新 thread_id 即纯替换，旧线程 checkpoint 链保留，会话切换后 `_rewind_configurable` 必须作废。act 内 `handle_token_budget` 的自动压缩只作用于当次 prompt，**不回写 checkpoint**
 - 摘要/截断产物的近端尾部可能切在 assistant(tool_calls) 与 tool 结果中间——持久化前必须修剪孤儿 tool 结果（`compact_handler._drop_orphan_tool_results`），否则违反下一条线格式红线
+- **Task v2（tools/tasks.py）的 state.tasks 是唯一事实源**：全量替换语义（与 todos 同纪律，不进 turn increment）；工具拿不到 state，act 每轮派发前把 state.tasks 传入 execute_single_tool、变更经 `state_extras["tasks"]` 全量替换回 state；模块级 store 只服务 ask 无 checkpoint 场景，**act 每轮必须用 state.tasks 覆盖 store**（rewind 分叉才不会发散）。task_create/task_update/task_list/task_get 在 execute_single_tool 特化分支处理，不走通用 execute_tool
 - **工具结果一律 `ToolMessage` 回传（role=tool + tool_call_id + status），禁止 HumanMessage 文本**；assistant 历史消息必须携带 tool_calls 不许剥（ISSUE-026：Qwen 类网关按消息形状判定函数调用模式，形状偏离即从第二轮起退化为 `<tool_call>` 正文）。确认挂起标 `status="success"`（挂起不是执行错误）；改工具循环必须含"真 key 多步任务 E2E 无泄漏"验收
 - checkpoint 序列化类型必须注册 serde 白名单（`graph.py` JsonPlusSerializer `allowed_msgpack_modules`），CI 已开 `LANGGRAPH_STRICT_MSGPACK=true`——往 state 塞新自定义类型时同步注册，否则 CI 硬失败（ISSUE-027）
 - 系统提示与 skills **不写入** `state["messages"]`：由 `act_node` 在每次 LLM 调用时经 `build_system_messages()` 前置（不进持久化历史、不被摘要/截断吃掉）

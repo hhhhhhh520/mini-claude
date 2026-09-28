@@ -142,6 +142,13 @@ class AgentState(TypedDict):
     # 不能挂 add reducer——act 节点返回的 todos 直接覆盖旧值。
     todos: List[Dict[str, Any]]
 
+    # Task 系统 v2（对标 Claude Code TaskCreate/Update/List/Get）：多任务 +
+    # 依赖边 + 委派（owner=agent_id）。与 todos 同纪律：**全量替换语义**、
+    # 不进 create_turn_increment（跨回合由 checkpoint 携带，rewind 分叉时
+    # 保留快照当时的清单）。act 每轮派发前经 tools.tasks.set_session_tasks
+    # 同步给模块级 store（ask 模式用）。
+    tasks: List[Dict[str, Any]]
+
     # UserPromptSubmit hook 注入的回合级上下文（P5 对齐 Claude Code）。
     # 全量替换语义：act 经 build_system_messages() 前置给 LLM（不进持久化
     # 历史），每轮增量必须带值（空串=清空），否则 checkpoint 会沿用旧值。
@@ -193,6 +200,7 @@ def create_initial_state(
         execution_plan=None,
         current_step_index=0,
         todos=[],
+        tasks=[],
     )
 
 

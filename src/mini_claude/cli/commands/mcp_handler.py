@@ -67,12 +67,14 @@ class McpCommandHandler(CommandHandler):
 
         lines = ["MCP servers:"]
         for name, info in status.items():
+            endpoint = info.get("url") or info.get("command") or ""
+            tag = f"[{info.get('transport', 'stdio')}] "
             if info["connected"]:
                 lines.append(
-                    f"  [ok] {name}: {info['tools']} 个工具"
+                    f"  [ok] {name}: {tag}{info['tools']} 个工具"
                     + ("（trusted）" if info.get("trusted") else "")
                 )
             else:
-                lines.append(f"  [--] {name}: 未连接（{info['command']}）")
+                lines.append(f"  [--] {name}: 未连接（{tag}{endpoint}）")
         lines.append("用 /mcp connect <name> 连接，/mcp reload 重载配置。")
         return "\n".join(lines)
