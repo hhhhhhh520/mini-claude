@@ -213,7 +213,7 @@ class ToolRegistry:
 
         subagent = is_subagent_mode()
 
-        # --- PreToolUse hook（先于权限门：allow 免确认、updatedInput 改写入参）---
+        # --- PreToolUse hook（先于权限门：allow 免确认 / ask 强制确认 / updatedInput 改写入参）---
         hook_allow = False
         if not subagent:
             hooks = _gate_hook_dispatcher()
@@ -229,6 +229,12 @@ class ToolRegistry:
                     )
                     params = verdict.updated_input
                 hook_allow = verdict.allow
+                if verdict.force_ask:
+                    from ..permissions.manager import PermissionAskRequired
+                    from ..permissions.rules import primary_arg
+
+                    logger.info("tool forced to ask by PreToolUse hook", tool_name=name)
+                    raise PermissionAskRequired(name, primary_arg(name, params))
 
         # --- 权限门（P3-2）：deny 拦下 / ask 抛确认异常；hook allow 免确认 ---
         if not subagent and not hook_allow:

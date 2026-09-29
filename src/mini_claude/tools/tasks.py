@@ -18,10 +18,15 @@ Task 形状（free-code 规格参考，未搬代码）：
 - 依赖边双向同步（A blocked_by B ⇔ B blocks A）；禁自引用、禁重复边、禁成环
 """
 
+import json
 import threading
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..utils.logger import get_logger
 from .base import BaseTool, register_tool
+
+_logger = get_logger("mini_claude.tools.tasks")
 
 VALID_TASK_STATUSES = ("pending", "in_progress", "completed")
 _DELETE = "deleted"
@@ -379,3 +384,38 @@ register_tool(TaskCreateTool())
 register_tool(TaskUpdateTool())
 register_tool(TaskListTool())
 register_tool(TaskGetTool())
+
+
+# ---- 跨会话落盘（收敛批次②D：Task 清单随会话存活，重启可接续） ----
+# 策略：act 链每次任务变更写透到 <workspace>/.mini-claude/tasks.json；
+# REPL **新会话**（非 resume）启动时装载并随首个回合增量播种进 state——
+# resume 以 checkpoint 为准（不回退）。崩溃窗口只丢最后一次变更。
+
+
+def _tasks_file_path() -> Path:
+    from ..config.settings import settings
+
+    return Path(settings.workspace_root) / ".mini-claude" / "tasks.json"
+
+
+def persist_tasks(tasks: List[Dict[str, Any]]) -> None:
+    """写透任务清单（旁路设施：失败只记日志，不弄断工具执行链）。"""
+    try:
+        path = _tasks_file_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(tasks, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        _logger.warning("task list persist failed", error=f"{type(e).__name__}: {e}")
+
+
+def load_persisted_tasks() -> List[Dict[str, Any]]:
+    """读取落盘的任务清单；缺失/损坏返回空表（不抛）。"""
+    try:
+        path = _tasks_file_path()
+        if not path.is_file():
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        _logger.warning("task list load failed", error=f"{type(e).__name__}: {e}")
+        return []

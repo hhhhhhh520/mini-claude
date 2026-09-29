@@ -351,6 +351,9 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
                     if not output_json:
                         print(f"[Tool] {tool_name}({tool_args})")
                     result = await execute_tool(tool_name, tool_args)
+                    from ..utils.result_clip import clip_tool_result
+
+                    result = clip_tool_result(str(result))
 
                     messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 

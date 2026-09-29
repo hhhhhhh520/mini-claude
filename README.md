@@ -22,7 +22,7 @@
 - **会话持久化**：SQLite checkpoint + 启动时恢复提示，支持 `/resume` 断点续跑
 - **工具降级**：连续失败 3 次自动跳过工具，10 分钟后自动恢复
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
-- **任务清单**：`todo_write` 维护会话 todo；Task v2（`task_create/update/list/get`）支持多任务、依赖边（防环）与委派——主代理 `task_update(owner=<agent_id>)` 指派、子代理认领推进（对齐 Claude Code Task 系统）
+- **任务清单**：`todo_write` 维护会话 todo；Task v2（`task_create/update/list/get`）支持多任务、依赖边（防环）与委派——主代理 `task_update(owner=<agent_id>)` 指派、子代理认领推进（对齐 Claude Code Task 系统）；清单**跨会话落盘**（`<工作区>/.mini-claude/tasks.json`，重启新会话自动接续，resume 以 checkpoint 为准）
 - **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md`、工作区 `CLAUDE.md` 与 `CLAUDE.local.md` 作为持久约定；支持 `@path` 引用展开（5 跳防环，含代码文件）（`CLAUDE_MD_ENABLED` 可关）
 - **MCP 支持**：接入 Model Context Protocol 服务器（stdio + streamable HTTP），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道；resources/prompts 经 `mcp_list_resources`/`mcp_read_resource`/`mcp_list_prompts`/`mcp_get_prompt` 只读访问（对齐 Claude Code 生态）
 - **Hooks**：PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop/SessionStart/SessionEnd/PreCompact/SubagentStart 十事件（对齐 Claude Code 事件面），用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换 / additionalContext 注入），超时强杀
@@ -32,7 +32,7 @@
 - **多工作目录**：`/add-dir <目录>` 会话级追加工作根（路径校验对所有已注册根放行，保护路径与穿越检查不放松）
 - **后台任务**：`run_background` 输出落盘，`task_output`/`task_kill` 读取与终止（对齐 BashOutput/KillShell）
 - **模型热切换**：`/model <name>` 会话内即时切换（含子代理），`.env` 默认值不动
-- **测试规模**：2164 个测试用例（2026-09-28 实测收集数）
+- **测试规模**：2179 个测试用例（2026-09-28 实测收集数）
 
 ## 安装
 
@@ -197,7 +197,7 @@ Use 'force_write' to overwrite.
 }
 ```
 
-- payload 走 stdin；`PreToolUse` exit 2 或输出 `{"decision":"block","reason":...}` 阻断执行，结构化裁决 `{"hookSpecificOutput":{"permissionDecision":"allow|deny","updatedInput":{...}}}` 可免确认/拒绝/**改写工具入参**，payload 含 session_id/permission_mode/cwd（子进程另有 `$CLAUDE_PROJECT_DIR`）；`PostToolUse` 输出 `{"replacement": "..."}` 替换结果，`Stop` 在回合结束时触发；`UserPromptSubmit`（stdin 含 `prompt`）exit 2 / decision=block 拦截本轮输入，exit 0 的 stdout 或 `hookSpecificOutput.additionalContext` 注入本回合 system 上下文（不进持久化历史）；`Notification` 在工具请求确认时触发（stdin 含 `message`）；`SubagentStop`（stdin 含 `agent_id/agent_task/result_summary`）exit 2 / decision=block 让子代理带着原因继续（受迭代上限兜底）
+- payload 走 stdin；`PreToolUse` exit 2 或输出 `{"decision":"block","reason":...}` 阻断执行，结构化裁决 `{"hookSpecificOutput":{"permissionDecision":"allow|deny|ask","updatedInput":{...}}}` 可免确认/**强制确认**/拒绝/**改写工具入参**，payload 含 session_id/permission_mode/cwd（子进程另有 `$CLAUDE_PROJECT_DIR`）；`PostToolUse` 输出 `{"replacement": "..."}` 替换结果，`Stop` 在回合结束时触发；`UserPromptSubmit`（stdin 含 `prompt`）exit 2 / decision=block 拦截本轮输入，exit 0 的 stdout 或 `hookSpecificOutput.additionalContext` 注入本回合 system 上下文（不进持久化历史）；`Notification` 在工具请求确认时触发（stdin 含 `message`）；`SubagentStop`（stdin 含 `agent_id/agent_task/result_summary`）exit 2 / decision=block 让子代理带着原因继续（受迭代上限兜底）
 - 尾部四事件均非阻断：`SessionStart`（stdin 含 `source: startup/resume`）stdout/`additionalContext` 注入**会话级**上下文（此后每回合都前置）；`SessionEnd`（stdin 含 `reason`）在 REPL 退出收口前触发；`PreCompact`（stdin 含 `trigger: manual/auto`）在 `/compact` 与自动摘要压缩前触发；`SubagentStart`（stdin 含 `agent_id/agent_task`）在子代理派生时触发
 - 超时强杀；hook 失败不阻断主链路；子代理不触发
 
@@ -231,7 +231,7 @@ pip install -e ".[mcp]"        # 先装 SDK（pin 1.x）
 ```
 
 - **transport**：`type` 缺省时按字段推断（有 `command` → stdio 向后兼容、有 `url` → streamable HTTP）；`headers` 透传（放鉴权头）；`sse` 等其他类型 v1 显式拒绝并提示
-- **resources/prompts**：server 连接后可用 `mcp_list_resources` / `mcp_read_resource`（server + uri）与 `mcp_list_prompts` / `mcp_get_prompt`（server + name + arguments）只读访问，不走确认通道
+- **resources/prompts**：server 连接后可用 `mcp_list_resources` / `mcp_read_resource`（server + uri）与 `mcp_list_prompts` / `mcp_get_prompt`（server + name + arguments）只读访问；prompt 可直接作斜杠命令键入——`/mcp__<server>__<prompt> [{json 参数}]` 展开注入输入流（对齐 Claude Code），均不走确认通道
 - **确认通道**：未放行的 MCP 工具调用会暂停等待用户回复 `yes`（会话内放行）；`"trusted": true` 的 server 自动放行
 - **REPL 命令**：`/mcp` 看状态（含 transport 与 endpoint），`/mcp connect <name>` / `disconnect <name>` / `reload` 手动管理
 - 子代理默认不可见 MCP 工具；`MCP_ENABLED=false` 可整体关闭

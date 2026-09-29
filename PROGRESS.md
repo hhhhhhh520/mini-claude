@@ -375,6 +375,38 @@
   被迫走真实 provider 分支（无 key 即炸）——图级 fake 测试统一旁路降级管理器
 - E2E 里按快照内容（而非列表序号）选取 fork 边界，避免对 checkpoint 排序的隐式依赖
 
+## 2026-09-28 对标收敛批次②：hook ask 补全 + MCP prompts 斜杠命令化 + 工具结果上限 + Task 落盘
+
+### 交付
+- **②A hook 强制确认**：`HookVerdict.force_ask`——`permissionDecision: "ask"`
+  无视规则/模式直接抛 PermissionAskRequired（三值语义补全，分歧点清零；
+  ask 与 allow 同现时 allow 被忽略——deny > ask > allow 合并序）
+- **②B MCP prompts 斜杠命令化**：`/mcp__<server>__<prompt> [{json 参数}]`
+  命中已连接 server 的 prompt 即展开注入输入流（`get_prompt_expansion`
+  无 role 前缀拼接）；未命中走原命令流程；manager 新增 expansion 变体
+- **②C 工具结果尺寸统一上限**（对齐本体 maxResultSizeChars）：
+  `utils/result_clip.py` 保头去尾 + 截断注记（含原始长度，LLM 可据此
+  自我修正）；act（execute_single_tool）与 ask（run_single）两条链统一
+  截断；`TOOL_RESULT_MAX_CHARS` 默认 24000
+- **②D Task 清单跨会话落盘**：任务变更写透 `<workspace>/.mini-claude/
+  tasks.json`；REPL **新会话**装载并随首个回合增量播种（`_apply_task_seed`
+  用后即清）；**resume 以 checkpoint 为准不播种**（不回退）；崩溃窗口只丢
+  最后一次变更
+
+### 验证
+- 定向：hooks/registry/tasks/persistence/global_tools/result_clip 122 全绿
+- 全量两层四场景 + ruff：CI 筛选层 **2098 passed / 40 skipped**（收集 2179，正常与
+  不可达×严格 msgpack 一致）、integration 层 **152 passed / 1 skipped**、ruff 全绿
+
+### 实踩教训
+- 仓库自定义 logger 只支持 kwarg 风格（`error=str(e)`），%s 位置参数会炸——
+  手册里写过的坑再次命中，新文件照抄邻居调用样式
+- 测试桩要完整覆盖被测路径的全部合作者（trace 要 nullcontext、degr 要
+  record_success/record_failure）；`with` 语句在**类型**上找 `__enter__`，
+  SimpleNamespace 实例属性无效
+- 假阳性排查路径固化：①clean HEAD 复现判"是否回归"→②多跑看方差判
+  "是否抖动"→③找边界外的隐藏成本（client 冷构造）
+
 ## 2026-09-28 对标收敛批次①：差距分析 Top3 落地（updatedInput / auto-compact 落盘 / rewind 代码回退）
 
 ### 背景

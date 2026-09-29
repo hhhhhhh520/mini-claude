@@ -150,6 +150,27 @@ class TestPreToolUseVerdict:
         assert v.blocked is not None and "高危命令" in v.blocked and v.allow is False
 
     @pytest.mark.asyncio
+    async def test_permission_decision_ask_forces_confirmation(self):
+        runner = AsyncMock(
+            return_value=SimpleNamespace(
+                exit_code=0,
+                stdout=json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "PreToolUse",
+                            "permissionDecision": "ask",
+                        }
+                    }
+                ),
+                stderr="",
+                timed_out=False,
+            )
+        )
+        d = _make_dispatcher({"PreToolUse": [_rule("", "x")]}, runner)
+        v = await d.dispatch_pre_tool_use("run_command", {})
+        assert v.force_ask is True and v.blocked is None
+
+    @pytest.mark.asyncio
     async def test_updated_input_from_hook_specific_output(self):
         runner = AsyncMock(
             return_value=SimpleNamespace(

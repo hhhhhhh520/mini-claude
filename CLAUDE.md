@@ -43,8 +43,8 @@
 
 ### Hooks 与权限约束
 
-- ToolRegistry.execute 裁决链顺序（收敛批次①）：**PreToolUse hook 先于权限门**——hook 可 deny 阻断、`permissionDecision=allow` 免确认（跳过 ask）、`updatedInput` 改写入参（喂给权限匹配与执行）；hook 的 allow 只有前置于权限门才有意义，改顺序前先想清楚
-- `permissionDecision="ask"`（强制确认）v1 不支持，按放行处理（已知分歧点）；payload 带 session_id/permission_mode/cwd，子进程有 `$CLAUDE_PROJECT_DIR`
+- ToolRegistry.execute 裁决链顺序（收敛批次①）：**PreToolUse hook 先于权限门**——hook 可 deny 阻断、`permissionDecision=allow` 免确认（跳过 ask）、**`permissionDecision=ask` 强制确认**（无视规则/模式直接走确认通道）、`updatedInput` 改写入参（喂给权限匹配与执行）；多值同现时 deny > ask > allow；hook 的 allow/ask 只有前置于权限门才有意义，改顺序前先想清楚
+- `permissionDecision="ask"` 已支持（收敛批次②A 补全，三值语义无分歧）；payload 带 session_id/permission_mode/cwd，子进程有 `$CLAUDE_PROJECT_DIR`
 
 - Hooks 事件面十事件（PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop/SessionStart/SessionEnd/PreCompact/SubagentStart）；hook 失败/超时不阻断主链路（UserPromptSubmit/SubagentStop 的 exit 2 阻断除外）。尾部四事件均非阻断：SessionStart 的 stdout/`hookSpecificOutput.additionalContext` 注入会话级上下文（repl 存 `_session_hook_context`，每回合与 UserPromptSubmit 上下文合并进 `hook_context`）；SessionEnd/PreCompact/SubagentStart 只触发不判断
 - `AgentState.hook_context` 是**全量替换语义**：`create_turn_increment` 每轮必须带值（空串=清空上一轮注入），act 经 `build_system_messages(hook_context=...)` 前置、不进持久化历史——漏带值会让 checkpoint 沿用旧回合的注入

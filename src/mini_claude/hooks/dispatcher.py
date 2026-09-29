@@ -5,9 +5,8 @@
   {"decision":"block","reason":...} 也阻断；结构化裁决
   {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":
   "allow"|"deny"|"ask","updatedInput":{...},"permissionDecisionReason":"..."}}——
-  deny 阻断、allow 免确认（跳过权限 ask）、updatedInput 改写工具入参；
-  permissionDecision="ask"（强制确认）v1 不支持，按放行处理并记日志
-  （已知分歧点）。updatedInput 改写结果会喂给权限系统与工具执行。
+  deny 阻断、allow 免确认（跳过权限 ask）、ask 强制确认（无视规则/模式
+  走确认通道）、updatedInput 改写工具入参（喂给权限系统与执行）。
   其他非零/超时 = 非阻断错误（放行+记日志）
 - PostToolUse：stdout JSON {"replacement": "..."} 替换工具输出；不可阻断
 - Stop：exit 2 / decision=block 阻断回合结束（原因喂回续跑，单回合硬顶一次）
@@ -38,11 +37,14 @@ class HookVerdict:
 
     blocked: 阻断原因（None=放行）
     allow: hook 显式放行（跳过权限 ask——本体 permissionDecision="allow"）
+    force_ask: hook 强制确认（本体 permissionDecision="ask"——无视规则/模式
+        直接走确认通道）
     updated_input: hook 改写后的工具入参（None=不改写；会喂给权限系统与执行）
     """
 
     blocked: Optional[str] = None
     allow: bool = False
+    force_ask: bool = False
     updated_input: Optional[Dict[str, Any]] = None
 
 
@@ -117,8 +119,8 @@ class HookDispatcher:
                 if decision == "allow":
                     verdict.allow = True
                 elif decision == "ask":
-                    # 本体支持强制确认；v1 未接线，按放行处理（已知分歧点）
-                    logger.debug("PreToolUse permissionDecision=ask not supported, allowing")
+                    # 强制确认（收敛批次②补全三值语义）：无视规则/模式走确认通道
+                    verdict.force_ask = True
                 updated = hook_out.get("updatedInput") or data.get("updatedInput")
                 if isinstance(updated, dict):
                     verdict.updated_input = updated

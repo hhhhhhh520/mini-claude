@@ -16,6 +16,7 @@ from ._shared import (
 )
 from ...mcp.bridge import McpConfirmationRequired
 from ...permissions.manager import PermissionAskRequired
+from ...utils.result_clip import clip_tool_result
 
 
 def convert_message(msg) -> Dict[str, Any]:
@@ -356,6 +357,8 @@ async def execute_single_tool(
         if state_extras is not None and result_tasks is not baseline:
             state_extras["tasks"] = result_tasks
             tasks_mod.set_session_tasks(result_tasks)
+            # 跨会话落盘（收敛批次②D）：任务变更写透，重启后新会话可接续
+            tasks_mod.persist_tasks(result_tasks)
         new_messages.append(
             ToolMessage(
                 content=str(out),
@@ -423,7 +426,7 @@ async def execute_single_tool(
 
         new_messages.append(
             ToolMessage(
-                content=str(result),
+                content=clip_tool_result(str(result)),
                 name=tool_name,
                 tool_call_id=tool_call_id,
                 status="success",

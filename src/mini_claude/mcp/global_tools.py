@@ -9,7 +9,7 @@
   MCP_ENABLED=false 或从未连接时这些工具不占工具列表
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ..tools.base import BaseTool, tool_registry
 from ..utils.logger import get_logger
@@ -168,6 +168,57 @@ class McpGetPromptTool(BaseTool):
             return f"Error: {e.args[0]}"
         except Exception as e:
             return f"Error: 获取 prompt 失败：{type(e).__name__}: {e}"
+
+
+async def expand_mcp_prompt_command(text: str) -> Optional[str]:
+    """把 `/mcp__<server>__<prompt> [{json 参数}]` 展开为纯文本输入。
+
+    对齐 Claude Code：MCP prompt 注册为斜杠命令，键入即展开注入输入流。
+    命中条件：server 已连接且该 prompt 存在——否则返回 None（走原命令
+    流程，未知命令按普通消息处理）。
+    """
+    if not text.startswith("/mcp__"):
+        return None
+    parts = text[1:].split(None, 1)
+    stem = parts[0][len("mcp__") :]
+    tail = parts[1].strip() if len(parts) > 1 else ""
+    if "__" not in stem:
+        return None
+    server, prompt_name = stem.split("__", 1)
+    if not server or not prompt_name:
+        return None
+
+    arguments: Optional[dict] = None
+    if tail:
+        import json
+
+        try:
+            parsed = json.loads(tail)
+        except json.JSONDecodeError:
+            return None  # 参数不是 JSON → 不当 prompt 命令处理
+        if not isinstance(parsed, dict):
+            return None
+        arguments = parsed
+
+    from .manager import get_mcp_manager
+
+    mgr = get_mcp_manager()
+    if server not in mgr._connections:
+        return None
+    try:
+        prompts = await mgr.list_prompts()
+    except Exception:
+        return None
+    if not any(p["server"] == server and p["name"] == prompt_name for p in prompts):
+        return None
+
+    try:
+        return await mgr.get_prompt_expansion(server, prompt_name, arguments)
+    except Exception as e:
+        logger.warning(
+            "mcp prompt expansion failed", server=server, prompt=prompt_name, error=str(e)
+        )
+        return None
 
 
 def ensure_global_tools_registered() -> None:

@@ -84,6 +84,9 @@ class LLMSettings(BaseSettings):
     # act 内的 handle_token_budget 摘要只作用于当次 prompt，不回写 checkpoint——
     # 真正缩减持久历史只有这条路（对齐 Claude Code auto-compact）。
     auto_compact_enabled: bool = Field(default=True)
+    # 工具结果尺寸上限（收敛批次②C，对齐本体 maxResultSizeChars）：
+    # act/ask 两条执行链统一截断超大输出，防止单次失控调用吃满 context
+    tool_result_max_chars: int = Field(default=24000)
 
     # LLM output settings
     llm_max_tokens: int = Field(default=16384)  # Max output tokens for LLM calls

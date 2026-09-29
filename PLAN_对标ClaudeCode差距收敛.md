@@ -162,7 +162,8 @@
 - ~~web 三件套异步化~~ 已完成（2026-09-28：httpx 共享 client + ddgs to_thread；注意 AsyncClient 构造的 SSL 证书库同步加载 ~0.2s，必须用进程级共享实例）
 - ~~Task 系统 v2~~ 已完成（2026-09-28：task_create/update/list/get——编号只增不复用、依赖边双向同步防环、owner 委派子代理；state.tasks 全量替换唯一事实源，act 经 state_extras 通道回写、每轮覆盖模块级 store）
 - ~~差距分析 Top3~~ 已完成（2026-09-28 收敛批次①）：①PreToolUse `updatedInput`/`allow` 结构化裁决 + payload 增强（session_id/permission_mode/cwd/$CLAUDE_PROJECT_DIR；ask 仍不支持）；②auto-compact 落盘（REPL 回合前 check_budget 超限即播种压缩，tasks/todos 随迁，60s 冷静期）；③/rewind 代码回退（file_history 会话日志 + `/rewind <n> [chat|code|both]`，进程内日志的诚实边界已声明）
-- 差距清单剩余（按性价比排序）：hook 强制确认（ask）、MCP prompts 注册为斜杠命令、权限规则工具语法（Bash(git diff:*) 形态）、持久 bash 会话（cwd/env 跨调用）、可定义子代理（.mini-claude/agents/*.md）、Task 清单跨会话落盘、plan 模式审批流、系统提示词调校加厚、工具结果尺寸统一上限
+- ~~hook 强制确认（ask）~~ / ~~MCP prompts 注册为斜杠命令~~ / ~~Task 清单跨会话落盘~~ / ~~工具结果尺寸统一上限~~ 已完成（2026-09-28 收敛批次②）
+- 差距清单剩余（按性价比排序）：权限规则工具语法（Bash(git diff:*) 形态）、持久 bash 会话（cwd/env 跨调用）、可定义子代理（.mini-claude/agents/*.md）、plan 模式审批流、系统提示词调校加厚
 - `ScheduleCronTool` 定时任务、Agent Teams；MCP OAuth（HTTP transport 已完成）
 - ~~CLAUDE.md `@import`~~ 已完成（2026-09-28：@path/@./x/@~/x/@abs 五跳防环 + CLAUDE.local.md）；扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
 - ~~MCP HTTP transport + resources/prompts~~ 已完成（2026-09-28：`type:http` + url/headers（type 缺省按字段推断，sse 显式拒绝）；resources/prompts 四个全局只读工具，连接时幂等注册；真 FastMCP+uvicorn 回环 E2E；OAuth 未做）

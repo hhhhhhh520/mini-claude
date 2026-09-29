@@ -157,6 +157,22 @@ class TestOrderWithRealChain:
         hooks.dispatch_pre_tool_use.assert_awaited_once()
         hooks.dispatch_post_tool_use.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_hook_force_ask_overrides_allow_rules(self, probe, monkeypatch):
+        """permissionDecision=ask：即使规则允许也强制走确认通道"""
+        hooks = SimpleNamespace(
+            dispatch_pre_tool_use=AsyncMock(return_value=HookVerdict(force_ask=True)),
+            dispatch_post_tool_use=AsyncMock(return_value=None),
+        )
+        perm = PermissionManager(allow_rules=parse_rules(["gate_probe"]), enabled=True)
+        _patch_managers(monkeypatch, permission=perm, hooks=hooks)
+
+        from mini_claude.permissions.manager import PermissionAskRequired
+
+        with pytest.raises(PermissionAskRequired):
+            await tool_registry.execute("gate_probe", {})
+        assert DummyTool.executed is False
+
 
 class TestHookVerdictWiring:
     """收敛批次①：allow 免确认、updatedInput 改写入参喂给权限与执行"""

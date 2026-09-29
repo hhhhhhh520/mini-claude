@@ -290,6 +290,21 @@ class McpManager:
             lines.append(f"{role}: {text}")
         return "\n".join(lines) or "(prompt 内容为空)"
 
+    async def get_prompt_expansion(
+        self, server: str, name: str, arguments: Optional[dict] = None
+    ) -> str:
+        """取 prompt 并返回纯文本展开（无 role 前缀）——斜杠命令注入输入流用
+        （收敛批次②B，对齐 Claude Code 把 MCP prompt 注册为斜杠命令）。"""
+        conn = self._get_connection(server)
+        result = await conn.session.get_prompt(name, arguments or {})
+        parts: List[str] = []
+        for m in getattr(result, "messages", []) or []:
+            content = getattr(m, "content", None)
+            text = getattr(content, "text", None)
+            if text is not None and text.strip():
+                parts.append(text)
+        return "\n\n".join(parts)
+
     def approve_tool(self, server: str, tool: str) -> None:
         self._approved.add(_approve_key(server, tool))
 

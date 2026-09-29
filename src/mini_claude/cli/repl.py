@@ -97,6 +97,9 @@ class REPLSession:
         self._session_hook_context = ""
         # auto-compact 限频时间戳（冷静期 60s，防止连续压缩空转）
         self._last_auto_compact_ts = 0.0
+        # Task 清单跨会话落盘（收敛批次②D）：新会话装载的持久清单，
+        # 随首个回合增量播种进 state（resume 以 checkpoint 为准，不播种）
+        self._pending_task_seed = None
 
     def _get_profile_manager(self) -> UserProfileManager:
         """Get or create profile manager."""
@@ -240,6 +243,14 @@ class REPLSession:
         if connected:
             display.console.print(f"[dim]MCP 已连接: {', '.join(connected)}[/]")
 
+    def _apply_task_seed(self, turn_state):
+        """把持久任务清单播种进首个回合增量（tasks 全量替换语义，用后即清）。"""
+        if self._pending_task_seed is None:
+            return turn_state
+        merged = {**turn_state, "tasks": list(self._pending_task_seed)}
+        self._pending_task_seed = None
+        return merged
+
     async def _maybe_auto_compact(self, graph) -> None:
         """auto-compact（收敛批次②）：回合前预算检查，超限即压缩落盘。
 
@@ -325,6 +336,16 @@ class REPLSession:
             except Exception as e:
                 logger.debug("session recovery prompt failed", error=str(e))
 
+        # Task 清单跨会话落盘（收敛批次②D）：新会话（非 resume）装载持久清单，
+        # 随首个回合增量播种进 state；resume 以 checkpoint 为准（不播种）
+        if not resumed:
+            from ..tools.tasks import load_persisted_tasks
+
+            seeded = load_persisted_tasks()
+            if seeded:
+                self._pending_task_seed = seeded
+                display.console.print(f"[dim]已装载上次会话的任务清单（{len(seeded)} 项）[/]")
+
         # SessionStart hook（P5 尾部事件）：MCP 自动连接后、主循环前触发，
         # 非阻断；stdout/additionalContext 注入会话级上下文（走 hook_context
         # 通道每回合前置，全量替换语义——见 AgentState.hook_context 注释）
@@ -351,9 +372,21 @@ class REPLSession:
 
                 # Handle commands
                 if user_input.startswith("/"):
-                    handled = await self._handle_command(user_input.strip())
-                    if handled:
-                        continue
+                    # MCP prompt 斜杠命令（收敛批次②B）：/mcp__<server>__<prompt>
+                    # 命中即展开注入输入流（对齐 Claude Code）；未命中走原命令流程
+                    try:
+                        from ..mcp.global_tools import expand_mcp_prompt_command
+
+                        expanded = await expand_mcp_prompt_command(user_input.strip())
+                    except Exception:
+                        expanded = None
+                    if expanded:
+                        display.console.print(f"[dim]已展开 MCP prompt：{user_input.strip()}[/]")
+                        user_input = expanded
+                    else:
+                        handled = await self._handle_command(user_input.strip())
+                        if handled:
+                            continue
 
                 # Check for path confirmation response
                 user_lower = user_input.strip().lower()
@@ -427,6 +460,7 @@ class REPLSession:
                             part for part in (self._session_hook_context, up_context) if part
                         ),
                     )
+                    turn_state = self._apply_task_seed(turn_state)
 
                     configurable = {"thread_id": self.thread_id}
                     if self._rewind_configurable is not None:
