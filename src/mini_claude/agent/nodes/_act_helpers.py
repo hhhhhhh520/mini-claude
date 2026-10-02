@@ -15,7 +15,7 @@ from ._shared import (
     llm_provider,
 )
 from ...mcp.bridge import McpConfirmationRequired
-from ...permissions.manager import PermissionAskRequired
+from ...permissions.manager import PermissionAskRequired, PlanApprovalRequired
 from ...utils.result_clip import clip_tool_result
 
 
@@ -497,6 +497,31 @@ async def execute_single_tool(
         return new_messages, {
             "stop_reason": StopReason.WAITING_CONFIRMATION,
             "pending_confirmation_path": f"perm:{e.tool}:{e.arg}",
+        }
+
+    except PlanApprovalRequired as e:
+        # plan 审批（收敛批次③C）：同一确认通道，键 "plan"；用户 yes 后
+        # route_confirmation_key 切到 accept_edits，模型随即执行已批准的计划
+        from ._shared import StopReason
+
+        logger.debug("plan approval required")
+        preview = e.plan[:2000] + ("…" if len(e.plan) > 2000 else "")
+        new_messages.append(
+            ToolMessage(
+                content=(
+                    "计划已提交，等待用户审批：\n\n"
+                    f"{preview}\n\n"
+                    "请回复 'yes' 或 'y' 批准计划并开始执行（会话切换到执行模式），"
+                    "或回复修改意见留在 plan 模式修订。"
+                ),
+                name=tool_name,
+                tool_call_id=tool_call_id,
+                status="success",
+            )
+        )
+        return new_messages, {
+            "stop_reason": StopReason.WAITING_CONFIRMATION,
+            "pending_confirmation_path": "plan",
         }
 
     except (FileNotFoundError, PermissionError, OSError) as e:

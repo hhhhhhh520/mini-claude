@@ -207,6 +207,16 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
         "risk_level": "low",
         "description": "Print working directory",
     },
+    "cd": {
+        # 收敛批次③D：cwd 会话持久化的前提。cd 本身无文件系统副作用；
+        # 链式使用（cd x && y）仍被 shell 注入检查拦截——模型应单发
+        # `cd <dir>`，后续调用经会话 cwd 前缀在新目录起跑。
+        # allowed_args=2：cmd 的 `/d` 不以 "-" 开头会被 shlex 归入位置参数
+        "allowed_flags": ["-L", "-P"],
+        "allowed_args": 2,
+        "risk_level": "low",
+        "description": "Change session working directory (persists across calls)",
+    },
     "which": {
         "allowed_flags": ["-a"],
         "allowed_args": 1,

@@ -375,6 +375,42 @@
   被迫走真实 provider 分支（无 key 即炸）——图级 fake 测试统一旁路降级管理器
 - E2E 里按快照内容（而非列表序号）选取 fork 边界，避免对 checkpoint 排序的隐式依赖
 
+## 2026-09-28 对标收敛批次③：权限 specifier / 可定义子代理 / plan 审批流 / bash cwd 持久化
+
+### 交付
+- **③A 权限规则 `Tool(specifier)` 语法**（对齐 Claude Code，与遗留
+  `tool:pattern` 并存）：命令类 `run_command(git diff:*)` 前缀/精确；
+  路径类 `edit_file(src/**)`、`read_file(~/x)`、`force_write(//C:/x)`
+  glob（全 posix 归一对比，Windows 大小写不敏感）；`web_fetch(domain:x)`
+  含子域。括号优先于 ":" 拆分
+- **③B 可定义子代理** `utils/agent_definitions.py`：`.mini-claude/agents/*.md`
+  frontmatter（name/description/tools）+ 正文=子代理提示词；两级扫描项目
+  覆盖用户级；tools 逐名校验 registry 存在性（拼错不静默）；model 字段
+  解析到即 warning 忽略（诚实边界：全局 provider）；spawn_agent 新参
+  agent_type，未知类型报错回流，description 动态列出可用类型
+- **③C plan 模式审批流**：`exit_plan_mode` 工具（非 MUTATING——plan 只读闸
+  的唯一出闸口）→ `PlanApprovalRequired` → act 转 WAITING_CONFIRMATION
+  （pending 键 "plan"）→ 用户 yes 经 route_confirmation_key 切 accept_edits
+  开始执行；no 留在 plan 模式修订
+- **③D bash cwd 会话持久化**：run_command 结束后取最终 cwd 存会话级，
+  下条命令自动 `cd` 前缀起跑（run_background 同前缀不捕获）；
+  `cd` 入白名单（allowed_args=2 容纳 cmd 的 /d）。诚实边界：env 不持久
+
+### 两个 shell 陷阱（实测踩中，写进 _wrap_cwd_capture docstring）
+- **cmd /c 遇内嵌换行只执行第一行**——`\r\n` 串联的哨兵命令被静默吞掉，
+  表现为"命令成功但 cwd 永不更新"
+- **cmd 的 %CD% 在整行解析时展开**——`cd /d "x" & echo %CD%` 拿到 cd 之前的
+  老目录；改用 `cd`（无参，执行时打印）重定向临时文件回传
+- 修法验证路径：先证"输出为空"（换行吞）→ 再证"捕获到老目录"（解析期
+  展开）→ 各自对症
+
+### 验证
+- 定向：permissions 全家 52 + agent_definitions 8 + plan_approval 8 +
+  bash_cwd 5 = 73 全绿
+- 全量两层四场景 + ruff：CI 筛选层 **2134 passed / 40 skipped**（收集 2215，正常与
+  不可达×严格 msgpack 一致）、integration 层 **152 passed / 1 skipped**（离线+正常
+  各一遍）、ruff 全绿
+
 ## 2026-09-28 对标收敛批次②：hook ask 补全 + MCP prompts 斜杠命令化 + 工具结果上限 + Task 落盘
 
 ### 交付

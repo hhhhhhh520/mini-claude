@@ -45,7 +45,20 @@ class SpawnAgentTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "Spawn a sub-agent to handle a specific task in parallel"
+        base = (
+            "Spawn a sub-agent to handle a specific task. Use agent_type to select "
+            "a custom agent defined in .mini-claude/agents/*.md (own prompt + tool "
+            "restrictions); omit for a general-purpose agent."
+        )
+        try:
+            from ..utils.agent_definitions import available_agent_names
+
+            names = available_agent_names()
+            if names:
+                base += f" Available agent_type values: {', '.join(names)}."
+        except Exception:
+            pass
+        return base
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -63,6 +76,12 @@ class SpawnAgentTool(BaseTool):
                 "agent_id": {
                     "type": "string",
                     "description": "Optional ID for the agent (auto-generated if not provided)",
+                },
+                "agent_type": {
+                    "type": "string",
+                    "description": (
+                        "Optional custom agent type defined in .mini-claude/agents/*.md"
+                    ),
                 },
             },
             "required": ["task"],
@@ -134,10 +153,22 @@ class SpawnAgentTool(BaseTool):
         else:
             return messages[-1].content if messages else "No result"
 
-    async def execute(self, task: str, context: str = "", agent_id: str = None) -> str:
+    async def execute(
+        self, task: str, context: str = "", agent_id: str = None, agent_type: str = ""
+    ) -> str:
         # Generate agent ID if not provided
         if not agent_id:
             agent_id = generate_agent_id("subagent")
+
+        # 可定义子代理（收敛批次③B）：agent_type 命中定义则用自定义
+        # 提示词 + 定义的白名单；未知类型直接报错回流给 LLM 自纠
+        definition = None
+        if agent_type:
+            from ..utils.agent_definitions import get_agent_definition
+
+            definition = get_agent_definition(agent_type)
+            if definition is None:
+                return f"Error: 未知的 agent_type {agent_type!r}（检查 .mini-claude/agents/*.md）"
 
         # Create sub-agent task with full tool loop
         async def subagent_task(progress_callback=None):
@@ -153,7 +184,12 @@ class SpawnAgentTool(BaseTool):
                 await progress_callback(0.1, "Starting sub-agent")
 
             # Get specialized prompt
-            prompt = get_subagent_prompt(task, context)
+            if definition is not None:
+                from ..utils.agent_definitions import build_custom_agent_prompt
+
+                prompt = build_custom_agent_prompt(definition, task, context)
+            else:
+                prompt = get_subagent_prompt(task, context)
 
             if progress_callback:
                 await progress_callback(0.3, "Processing task")
@@ -164,7 +200,12 @@ class SpawnAgentTool(BaseTool):
 
                 # CRITICAL: Mark as subagent and limit allowed tools
                 # Sub-agents cannot spawn more agents (prevent infinite recursion)
-                subagent_allowed_tools = self.ALLOWED_TOOLS
+                if definition is not None:
+                    from ..utils.agent_definitions import resolve_agent_tools
+
+                    subagent_allowed_tools = resolve_agent_tools(definition)
+                else:
+                    subagent_allowed_tools = self.ALLOWED_TOOLS
 
                 state = create_initial_state(
                     prompt,

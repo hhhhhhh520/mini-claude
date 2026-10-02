@@ -42,6 +42,18 @@ class PermissionAskRequired(Exception):
         super().__init__(f"Permission ask required: {tool}:{arg}")
 
 
+class PlanApprovalRequired(Exception):
+    """plan 模式下 exit_plan_mode 提交计划，需用户批准（收敛批次③C）。
+
+    Attributes:
+        plan: 提交的计划文本（展示给用户）
+    """
+
+    def __init__(self, plan: str):
+        self.plan = plan
+        super().__init__("Plan approval required")
+
+
 def _ask_key(tool: str, arg: str) -> str:
     return f"{tool}:{arg}"
 

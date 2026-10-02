@@ -26,6 +26,7 @@ from .web_search import WebSearchTool
 from .web_fetch import WebFetchTool
 from .weather import WeatherTool
 from .todos import TodoWriteTool, validate_todos
+from .plan_mode import ExitPlanModeTool
 from .tasks import (
     TaskCreateTool,
     TaskUpdateTool,
@@ -131,6 +132,8 @@ __all__ = [
     # Todos
     "TodoWriteTool",
     "validate_todos",
+    # Plan mode
+    "ExitPlanModeTool",
     # Tasks (v2)
     "TaskCreateTool",
     "TaskUpdateTool",

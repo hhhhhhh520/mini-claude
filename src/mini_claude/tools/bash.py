@@ -3,7 +3,7 @@
 import asyncio
 import os
 import tempfile
-from typing import Dict, Any
+from typing import Any, Dict, List, Optional
 
 from .base import BaseTool, register_tool
 from ..utils.logger import get_logger
@@ -36,6 +36,77 @@ async def cleanup_all_background_processes() -> None:
     _background_processes.clear()
 
 
+# ---- 会话级 cwd 持久化（收敛批次③D） ----
+# 诚实边界：持久的是**工作目录**（cd 跨调用生效），env 变量不持久
+# （本体的 shell snapshot 机制未做）。实现为"cd 前缀 + 哨兵捕获"而非
+# 持久进程：每条命令在会话 cwd 里起跑，结束后取回最终 cwd。
+_session_cwd: Optional[str] = None
+_CWD_SENTINEL = "__MC_CWD__"
+
+
+def get_session_cwd() -> Optional[str]:
+    return _session_cwd
+
+
+def set_session_cwd(path: Optional[str]) -> None:
+    global _session_cwd
+    _session_cwd = path
+
+
+def _cd_prefix() -> str:
+    """回到会话 cwd 的命令前缀（cmd 用 /d 跨盘；sh 用引号）。"""
+    if not _session_cwd:
+        return ""
+    if os.name == "nt":
+        return f'cd /d "{_session_cwd}" & '
+    return f'cd "{_session_cwd}" && '
+
+
+def _wrap_cwd_capture(command: str) -> str:
+    """命令后追加取 cwd 的收尾命令。
+
+    平台分治（两个 shell 展开时机的坑都实测踩过）：
+    - Windows：不能用 `%CD%`——它在**整行解析时**展开，拿到的是 cd 之前的
+      老目录；也不能用换行——cmd /c 遇到内嵌换行只执行第一行。改为把
+      `cd`（无参，**执行时**打印当前目录）重定向到临时文件。
+    - POSIX：`$PWD` 在该段命令执行时展开，`;` 串联即可。
+    """
+    if os.name == "nt":
+        cwd_file = os.path.join(tempfile.gettempdir(), f"mini_claude_cwd_{os.getpid()}.tmp")
+        return f'{command} & cd>"{cwd_file}"'
+    return f"{command}; echo {_CWD_SENTINEL}$PWD"
+
+
+def _read_cwd_file() -> Optional[str]:
+    """读取并删除 Windows 侧的 cwd 临时文件（尽力而为）。"""
+    cwd_file = os.path.join(tempfile.gettempdir(), f"mini_claude_cwd_{os.getpid()}.tmp")
+    try:
+        with open(cwd_file, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read().strip()
+        os.remove(cwd_file)
+        return content or None
+    except OSError:
+        return None
+
+
+def _extract_cwd(output: str) -> Optional[str]:
+    """从输出末尾解析哨兵行；没有（超时被杀等）返回 None（cwd 不变）。"""
+    cwd = None
+    lines = output.splitlines()
+    keep: List[str] = []
+    for line in lines:
+        if line.startswith(_CWD_SENTINEL):
+            candidate = line[len(_CWD_SENTINEL) :].strip()
+            if candidate:
+                cwd = candidate
+            continue  # 哨兵行从输出剔除
+        keep.append(line)
+    if cwd is not None:
+        set_session_cwd(cwd)
+        return "\n".join(keep)
+    return None
+
+
 class RunCommandTool(BaseTool):
     """Execute a shell command."""
 
@@ -45,7 +116,13 @@ class RunCommandTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "[LAST RESORT] Execute a shell command. Only use when no other tool is suitable. Prefer read_file, write_file, edit_file, list_dir, search_files for file operations."
+        return (
+            "[LAST RESORT] Execute a shell command. Only use when no other tool is "
+            "suitable. Prefer read_file, write_file, edit_file, list_dir, "
+            "search_files for file operations. The working directory persists "
+            "across calls: `cd` in one command carries into the next (env vars "
+            "do not persist)."
+        )
 
     @property
     def parameters(self) -> Dict[str, Any]:
@@ -90,6 +167,10 @@ class RunCommandTool(BaseTool):
         if not is_safe:
             return f"Error: {reason}"
 
+        # 收敛批次③D：会话 cwd 前缀 + 结束后取最终工作目录
+        command = _cd_prefix() + command
+        command = _wrap_cwd_capture(command)
+
         try:
             process = await asyncio.create_subprocess_shell(
                 command,
@@ -110,6 +191,16 @@ class RunCommandTool(BaseTool):
                 output.append(f"STDERR:\n{stderr.decode('utf-8', errors='replace')}")
 
             result = "\n".join(output) or "(no output)"
+            if os.name == "nt":
+                # Windows：cwd 经临时文件回传（%CD% 的解析期展开坑见
+                # _wrap_cwd_capture docstring）；输出本身无哨兵行，无需剔除
+                new_cwd = _read_cwd_file()
+                if new_cwd:
+                    set_session_cwd(new_cwd)
+            else:
+                stripped = _extract_cwd(result)
+                if stripped is not None:
+                    result = stripped
             return f"Exit code: {process.returncode}\n{result}"
 
         except Exception as e:
@@ -145,6 +236,9 @@ class RunBackgroundTool(BaseTool):
         is_safe, reason = validate_command(command)
         if not is_safe:
             return f"Error: {reason}"
+
+        # 收敛批次③D：后台命令同样从会话 cwd 起跑（不捕获——进程长驻）
+        command = _cd_prefix() + command
 
         try:
             # P4-2：输出重定向到文件。PIPE 写满会卡死子进程（无人消费），

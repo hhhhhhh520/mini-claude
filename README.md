@@ -26,13 +26,13 @@
 - **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md`、工作区 `CLAUDE.md` 与 `CLAUDE.local.md` 作为持久约定；支持 `@path` 引用展开（5 跳防环，含代码文件）（`CLAUDE_MD_ENABLED` 可关）
 - **MCP 支持**：接入 Model Context Protocol 服务器（stdio + streamable HTTP），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道；resources/prompts 经 `mcp_list_resources`/`mcp_read_resource`/`mcp_list_prompts`/`mcp_get_prompt` 只读访问（对齐 Claude Code 生态）
 - **Hooks**：PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop/SessionStart/SessionEnd/PreCompact/SubagentStart 十事件（对齐 Claude Code 事件面），用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换 / additionalContext 注入），超时强杀
-- **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则（glob 匹配主参数），deny > ask > allow > 模式默认
+- **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则——支持 Claude Code 的 `Tool(specifier)` 语法：`run_command(git diff:*)` 命令前缀、`edit_file(src/**)` 路径 glob、`web_fetch(domain:x)` 域名（与遗留 `tool:pattern` 并存），deny > ask > allow > 模式默认；plan 模式配 `exit_plan_mode` 审批流（批准即转执行）
 - **会话回退**：`/rewind` 列出回合边界 checkpoint，支持 `[chat|code|both]` 三种范围——对话分叉重跑之外还能**恢复文件**（write/edit/force_write 的修改按快照时间戳回放：改写恢复、新建删除；会话内日志，侧门修改除外）
 - **上下文压缩**：`/compact [指令]` 手动压缩会话历史（LLM 摘要 + 新线程播种，旧 checkpoint 链保留；自定义指令透传摘要提示词）；**auto-compact** 回合前预算超限自动压缩落盘（`AUTO_COMPACT_ENABLED` 可关，60s 冷却）
 - **多工作目录**：`/add-dir <目录>` 会话级追加工作根（路径校验对所有已注册根放行，保护路径与穿越检查不放松）
 - **后台任务**：`run_background` 输出落盘，`task_output`/`task_kill` 读取与终止（对齐 BashOutput/KillShell）
 - **模型热切换**：`/model <name>` 会话内即时切换（含子代理），`.env` 默认值不动
-- **测试规模**：2179 个测试用例（2026-09-28 实测收集数）
+- **测试规模**：2215 个测试用例（2026-09-28 实测收集数）
 
 ## 安装
 
@@ -267,7 +267,7 @@ GOOGLE_API_KEY=your-gemini-key
 ### 命令执行 (4个)
 | 工具 | 功能 |
 |------|------|
-| `run_command` | 执行Shell命令 |
+| `run_command` | 执行Shell命令（工作目录跨调用持久，env 不持久） |
 | `run_background` | 后台执行长时间命令 |
 | `task_output` | 读取后台任务输出（对齐 BashOutput） |
 | `task_kill` | 终止后台任务（对齐 KillShell） |
@@ -291,7 +291,7 @@ GOOGLE_API_KEY=your-gemini-key
 ### Agent协作 (8个)
 | 工具 | 功能 |
 |------|------|
-| `spawn_agent` | 启动单个子Agent |
+| `spawn_agent` | 启动单个子Agent（`agent_type` 可选 `.mini-claude/agents/*.md` 自定义类型：专属提示词+工具白名单） |
 | `spawn_parallel` | 并行启动多个子Agent（简单模式） |
 | `list_agents` | 查看所有子Agent状态 |
 | `get_result` | 获取子Agent结果 |
