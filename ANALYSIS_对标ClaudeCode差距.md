@@ -2,6 +2,10 @@
 
 > 分析时间: 2026-09-26（会话内完成），2026-09-27 补档落盘
 > 结论供《PLAN_对标ClaudeCode差距收敛.md》引用；补充参考：free-code 逆向源码（`D:\Free-Claude\free-code-main`，仅作规格参考，不搬运代码）
+>
+> **⚠️ 状态（2026-10-02）：本文是历史分析，下列差距已全部收敛**——MCP（stdio+HTTP+OAuth，7286e32）、
+> Hooks 十事件、CLAUDE.md 自动加载、TodoWrite/任务系统、细粒度权限、rewind、/compact、
+> 自动压缩均已落地，销项明细见 PLAN 文档。本文保留作为起点基线，勿据此判断现状。
 
 ## 总体判断
 

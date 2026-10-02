@@ -1,7 +1,8 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-09-27 (P1~P4 全部落地：Todo/CLAUDE.md/MCP/Hooks/权限/rewind/后台任务/model 热切换；修复多轮消息复制 bug)
+> 最后更新: 2026-10-02 (MCP OAuth：http server 授权码+PKCE+动态注册，token 落盘自动刷新；
+> 连接失败异常翻译 McpOAuthError/McpConnectError；测试收集 2291，CI 9 job 全绿)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
