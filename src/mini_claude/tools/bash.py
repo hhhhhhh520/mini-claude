@@ -43,6 +43,62 @@ async def cleanup_all_background_processes() -> None:
 _session_cwd: Optional[str] = None
 _CWD_SENTINEL = "__MC_CWD__"
 
+# ---- 会话级 env 持久化（收敛批次④A） ----
+# 只捕获**显式** `export K=V`（POSIX）/ `set K=V`（cmd）——脚本/子进程里
+# 的 export 对会话不可见（诚实边界，与 cwd 同级）。注入顺序：先 env 后 cd。
+_session_env: Dict[str, str] = {}
+
+
+def get_session_env() -> Dict[str, str]:
+    return dict(_session_env)
+
+
+def set_session_env(env: Dict[str, str]) -> None:
+    global _session_env
+    _session_env = dict(env or {})
+
+
+def reset_session_env() -> None:
+    _session_env.clear()
+
+
+def _parse_env_assignments(command: str) -> Dict[str, str]:
+    """从命令里解析显式的 export K=V / set K=V 赋值（尽力而为）。
+
+    只认单行内的直接赋值：POSIX `export K=V [K2=V2 ...]`（shlex 分词，
+    引号内空格保留）；cmd `set K=V...`（行内其余部分整体为值，剥一层引号）。
+    """
+    import re
+    import shlex
+
+    out: Dict[str, str] = {}
+    name_re = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+    if os.name != "nt":
+        for line in command.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("export "):
+                continue
+            try:
+                tokens = shlex.split(stripped)[1:]
+            except ValueError:
+                continue
+            for token in tokens:
+                if "=" in token:
+                    key, _, value = token.partition("=")
+                    if name_re.match(key):
+                        out[key] = value
+    else:
+        for line in command.splitlines():
+            m = re.match(r'^\s*set\s+"?([A-Za-z_][A-Za-z0-9_]*)=(.*)"?$', line, re.IGNORECASE)
+            if m:
+                key, value = m.group(1), m.group(2).strip()
+                if value.endswith('"'):
+                    value = value[:-1]
+                if name_re.match(key):
+                    out[key] = value
+    return out
+
 
 def get_session_cwd() -> Optional[str]:
     return _session_cwd
@@ -168,6 +224,9 @@ class RunCommandTool(BaseTool):
             return f"Error: {reason}"
 
         # 收敛批次③D：会话 cwd 前缀 + 结束后取最终工作目录
+        # 收敛批次④A：显式 export/set 记进会话 env，经子进程 env 注入——
+        # 不能用 set 前缀：cmd 的 %VAR% 在整行解析期展开，同行 set 完拿不到
+        _session_env.update(_parse_env_assignments(command))
         command = _cd_prefix() + command
         command = _wrap_cwd_capture(command)
 
@@ -176,6 +235,7 @@ class RunCommandTool(BaseTool):
                 command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, **_session_env},
             )
 
             try:
@@ -238,6 +298,9 @@ class RunBackgroundTool(BaseTool):
             return f"Error: {reason}"
 
         # 收敛批次③D：后台命令同样从会话 cwd 起跑（不捕获——进程长驻）
+        # 收敛批次④A：显式 export/set 记进会话 env，经子进程 env 注入——
+        # 不能用 set 前缀：cmd 的 %VAR% 在整行解析期展开，同行 set 完拿不到
+        _session_env.update(_parse_env_assignments(command))
         command = _cd_prefix() + command
 
         try:
@@ -250,6 +313,7 @@ class RunBackgroundTool(BaseTool):
             env.update(
                 {"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8:replace", "PYTHONUNBUFFERED": "1"}
             )
+            env.update(_session_env)
 
             process = await asyncio.create_subprocess_shell(
                 command,

@@ -144,3 +144,27 @@ def load_claude_md(
         parts.append(content)
 
     return "\n\n".join(parts)
+
+
+def append_project_memory(text: str, workspace_root=None) -> str:
+    """向项目级 CLAUDE.md 追加一条记忆（/memory add 与 `#` 快速追加共用）。
+
+    文件不存在时创建（带最小头注释）。返回写入的文件路径；任何 IO 失败
+    抛给调用方展示（记忆是用户显式动作，失败应当可见）。
+    """
+    from ..config.settings import settings
+
+    root = Path(workspace_root) if workspace_root else Path(settings.workspace_root)
+    path = root / "CLAUDE.md"
+    if not path.is_file():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "# CLAUDE.md\n\n<!-- 项目记忆：本文件每次会话自动加载给 LLM -->\n",
+            encoding="utf-8",
+        )
+    text = text.strip()
+    if not text:
+        raise ValueError("记忆内容为空")
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(f"\n- {text}\n")
+    return str(path)

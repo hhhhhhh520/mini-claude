@@ -173,6 +173,7 @@ def get_command_registry() -> CommandRegistry:
             alert_handler,
             compact_handler,
             help_handler,
+            memory_handler,
             skill_handler,
             mcp_handler,
             permission_handler,
@@ -194,6 +195,7 @@ def get_command_registry() -> CommandRegistry:
             rewind_handler.RewindHandler,
             compact_handler.CompactHandler,
             add_dir_handler.AddDirHandler,
+            memory_handler.MemoryCommandHandler,
         ]:
             _registry.register(handler_class())
 

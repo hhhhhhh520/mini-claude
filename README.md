@@ -267,7 +267,7 @@ GOOGLE_API_KEY=your-gemini-key
 ### 命令执行 (4个)
 | 工具 | 功能 |
 |------|------|
-| `run_command` | 执行Shell命令（工作目录跨调用持久，env 不持久） |
+| `run_command` | 执行Shell命令（工作目录与显式 export/set 的环境变量均跨调用持久） |
 | `run_background` | 后台执行长时间命令 |
 | `task_output` | 读取后台任务输出（对齐 BashOutput） |
 | `task_kill` | 终止后台任务（对齐 KillShell） |

@@ -201,6 +201,21 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
         "risk_level": "low",
         "description": "Display text",
     },
+    "export": {
+        # 收敛批次④A：env 会话持久化的前提。export 本身无文件系统副作用；
+        # 只有显式 export 的变量会被会话记住（脚本内的 export 不可见）
+        "allowed_flags": [],
+        "allowed_args": 16,
+        "risk_level": "low",
+        "description": "Persist environment variables for the session",
+    },
+    "set": {
+        # Windows cmd 的 set X=Y（env 持久化）；与链式注入检查并存
+        "allowed_flags": ["/a", "/p"],
+        "allowed_args": 4,
+        "risk_level": "low",
+        "description": "Set environment variable (Windows cmd)",
+    },
     "pwd": {
         "allowed_flags": [],
         "allowed_args": 0,

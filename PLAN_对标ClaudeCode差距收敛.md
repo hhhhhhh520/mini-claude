@@ -164,7 +164,8 @@
 - ~~差距分析 Top3~~ 已完成（2026-09-28 收敛批次①）：①PreToolUse `updatedInput`/`allow` 结构化裁决 + payload 增强（session_id/permission_mode/cwd/$CLAUDE_PROJECT_DIR；ask 仍不支持）；②auto-compact 落盘（REPL 回合前 check_budget 超限即播种压缩，tasks/todos 随迁，60s 冷静期）；③/rewind 代码回退（file_history 会话日志 + `/rewind <n> [chat|code|both]`，进程内日志的诚实边界已声明）
 - ~~hook 强制确认（ask）~~ / ~~MCP prompts 注册为斜杠命令~~ / ~~Task 清单跨会话落盘~~ / ~~工具结果尺寸统一上限~~ 已完成（2026-09-28 收敛批次②）
 - ~~权限规则工具语法~~ / ~~可定义子代理 agents/*.md~~ / ~~plan 模式审批流~~ / ~~bash cwd 持久化~~ 已完成（2026-09-28 收敛批次③；cwd 版本诚实边界：env 不持久，本体的 shell snapshot 未做）
-- 差距清单剩余（按性价比排序）：持久 bash 会话 env 快照、系统提示词调校加厚、MCP OAuth、Agent Teams/ScheduleCronTool
+- ~~bash env 快照~~（会话级显式 export/set 持久化） / ~~系统提示词调校加厚~~ / ~~CLAUDE.md 记忆快捷面（/memory + #）~~ 已完成（2026-09-28 收敛批次④）
+- 差距清单剩余：MCP OAuth（独立大块，依赖外部授权流）、Agent Teams/ScheduleCronTool（属未做新功能）——**已有功能的深度差距到此收敛完毕**
 - `ScheduleCronTool` 定时任务、Agent Teams；MCP OAuth（HTTP transport 已完成）
 - ~~CLAUDE.md `@import`~~ 已完成（2026-09-28：@path/@./x/@~/x/@abs 五跳防环 + CLAUDE.local.md）；扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
 - ~~MCP HTTP transport + resources/prompts~~ 已完成（2026-09-28：`type:http` + url/headers（type 缺省按字段推断，sse 显式拒绝）；resources/prompts 四个全局只读工具，连接时幂等注册；真 FastMCP+uvicorn 回环 E2E；OAuth 未做）

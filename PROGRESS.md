@@ -375,6 +375,36 @@
   被迫走真实 provider 分支（无 key 即炸）——图级 fake 测试统一旁路降级管理器
 - E2E 里按快照内容（而非列表序号）选取 fork 边界，避免对 checkpoint 排序的隐式依赖
 
+## 2026-09-28 对标收敛批次④：bash env 持久化 + 系统提示词加厚 + 记忆快捷面
+
+### 交付
+- **④A bash env 跨调用持久化**（补完持久 shell 故事）：显式 `export K=V`
+  （POSIX）/ `set K=V`（cmd）解析进会话 env，经 `create_subprocess_shell`
+  的 **env= 参数**注入子进程；export/set 入白名单。
+  **设计踩坑**：初版用 set 前缀注入——cmd 的 `%VAR%` 在整行解析期展开，
+  同行 set 完 echo 拿到旧值（实测空输出）；改走子进程 env 后时序问题
+  根除。诚实边界：脚本/子进程内的 export 对会话不可见
+- **④B 系统提示词加厚**：BASE_PROMPT 注入 "Working Guidelines"——任务管理
+  （3+ 步用 todo/task、恰一个 in_progress、委派闭环）、工具卫生
+  （专用工具优先/先读后改/截断感知）、运行环境事实（cwd 持久、env 需
+  显式 export、plan 只读 + exit_plan_mode）、代码纪律（不夹带重构/
+  不留桩、跑测试再收工）、沟通（结论先行、不无证据宣称成功）
+- **④C 记忆快捷面**：`/memory` 列出三级记忆文件与行数、`/memory add <文本>`
+  追加项目 CLAUDE.md（`claudemd.append_project_memory`，缺文件建带头版）；
+  REPL 输入 `# 内容` 快速追加记忆（不进对话不发给模型，对齐 Claude Code）
+
+### 验证
+- 定向：bash_env 9 + memory_and_prompt 11 全绿（env 设计返工一次后）
+- 全量两层四场景 + ruff：CI 筛选层 **2149 passed / 42 skipped**（收集 2232，正常与
+  不可达×严格 msgpack 一致）、integration 层 **152 passed / 1 skipped**（离线+正常
+  各一遍）、ruff 全绿
+
+### 实踩教训
+- cmd 展开时机的第二课：%VAR% 同行 set 后立即消费拿旧值（解析期展开）——
+  与批次③的 %CD% 坑同根，shell 语义类改动必须真跑子进程验证
+- 命令处理器解析参数先 strip 再 startswith 会吃掉尾部空格，"add   " 判空
+  失败——用 split(None, 1) 取词
+
 ## 2026-09-28 对标收敛批次③：权限 specifier / 可定义子代理 / plan 审批流 / bash cwd 持久化
 
 ### 交付

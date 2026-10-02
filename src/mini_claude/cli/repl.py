@@ -370,6 +370,18 @@ class REPLSession:
                 if not user_input.strip():
                     continue
 
+                #  快速追加记忆（收敛批次④C）：写入项目 CLAUDE.md，
+                # 不进对话、不发给模型（对齐 Claude Code 的 # 快捷记忆）
+                if user_input.startswith("#") and len(user_input.strip()) > 1:
+                    try:
+                        from ..utils.claudemd import append_project_memory
+
+                        path = append_project_memory(user_input[1:].strip())
+                        display.console.print(f"[green]已记住（{path}）[/]")
+                    except Exception as mem_err:
+                        display.show_error(f"记忆写入失败：{mem_err}")
+                    continue
+
                 # Handle commands
                 if user_input.startswith("/"):
                     # MCP prompt 斜杠命令（收敛批次②B）：/mcp__<server>__<prompt>
