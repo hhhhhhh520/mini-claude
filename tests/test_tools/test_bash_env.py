@@ -52,7 +52,7 @@ async def test_export_value_with_spaces():
         r2 = await tool.execute("echo %MC_SPACED%")
     else:
         r1 = await tool.execute("export MC_SPACED='two words here'")
-        assert not r1.startswith('Error'), r1
+        assert not r1.startswith("Error"), r1
         r2 = await tool.execute("echo $MC_SPACED")
 
     assert "two words here" in r2, r2[:200]
