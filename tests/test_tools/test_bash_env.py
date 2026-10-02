@@ -36,7 +36,7 @@ async def test_export_persists_across_calls():
         r2 = await tool.execute("echo %MC_TEST_VAR%")
     else:
         r1 = await tool.execute("export MC_TEST_VAR=hello")
-        r2 = await tool.execute("echo $MC_TEST_VAR")
+        r2 = await tool.execute("printenv MC_TEST_VAR")
 
     assert not r1.startswith("Error"), r1
     assert not r2.startswith("Error"), r2
@@ -53,7 +53,7 @@ async def test_export_value_with_spaces():
     else:
         r1 = await tool.execute("export MC_SPACED='two words here'")
         assert not r1.startswith("Error"), r1
-        r2 = await tool.execute("echo $MC_SPACED")
+        r2 = await tool.execute("printenv MC_SPACED")
 
     assert "two words here" in r2, r2[:200]
 

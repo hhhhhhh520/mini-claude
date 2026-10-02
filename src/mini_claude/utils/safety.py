@@ -216,6 +216,14 @@ ALLOWED_COMMANDS: Dict[str, CommandConfig] = {
         "risk_level": "low",
         "description": "Set environment variable (Windows cmd)",
     },
+    "printenv": {
+        # env 持久化的验证/读取路径（无 $ 语法——注入检查拦裸 $VAR，
+        # 放宽与否见 PLAN 待议项；printenv 只读零副作用）
+        "allowed_flags": [],
+        "allowed_args": 1,
+        "risk_level": "low",
+        "description": "Print an environment variable",
+    },
     "pwd": {
         "allowed_flags": [],
         "allowed_args": 0,
