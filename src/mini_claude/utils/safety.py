@@ -439,6 +439,21 @@ SHELL_INJECTION_PATTERNS = [
     r"%[0-9a-fA-F]{2}",  # URL encoding %NN
 ]
 
+# 敏感路径守卫（2026-10-02 拍板）：路径沙箱只约束文件工具，命令通道可读
+# 沙箱外文件（实测模型改道命令通道读到了沙箱外源码）——按"硬拒核心资产"
+# 收口：密钥/凭据类路径出现在命令文本中即拒绝。.env 的 example/sample/
+# template/dist 模板变体放行（无密钥，属合法读写）。检查在白名单之前，
+# RunCommandTool 与 RunBackgroundTool 共用 validate_command 单点生效。
+SENSITIVE_PATH_PATTERNS = [
+    r"\.env(?!\.(?:example|sample|template|dist))\b",  # .env 及 .env.local 等派生（模板变体除外）
+    r"\.ssh\b",
+    r"\bid_rsa\b",
+    r"\bid_ed25519\b",
+    r"mcp-auth",  # MCP OAuth token 落盘目录
+    r"\.pem\b",
+    r"\bcredentials\b",  # .git-credentials / aws credentials 等
+]
+
 
 def _normalize_command(command: str) -> str:
     """Normalize command string to prevent Unicode bypass.
@@ -861,6 +876,17 @@ def validate_command(command: str) -> Tuple[bool, str]:
     for pattern in CONFIRMATION_REQUIRED_PATTERNS:
         if re.search(pattern, command, re.IGNORECASE):
             return False, f"Command requires user confirmation: {pattern}"
+
+    # 敏感路径守卫（2026-10-02 拍板，见 SENSITIVE_PATH_PATTERNS 注释）：
+    # 密钥/凭据类路径禁止经命令通道访问，置于白名单之前优先生效
+    for pattern in SENSITIVE_PATH_PATTERNS:
+        if re.search(pattern, command, re.IGNORECASE):
+            return (
+                False,
+                "命令涉及敏感路径（.env / .ssh / mcp-auth / id_rsa / *.pem / "
+                "credentials 类），已拒绝：密钥与凭据文件禁止经命令通道访问。"
+                "如需读写请使用文件工具（走路径确认通道）。",
+            )
 
     # Try whitelist validation (more secure)
     is_safe, reason = validate_command_v2(command)

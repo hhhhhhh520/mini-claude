@@ -24,6 +24,11 @@
 - `pip install` / `pip3 install` / `pip -r/-e`（含 `python -m pip ...` 形式）— 供应链敞口，进 confirmation（拒+文案，与 `pip uninstall` 对称，ISSUE-019）
 - `python <带目录成分的.py>` 在工作区外拒绝（`validate_path`）；纯文件名放行是刻意保留的旧行为，改白名单时别顺手堵死
 
+### 敏感路径守卫（2026-10-02 拍板）
+
+- `SENSITIVE_PATH_PATTERNS`（safety.py，检查在白名单之前，双命令工具共用 `validate_command` 单点生效）：命令文本命中 `.env`（example/sample/template/dist 模板变体放行）/`.ssh`/`id_rsa`/`id_ed25519`/`mcp-auth`/`*.pem`/`credentials` 即硬拒——密钥与凭据文件禁止经命令通道访问
+- **已知边界（刻意接受，勿"顺手修复"）**：路径沙箱只约束文件工具；命令通道对非敏感的沙箱外文件仍可读（对标本体是权限制而非硬沙箱，REPL 危险命令走 ask 门槛）。`.env` 真密钥已由守卫硬拒；要进一步收紧读面属安全策略变更，需单独评审
+
 ### 文件操作安全
 
 - `/rewind` 的代码回退依赖 `utils/file_history.py` 会话日志：**只有走 `_atomic_write` 的三个工具（write/edit/force_write）被记录**，run_command 等侧门修改与跨会话修改不在恢复范围（诚实边界，勿对外夸大）；日志同路径只记最早一次、回放即消费；`_atomic_write` 里 `record_before_write` 必须在任何写动作之前，且失败静默（旁路设施不弄断写入）

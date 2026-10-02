@@ -103,6 +103,16 @@
 - integration 层：常态/不可达 **157 passed / 1 skipped**
 - ruff check/format 双清；提交前经 git stash 对照证明 test_cli 污染为本次引入并根治
 
+### 附：敏感路径守卫（同日拍板落地）
+
+- 拍板背景：任务 B 复测暴露路径沙箱只约束文件工具，命令通道可读沙箱外文件
+  （模型改道命令通道读到了沙箱外源码；`.env` 真 key 恰在沙箱外）
+- 方案：`SENSITIVE_PATH_PATTERNS`（safety.py，白名单之前单点生效）硬拒
+  `.env`（模板变体放行）/.ssh/id_rsa/id_ed25519/mcp-auth/*.pem/credentials；
+  通用读面缺口如实文档化为已知边界（对标本体是权限制非硬沙箱）
+- 测试：16 条红→绿（拒绝面 10 + 工具层 2 + 放行面 4——放行面只用白名单内命令，
+  type/copy/dir 预存就不在白名单）
+
 ## 2026-10-02 MCP OAuth（http transport，对齐 Claude Code 401 自动授权流）
 
 **范围**：仅 streamable HTTP（stdio 不做 OAuth）；SDK pin 1.x 不变。授权码 + PKCE + 动态客户端注册（RFC 7591）+ 受保护资源发现（RFC 9728，401/WWW-Authenticate 触发）+ 过期刷新全部复用 SDK `OAuthClientProvider`（httpx.Auth），本项目只做三件事：回调交互、token 文件落盘、按配置装配。
