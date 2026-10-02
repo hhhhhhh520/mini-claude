@@ -1,11 +1,13 @@
 """System prompts for different model providers."""
 
+import os
+import platform
 import re
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
-from mini_claude.config.settings import ModelProvider
+from mini_claude.config.settings import ModelProvider, settings
 
 logger = logging.getLogger(__name__)
 
@@ -487,6 +489,119 @@ CORRECT - Use tools instead:
 BASE_PROMPT = _build_base_prompt()
 
 
+def build_env_block() -> str:
+    """构造 <env> 环境事实块（对齐 Claude Code 的 env 注入）。
+
+    2026-10-02 真机实测的教训：系统提示词不含环境信息时，模型会猜工作区
+    路径（/workspace）、在 Windows cmd 里用 ls/pwd，把工具轮数预算全部烧在
+    环境适应上。REPL 图路径与 ask 模式共用 get_system_prompt，env 块在此
+    单点注入。
+    """
+    from ..utils.safety import get_workspace_roots
+
+    roots = get_workspace_roots()
+    primary = roots[0]
+    lines = [
+        "<env>",
+        f"working_directory: {primary}",
+        "  （读写沙箱根：相对路径基于此；沙箱外路径默认需要确认，ask 模式下直接拒绝）",
+    ]
+    if len(roots) > 1:
+        lines.append(f"additional_directories: {', '.join(roots[1:])}")
+    if os.name == "nt":
+        lines.append(
+            "shell: cmd —— 没有 ls/pwd/cat：列目录用 dir，搜索用 findstr，"
+            "跨盘切目录用 cd /d，运行 Python 用 python"
+        )
+    else:
+        lines.append("shell: /bin/sh —— ls/pwd/grep 等常规工具可用")
+    lines.append(f"platform: {platform.system()} {platform.release()}")
+    lines.append("</env>")
+    return "\n".join(lines)
+
+
+def build_system_messages(hook_context: str = "") -> list:
+    """构造前置给 LLM 的系统消息（LiteLLM 格式）：系统提示 + CLAUDE.md + skills + hook 注入.
+
+    刻意**不写入** state["messages"]：messages 字段是 `Annotated[List, add]`
+    累加语义，把系统提示塞进去再由 think 返回全量列表，会导致用户消息被复制、
+    SystemMessage 落到 HumanMessage 之后（见 ISSUE：reducer 消息重复）。
+    系统提示应在每次 LLM 调用时前置，永远完整、永远在最前、不进持久化历史。
+
+    Args:
+        hook_context: UserPromptSubmit hook 注入的回合级上下文（空串=无注入）。
+            与系统提示同一前置通道：每次 LLM 调用都在场、当回合结束即失效
+            （下一轮增量带空串清空），不进持久化历史。
+
+    位置说明：本函数原在 agent/nodes/_shared.py，2026-10-02 迁入——ask 模式
+    接入系统提示时不能拖进 _shared 的导入期 LLMProvider 单例副作用（见
+    _shared 转发层的注释）。
+    """
+    from ..utils.claudemd import load_claude_md
+
+    provider = settings.get_model_provider()
+    system_msgs = [{"role": "system", "content": get_system_prompt(provider)}]
+
+    # Inject CLAUDE.md project/user memory (P1-2)——与 skills 同一通道：
+    # 每次调用前置、不进持久化历史、失效不阻断主链路。
+    if getattr(settings, "claude_md_enabled", False):
+        try:
+            claude_md = load_claude_md(settings.workspace_root)
+            if claude_md:
+                system_msgs.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "以下约定来自 CLAUDE.md（用户级与项目级记忆），"
+                            "在本会话中必须始终遵守：\n\n" + claude_md
+                        ),
+                    }
+                )
+        except Exception as e:
+            logger.debug("claudemd injection failed: %s", e)
+
+    # UserPromptSubmit hook 注入的回合级上下文（P5 对齐 Claude Code）
+    hook_ctx = (hook_context or "").strip()
+    if hook_ctx:
+        system_msgs.append(
+            {
+                "role": "system",
+                "content": ("以下内容来自 UserPromptSubmit hook（仅本回合有效）：\n\n" + hook_ctx),
+            }
+        )
+
+    # Inject skills as a dedicated system message（小模型更关注近期上下文，
+    # 但系统消息本就整体前置，这里保持与旧行为一致的完整 skill 说明）。
+    try:
+        from mini_claude.skills.registry import get_skill_registry
+
+        registry = get_skill_registry()
+        skills = [s for s in registry.list_skills() if s.model_invocable]
+        if skills:
+            parts = [
+                "IMPORTANT: You have the following skills available. "
+                "A skill is a set of specialized instructions you should follow "
+                "when the user's request matches. DO NOT search for skills on disk — "
+                "they are already loaded here:\n"
+            ]
+            for skill in skills:
+                parts.append(f"--- Skill: {skill.name} ---")
+                if skill.description:
+                    parts.append(f"Trigger: {skill.description}")
+                if skill.body:
+                    parts.append(skill.body)
+                parts.append("")
+            parts.append(
+                "To use a skill, tell the user you are following it and apply its instructions. "
+                "You can also suggest the user type /skill <name> to explicitly activate one."
+            )
+            system_msgs.append({"role": "system", "content": "\n".join(parts)})
+    except Exception as e:  # skills 失效不应阻断主链路，但必须可见
+        logger.debug("skills injection failed: %s", e)
+
+    return system_msgs
+
+
 def get_system_prompt(provider: ModelProvider) -> str:
     """Get provider-specific system prompt.
 
@@ -507,6 +622,10 @@ def get_system_prompt(provider: ModelProvider) -> str:
         prompt = prompt.replace("{SKILLS_PLACEHOLDER}", skill_prompt)
     except Exception:
         prompt = prompt.replace("{SKILLS_PLACEHOLDER}", "")
+
+    # 环境事实块（工作区根/OS/shell 习惯）——所有 provider 分支共享，
+    # 必须在分支拼接之前附加，CLAUDE/OpenAI 等各自的追加段才会跟在 env 之后
+    prompt = f"{prompt}\n\n{build_env_block()}"
 
     if provider == ModelProvider.CLAUDE:
         # Claude prefers XML-style instructions

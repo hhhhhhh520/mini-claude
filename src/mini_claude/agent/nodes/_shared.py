@@ -76,81 +76,17 @@ def get_degradation_manager() -> DegradationManager:
 
 
 def build_system_messages(hook_context: str = "") -> list:
-    """构造前置给 LLM 的系统消息（LiteLLM 格式）：系统提示 + CLAUDE.md + skills + hook 注入.
+    """构造前置给 LLM 的系统消息——实现在 llm/prompts.py，此处仅兼容转发。
 
-    刻意**不写入** state["messages"]：messages 字段是 `Annotated[List, add]`
-    累加语义，把系统提示塞进去再由 think 返回全量列表，会导致用户消息被复制、
-    SystemMessage 落到 HumanMessage 之后（见 ISSUE：reducer 消息重复）。
-    系统提示应在每次 LLM 调用时前置，永远完整、永远在最前、不进持久化历史。
-
-    Args:
-        hook_context: UserPromptSubmit hook 注入的回合级上下文（空串=无注入）。
-            与系统提示同一前置通道：每次 LLM 调用都在场、当回合结束即失效
-            （下一轮增量带空串清空），不进持久化历史。
+    历史教训（2026-10-02）：ask 模式在本函数被引入后首次触发 `_shared`
+    导入，恰逢测试把 LLMProvider 打补丁的窗口，模块导入期的
+    `llm_provider = LLMProvider()` 单例初始化把假 provider 铸进了全局，
+    污染后续所有图测试。提示词装配不依赖 LLM 机制，因此整体迁往
+    llm/prompts.py——ask 只依赖 llm 层，_shared 保留转发兼容图路径调用方。
     """
-    provider = settings.get_model_provider()
-    system_msgs = [{"role": "system", "content": get_system_prompt(provider)}]
+    from ...llm.prompts import build_system_messages as _build
 
-    # Inject CLAUDE.md project/user memory (P1-2)——与 skills 同一通道：
-    # 每次调用前置、不进持久化历史、失效不阻断主链路。
-    if getattr(settings, "claude_md_enabled", False):
-        try:
-            from mini_claude.utils.claudemd import load_claude_md
-
-            claude_md = load_claude_md(settings.workspace_root)
-            if claude_md:
-                system_msgs.append(
-                    {
-                        "role": "system",
-                        "content": (
-                            "以下约定来自 CLAUDE.md（用户级与项目级记忆），"
-                            "在本会话中必须始终遵守：\n\n" + claude_md
-                        ),
-                    }
-                )
-        except Exception as e:
-            logger.debug("claudemd injection failed", error=str(e))
-
-    # UserPromptSubmit hook 注入的回合级上下文（P5 对齐 Claude Code）
-    hook_ctx = (hook_context or "").strip()
-    if hook_ctx:
-        system_msgs.append(
-            {
-                "role": "system",
-                "content": ("以下内容来自 UserPromptSubmit hook（仅本回合有效）：\n\n" + hook_ctx),
-            }
-        )
-
-    # Inject skills as a dedicated system message（小模型更关注近期上下文，
-    # 但系统消息本就整体前置，这里保持与旧行为一致的完整 skill 说明）。
-    try:
-        from mini_claude.skills.registry import get_skill_registry
-
-        registry = get_skill_registry()
-        skills = [s for s in registry.list_skills() if s.model_invocable]
-        if skills:
-            parts = [
-                "IMPORTANT: You have the following skills available. "
-                "A skill is a set of specialized instructions you should follow "
-                "when the user's request matches. DO NOT search for skills on disk — "
-                "they are already loaded here:\n"
-            ]
-            for skill in skills:
-                parts.append(f"--- Skill: {skill.name} ---")
-                if skill.description:
-                    parts.append(f"Trigger: {skill.description}")
-                if skill.body:
-                    parts.append(skill.body)
-                parts.append("")
-            parts.append(
-                "To use a skill, tell the user you are following it and apply its instructions. "
-                "You can also suggest the user type /skill <name> to explicitly activate one."
-            )
-            system_msgs.append({"role": "system", "content": "\n".join(parts)})
-    except Exception as e:  # skills 失效不应阻断主链路，但必须可见
-        logger.debug("skills injection failed", error=str(e))
-
-    return system_msgs
+    return _build(hook_context)
 
 
 __all__ = [

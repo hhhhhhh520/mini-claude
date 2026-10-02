@@ -7,8 +7,42 @@ import click
 from dotenv import load_dotenv
 from rich.panel import Panel
 
+from ..config.settings import settings
+from ..tools import execute_tool
 from .display import display
 from .repl import REPLSession
+
+
+async def _execute_ask_tool(tool_name: str, tool_args: dict) -> str:
+    """ask 模式的单工具执行：确认类异常就地翻译成工具错误回流给 LLM。
+
+    ask 无法交互确认——三类确认异常若裸抛会打崩整个工具循环（实测：
+    PathConfirmationRequired 把 run_single 变成顶层"模型调用失败"）。
+    REPL 图路径的对应处理见 agent/nodes/_act_helpers.py（转 WAITING_CONFIRMATION）。
+    """
+    from ..mcp.bridge import McpConfirmationRequired
+    from ..permissions.manager import PermissionAskRequired
+    from ..utils.safety import PathConfirmationRequired
+
+    try:
+        return await execute_tool(tool_name, tool_args)
+    except PathConfirmationRequired as e:
+        return (
+            "工具执行被拒：路径需要用户确认，ask 模式无法交互确认。\n"
+            f"路径：{e.path}\n原因：{e.reason}\n"
+            f"沙箱根（相对路径基于此）：{settings.workspace_root}\n"
+            "请改用沙箱内路径；或在 REPL 模式用 /add-dir 添加该目录后再试。"
+        )
+    except McpConfirmationRequired as e:
+        return (
+            "工具执行被拒：MCP 工具未放行，ask 模式无法交互确认。\n"
+            f"MCP 工具：{e.server}/{e.tool}\n请改用其他工具或方式完成任务。"
+        )
+    except PermissionAskRequired as e:
+        return (
+            "工具执行被拒：权限裁决为 ask，ask 模式无法交互确认。\n"
+            f"工具：{e.tool}（主参数：{e.arg}）\n请改用其他方式，或在 REPL 模式重试。"
+        )
 
 
 def load_environment():
@@ -114,7 +148,7 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
     import json
     import traceback
     from ..llm.provider import LLMProvider, convert_tools_to_litellm
-    from ..tools import get_all_tools, execute_tool
+    from ..tools import get_all_tools
     from ..utils.logger import get_logger
 
     logger = get_logger(__name__)
@@ -280,11 +314,18 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
         tools = get_all_tools()
         litellm_tools = convert_tools_to_litellm(tools)
 
-        messages = [{"role": "user", "content": prompt}]
+        # 系统提示 + CLAUDE.md + skills + <env> 环境块：与 REPL 图路径同源
+        # （build_system_messages）。此前 ask 模式裸奔无系统提示，模型连工作区
+        # 路径/OS 都不知道——实测 10 轮预算全部烧在路径与命令试错上。
+        # 注意：必须从 llm.prompts 导入——agent.nodes._shared 有导入期
+        # LLMProvider 单例副作用，在测试打补丁窗口内导入会污染全局单例。
+        from ..llm.prompts import build_system_messages
+
+        messages = build_system_messages() + [{"role": "user", "content": prompt}]
         hook_context = "\n\n".join(part for part in (start_context, up_context) if part)
         if hook_context:
             messages.insert(
-                0,
+                len(messages) - 1,
                 {
                     "role": "system",
                     "content": f"以下内容来自 hooks（仅本次有效）：\n\n{hook_context}",
@@ -296,7 +337,7 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
             # 工具结果以 role=tool + tool_call_id 回传、后续调用继续带 tools。
             # 旧实现剥 tool_calls + user 文本回传，Qwen 类网关第二轮起丢失
             # 函数调用状态，把 <tool_call> 原生文本当正文输出。
-            max_tool_rounds = 10
+            max_tool_rounds = settings.ask_max_tool_rounds
             rounds = 0
             result_text = ""
             while True:
@@ -313,7 +354,9 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
 
                 rounds += 1
                 if rounds > max_tool_rounds:
-                    result_text = (message.content or "") + "\n（工具调用轮数达到上限，已停止执行）"
+                    result_text = (message.content or "") + (
+                        f"\n（工具调用轮数达到上限 {max_tool_rounds}，已停止执行）"
+                    )
                     break
 
                 messages.append(
@@ -350,7 +393,7 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
 
                     if not output_json:
                         print(f"[Tool] {tool_name}({tool_args})")
-                    result = await execute_tool(tool_name, tool_args)
+                    result = await _execute_ask_tool(tool_name, tool_args)
                     from ..utils.result_clip import clip_tool_result
 
                     result = clip_tool_result(str(result))

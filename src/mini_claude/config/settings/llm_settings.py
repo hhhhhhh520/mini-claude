@@ -87,6 +87,9 @@ class LLMSettings(BaseSettings):
     # 工具结果尺寸上限（收敛批次②C，对齐本体 maxResultSizeChars）：
     # act/ask 两条执行链统一截断超大输出，防止单次失控调用吃满 context
     tool_result_max_chars: int = Field(default=24000)
+    # ask（无头）模式的工具调用轮数预算（2026-10-02：10 连正常的环境恢复
+    # 循环都不够——真机实测 FizzBuzz 任务因路径试错耗尽 10 轮而失败，改 25）
+    ask_max_tool_rounds: int = Field(default=25)
 
     # LLM output settings
     llm_max_tokens: int = Field(default=16384)  # Max output tokens for LLM calls

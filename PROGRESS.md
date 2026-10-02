@@ -1,8 +1,8 @@
 # Mini Claude Code 项目进度
 
 > 创建时间: 2026-04-13
-> 最后更新: 2026-10-02 (MCP OAuth：http server 授权码+PKCE+动态注册，token 落盘自动刷新；
-> 连接失败异常翻译 McpOAuthError/McpConnectError；测试收集 2291，CI 9 job 全绿)
+> 最后更新: 2026-10-02 (双条目：MCP OAuth http transport；任务完成能力实测与四洞修复——
+> ask 接入系统提示词+env 块、确认异常回流、轮数 25。测试收集 2304)
 
 ## 项目概述
 **项目地址**: D:\my project\mini-claude
@@ -63,6 +63,45 @@
 | 低 | reflect_node 异常吞没 | 非关键节点，但应至少记 ERROR 日志 |
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（`observe.py`、`web_fetch.py` 等核心路径优先） |
 | 低 | ~~同步 HTTP~~ | 已结（2026-09-28）：web 三件套全部异步化（httpx 共享 client + to_thread），见当日节 |
+
+## 2026-10-02 任务完成能力实测与四洞修复（ask 模式对齐）
+
+**起因**：2×2 真机实测（qwen3.8-flash，有无环境提示 × FizzBuzz 自验证任务/源码定位任务）
+暴露四个洞——修复前无提示两任务全败（代码一次写对，10 轮预算烧在环境试错上）。
+
+### 四个洞与修复
+
+| 洞 | 修复 |
+|---|---|
+| ① 系统提示词无环境信息（OS/shell/工作区路径）——模型猜 `/workspace`、在 cmd 用 ls/pwd | prompts.py 新增 `build_env_block()`（`<env>`：沙箱根/额外根/OS/shell 习惯），挂进 `get_system_prompt`，REPL 与 ask 同源生效 |
+| ② **ask 模式完全没有系统提示词**（无 BASE_PROMPT/CLAUDE.md/skills） | run_single 改用 `build_system_messages()` 装配（hooks 消息保持独立标注） |
+| ③ 确认类异常在 ask 裸抛炸穿循环（PathConfirmationRequired → 顶层"模型调用失败"） | `_execute_ask_tool` 就地翻译三类确认异常（Path/Mcp/Permission）为可读工具错误：含路径、原因、沙箱根、/add-dir 出路 |
+| ④ max_tool_rounds=10 硬编码，恢复循环预算不足 | settings 新增 `ask_max_tool_rounds`（默认 25），超限提示带具体数字 |
+
+### 修复后真机复测（2×2 全绿）
+
+- 任务 A（FizzBuzz 自验证，无提示）：❌ → ✅ 一次通过（写→跑→验证第15行→汇报）
+- 任务 B（源码定位 result_clip，无提示）：崩溃 → ✅ 沙箱拒绝回流后模型改道
+  临时脚本读取，答出 `_NOTE_RESERVE=120` 等真读过的细节并自清理
+- 注：路径沙箱只约束文件工具，run_command 命令通道可读沙箱外文件——预存边界，非本次引入
+
+### 修②时引入又根治的坑（实踩教训，重要）
+
+- ask 首次 import `agent.nodes._shared` 发生在测试把 `LLMProvider` 打补丁的窗口内，
+  `_shared` **模块导入期**的 `llm_provider = LLMProvider()` 把假 provider 铸进全局单例，
+  污染同进程后续所有图测试（test_cli 20 errors，单跑全过——典型导入序敏感）。
+- **根治**：`build_system_messages` 整体迁往 `llm/prompts.py`（提示词装配不依赖 LLM
+  机制，架构上本就该在那），`_shared` 留薄转发兼容图路径调用方；ask 只依赖 llm 层。
+- 教训：**模块导入期副作用 + 测试补丁窗口 = 跨测试污染**；诊断靠 git stash 对照
+  （先怀疑预存问题、用 stash 证伪）+ 单跑/合跑二分。
+- 另：早前强杀 E2E 压测循环留下的僵尸 python 进程持有锁，曾让 pytest 挂 20 分钟——
+  排查挂死先 `tasklist` 查僵尸进程。
+
+### 实测数字（两层四场景）
+
+- CI 筛选层：常态/不可达 **2219 passed / 44 skipped**（新增 13：env 块 8 + ask 错误语义 5）
+- integration 层：常态/不可达 **157 passed / 1 skipped**
+- ruff check/format 双清；提交前经 git stash 对照证明 test_cli 污染为本次引入并根治
 
 ## 2026-10-02 MCP OAuth（http transport，对齐 Claude Code 401 自动授权流）
 
