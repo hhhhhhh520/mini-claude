@@ -63,6 +63,51 @@
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（`observe.py`、`web_fetch.py` 等核心路径优先） |
 | 低 | ~~同步 HTTP~~ | 已结（2026-09-28）：web 三件套全部异步化（httpx 共享 client + to_thread），见当日节 |
 
+## 2026-10-02 MCP OAuth（http transport，对齐 Claude Code 401 自动授权流）
+
+**范围**：仅 streamable HTTP（stdio 不做 OAuth）；SDK pin 1.x 不变。授权码 + PKCE + 动态客户端注册（RFC 7591）+ 受保护资源发现（RFC 9728，401/WWW-Authenticate 触发）+ 过期刷新全部复用 SDK `OAuthClientProvider`（httpx.Auth），本项目只做三件事：回调交互、token 文件落盘、按配置装配。
+
+### 落地内容
+
+| 项 | 说明 |
+|---|---|
+| config（mcp/config.py） | http server 新增 `auth`：`"oauth"` 简写或 `{"mode": "oauth", "scope", "callback": "local\|paste", "client_name"}`；非法值跳过该 server 并 warning（不静默）；stdio 带 auth 只忽略字段 |
+| token 落盘（mcp/token_store.py） | `FileTokenStorage`——SDK 无关纯 I/O（无 SDK 环境可测），`~/.mini-claude/mcp-auth/<server>.json`，POSIX 0600（Windows 尽力而为），坏 JSON 按空处理；pydantic 模型经 `model_dump` 鸭子兼容，SDK 侧转换在 oauth.py 适配层 |
+| OAuth 适配器（mcp/oauth.py） | `build_oauth_provider`：local 模式起 `McpCallbackServer`（127.0.0.1 临时端口，打印授权 URL，future 在 start() 即建防回跳竞态）等待超时自动转手动粘贴；paste 模式用 OOB（`urn:ietf:wg:oauth:2.0:oob`）全程手动粘贴完整回跳 URL（裸 code 过不了 SDK state 校验）；绑定失败自动回退 paste |
+| manager 接线 | `_open_connection` http+auth 时装配 provider 传 `auth=`，aclose 挂进连接的 AsyncExitStack；`token_home` 可注入（测试不碰真 home）；status() 增加 `auth`/`auth_token` 字段；`/mcp` 状态显示授权标签 |
+| 异常翻译（实测必要） | 授权流/初始化在 SDK 任务组内失败时原始异常被取消风暴顶掉——收口吞次生异常保原始异常 + `_extract_connect_failure` 鸭子特征提取（异常组 3.11 内建/3.10 backport，不能按名 import）+ oauth 侧 `last_error` 记录真实原因 → `McpOAuthError`/`McpConnectError`；纯 CancelledError 也按连接失败呈现（连接阶段无自然取消源），否则穿透 connect_all 炸主链路（实测） |
+
+### 实测数字（两层四场景，最终代码态复测）
+
+- CI 筛选层：常态 **2207 passed / 43 skipped**、不可达模拟 **2207 passed / 43 skipped**（新增 54：config 9 + token_store 13 + oauth 适配器 22 + manager 接线 10）
+- integration 层：常态 **157 passed / 1 skipped**、不可达模拟 **157 passed / 1 skipped**（新增 5：全流程 local 回调 / paste OOB / 过期刷新（expires_in=1 真刷新）/ 用户拒绝快失败 / 无 auth 对 OAuth server 错误隔离）
+- E2E 假 IdP：FastMCP `auth_server_provider` 实现协议 9 方法 + `AuthSettings(issuer_url/resource_server_url)`——SDK 原生挂 /.well-known/PRM、AS metadata、/register、/authorize、/token；"浏览器"由 notify 捕获授权 URL 后真 GET（302 回跳真打到本地回调 server）
+
+### 已知边界（诚实记录）：MCP E2E 家族的跨测试顺序脆弱性
+
+- **现象**：同一 pytest 进程内，先跑"全流程 local 回调"+"过期刷新"两条 E2E（共同点：
+  本地回调 server + 真实工具调用），再连**任何**新 MCP server（哪怕普通无 auth server），
+  initialize 会**永久挂起**（anyio/uvicorn/SDK 收口碎片化，探针证实毒源在 SDK 层而非
+  mini-claude 封装——裸 SDK 复现路径未走通，归属未定论）。
+- **产品侧缓解**：无交互流的 http 连接 initialize 加 30s 上限（`_HTTP_CONNECT_TIMEOUT_SECONDS`）——
+  挂死变 `McpConnectError("连接超时(30s 无进展)")`；带 OAuth 的连接不设限（首次 401 进
+  交互式授权，用户开浏览器可能超 30s）。
+- **触发面评估**：标准两层命令按文件名字母序（test_mcp_http_e2e 在 test_mcp_oauth_e2e
+  **之前**）永不触发该顺序；CI integration job 无 [mcp] SDK，两文件整体跳过。仅手工
+  乱序局部跑两条 E2E 文件可复现。
+- **验证**：毒序 trio 由"永久挂"变为 42s 快速失败；标准两层常态/不可达四场景终态复测全绿。
+
+### 实踩教训
+
+- **SDK `OAuthClientProvider(timeout=...)` 参数只存不用**（1.30 实测）——流程超时必须自己实现（回调 server wait_code 自带超时）
+- **`athrow(): asynchronous generator is already running` + "exit cancel scope in a different task"**：授权流异常（用户拒绝/401）穿过 streamablehttp_client 的 anyio 任务组后，`stack.aclose()` 的次生异常会顶掉原始异常，最终到达调用方的是 `anyio.WouldBlock` 或链式 CancelledError—— hence 上述异常翻译层（ISSUE-029 同族，收口同任务纪律不变）
+- **httpx 1.x 对 302 的 urn Location 无条件做 redirect request 构建**（`follow_redirects=False` 也炸 `InvalidURL`）——测试模拟"浏览器跟到 OOB 地址栏"必须手工 socket GET
+- **FastMCP 服务端 OAuth**：`auth_server_provider` 必须与 `auth=AuthSettings(...)` 同时给（二者缺一 raise）；`resource_server_url` 设置后会自动挂 PRM 路由并在 401 带 WWW-Authenticate
+- **ruff F821 `BaseExceptionGroup`**：项目支持 3.10（异常组是 3.11 内建）——按 `exceptions` 属性鸭子特征识别，勿按名 import backport
+- 回调 server 的 future 必须在 `start()` 创建而非等待时——浏览器回跳可能早于 `callback_handler` 被等待
+- **pytest 管道里 `EXIT=$?` 拿的是 tail 的退出码**——`timeout N pytest | tail` 后判断 124/0 会被骗；探针/排查时要用 `-rf` 或直接看输出
+- 同一进程反复 OAuth 连接后 SDK 任务组可僵死挂住后续 initialize（见上"已知边界"）——无交互路径一律限时，交互路径（浏览器授权）不可限时
+
 ## 2026-09-28 目标批次①：web 三件套异步化 + 白名单去重 + coverage job 激活（对标 Claude Code）
 
 ### 交付

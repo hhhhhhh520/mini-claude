@@ -69,12 +69,24 @@ class McpCommandHandler(CommandHandler):
         for name, info in status.items():
             endpoint = info.get("url") or info.get("command") or ""
             tag = f"[{info.get('transport', 'stdio')}] "
+            auth_tag = self._auth_tag(info)
             if info["connected"]:
                 lines.append(
                     f"  [ok] {name}: {tag}{info['tools']} 个工具"
+                    + auth_tag
                     + ("（trusted）" if info.get("trusted") else "")
                 )
             else:
-                lines.append(f"  [--] {name}: 未连接（{tag}{endpoint}）")
+                lines.append(f"  [--] {name}: 未连接（{tag}{endpoint}）" + auth_tag)
         lines.append("用 /mcp connect <name> 连接，/mcp reload 重载配置。")
         return "\n".join(lines)
+
+    @staticmethod
+    def _auth_tag(info: dict) -> str:
+        """OAuth 状态标签：授权形态 + token 落盘摘要。"""
+        if not info.get("auth"):
+            return ""
+        token = info.get("auth_token")
+        if token and token.get("has_tokens"):
+            return "（oauth，token 已缓存）"
+        return "（oauth，未授权——连接时将发起授权）"

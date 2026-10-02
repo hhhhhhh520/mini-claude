@@ -165,11 +165,12 @@
 - ~~hook 强制确认（ask）~~ / ~~MCP prompts 注册为斜杠命令~~ / ~~Task 清单跨会话落盘~~ / ~~工具结果尺寸统一上限~~ 已完成（2026-09-28 收敛批次②）
 - ~~权限规则工具语法~~ / ~~可定义子代理 agents/*.md~~ / ~~plan 模式审批流~~ / ~~bash cwd 持久化~~ 已完成（2026-09-28 收敛批次③；cwd 版本诚实边界：env 不持久，本体的 shell snapshot 未做）
 - ~~bash env 快照~~（会话级显式 export/set 持久化） / ~~系统提示词调校加厚~~ / ~~CLAUDE.md 记忆快捷面（/memory + #）~~ 已完成（2026-09-28 收敛批次④）
-- 差距清单剩余：MCP OAuth（独立大块，依赖外部授权流）、Agent Teams/ScheduleCronTool（属未做新功能）——**已有功能的深度差距到此收敛完毕**
+- ~~MCP OAuth（http transport）~~ 已完成（2026-10-02：`auth: "oauth"` / dict 形态（scope/callback/client_name）；401 自动触发 SDK 授权码+PKCE+动态注册+RFC 9728 发现，过期自动刷新；本地回环回调 server + OOB 手动粘贴兜底；token 落盘 ~/.mini-claude/mcp-auth/<server>.json（POSIX 0600）；授权失败/拒绝经异常翻译成 McpOAuthError，不阻断其他 server；三层测试——无 SDK 单测 / 真 SDK 单测 / FastMCP+uvicorn 回环 E2E 五场景）
+- 差距清单剩余：Agent Teams/ScheduleCronTool（属未做新功能）——**已有功能对齐 Claude Code 的差距收敛完毕**
 - 待独立评审：注入检查拦裸 $VAR（bash_env 测试因此改走 printenv）——放宽属安全策略变更，需单独评审+测试，勿顺手改
-- `ScheduleCronTool` 定时任务、Agent Teams；MCP OAuth（HTTP transport 已完成）
+- `ScheduleCronTool` 定时任务、Agent Teams
 - ~~CLAUDE.md `@import`~~ 已完成（2026-09-28：@path/@./x/@~/x/@abs 五跳防环 + CLAUDE.local.md）；扩展思考开关（/ultrathink 类）、视觉输入、statusline/主题
-- ~~MCP HTTP transport + resources/prompts~~ 已完成（2026-09-28：`type:http` + url/headers（type 缺省按字段推断，sse 显式拒绝）；resources/prompts 四个全局只读工具，连接时幂等注册；真 FastMCP+uvicorn 回环 E2E；OAuth 未做）
+- ~~MCP HTTP transport + resources/prompts~~ 已完成（2026-09-28：`type:http` + url/headers（type 缺省按字段推断，sse 显式拒绝）；resources/prompts 四个全局只读工具，连接时幂等注册；真 FastMCP+uvicorn 回环 E2E；OAuth 已于 2026-10-02 补齐，见上）
 - ~~Hooks 尾部四事件~~ 已完成（2026-09-28：SessionStart/SessionEnd/PreCompact/SubagentStart，事件面 6→10；SessionStart stdout/additionalContext 注入会话级上下文走 hook_context 通道；均已非阻断）
 - ~~/compact 手动压缩 + PreCompact hook~~ 已完成（2026-09-28：复用 summarize_messages 引擎透传自定义指令；**压缩结果播种新 thread_id**——messages 是裸 add reducer，aupdate_state 无法替换；持久化前修剪孤儿 tool 结果防 ISSUE-026 复发）
 - ~~/add-dir 多工作目录~~ 已完成（2026-09-28：safety.py 多根注册表 `_additional_roots`，validate_path 三处比较点 OR 并入；额外根带 os.sep 守卫防兄弟前缀误放行，主根行为不变）

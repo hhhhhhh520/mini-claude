@@ -12,6 +12,7 @@ SDK 版本纪律：pin 在 1.x（mcp>=1.30.0,<2.0.0）。2.x 改了公开 API
 （FastMCP→MCPServer 等），未验证前不跟。
 """
 
+import asyncio
 from types import SimpleNamespace
 from typing import Dict, List, Optional, Tuple
 
@@ -20,14 +21,47 @@ from ..config.settings import settings
 from ..utils.logger import get_logger
 from .bridge import register_server_tools, unregister_server_tools
 from .config import McpServerConfig, load_mcp_config
+from .token_store import FileTokenStorage
 
 logger = get_logger("mini_claude.mcp.manager")
 
 MCP_CONFIRM_PREFIX = "mcp:"
 
+_HTTP_CONNECT_TIMEOUT_SECONDS = 30.0  # 无交互流 http 连接的 initialize 上限（见 _open_connection）
+
 
 class McpSDKMissingError(RuntimeError):
     """mcp SDK 未安装。"""
+
+
+class McpConnectError(RuntimeError):
+    """MCP server 连接失败（含 OAuth 授权失败）。"""
+
+
+def _extract_connect_failure(e: BaseException) -> Optional[BaseException]:
+    """从连接失败的异常组中提取真实原因。
+
+    授权流/初始化在 SDK 的 anyio 任务组内失败时，原始异常会被取消风暴
+    顶掉并以异常组（含 CancelledError 成员）呈现（实测：401 场景到达
+    调用方的是 WouldBlock→"Cancelled via cancel scope" 链，或含取消成员
+    的异常组）——提取非取消叶子异常作为真实原因；全是取消成员时返回
+    None，由调用方把取消伪装按连接失败呈现（连接阶段无自然取消源，
+    REPL 收口不走本路径）。
+
+    异常组用 exceptions 属性鸭子特征识别（3.11 内建 / 3.10 是
+    exceptiongroup backport，项目要同时支持，不能按名字 import）。
+    """
+    pending: List[BaseException] = [e]
+    while pending:
+        x = pending.pop()
+        sub_excs = getattr(x, "exceptions", None)
+        if isinstance(sub_excs, tuple):
+            pending.extend(sub_excs)
+            continue
+        if isinstance(x, (asyncio.CancelledError, GeneratorExit)):
+            continue
+        return x
+    return None
 
 
 def _approve_key(server: str, tool: str) -> str:
@@ -53,11 +87,12 @@ def approve_confirmation_key(key: str) -> bool:
 class McpManager:
     """MCP server 连接与工具注册的管理器（进程内单例）。"""
 
-    def __init__(self):
+    def __init__(self, token_home=None):
         self._configs: Dict[str, McpServerConfig] = {}
         self._connections: Dict[str, object] = {}
         self._approved: set = set()
         self._config_loaded = False
+        self._token_home = token_home  # OAuth token 落盘根；None → ~/.mini-claude
 
     # ---------- 配置 ----------
 
@@ -100,13 +135,24 @@ class McpManager:
             ) from e
 
         stack = AsyncExitStack()
+        oauth_setup = None  # http+auth 时持有 OAuthSetup（异常翻译用）
         try:
             if cfg.transport == "http":
                 from mcp import ClientSession
                 from mcp.client.streamable_http import streamablehttp_client
 
+                # OAuth：401 触发授权流（SDK httpx.Auth 内建）；失败随连接异常上抛，
+                # 由 connect_all/connect_server 的错误隔离兜住，不阻断其他 server
+                auth_provider = None
+                if cfg.auth is not None:
+                    from .oauth import build_oauth_provider
+
+                    oauth_setup = await build_oauth_provider(cfg, home_dir=self._token_home)
+                    auth_provider = oauth_setup.provider
+                    stack.push_async_callback(oauth_setup.aclose)
+
                 read, write, _get_session_id = await stack.enter_async_context(
-                    streamablehttp_client(cfg.url, headers=cfg.headers or None)
+                    streamablehttp_client(cfg.url, headers=cfg.headers or None, auth=auth_provider)
                 )
             else:
                 from mcp import ClientSession, StdioServerParameters
@@ -118,14 +164,51 @@ class McpManager:
                 read, write = await stack.enter_async_context(stdio_client(params))
 
             session = await stack.enter_async_context(ClientSession(read, write))
-            await session.initialize()
+            if cfg.transport == "http" and oauth_setup is None:
+                # 无交互流的 http 连接限时：SDK 任务组偶发僵死会让 initialize
+                # 永久挂起（实测，同进程内反复连接后触发）——30s 无进展即失败。
+                # 带 OAuth 的连接不限时：首次 401 会进交互式授权（用户开浏览器）。
+                try:
+                    await asyncio.wait_for(
+                        session.initialize(), timeout=_HTTP_CONNECT_TIMEOUT_SECONDS
+                    )
+                except asyncio.TimeoutError as e:
+                    raise McpConnectError(
+                        f"MCP server '{cfg.name}' 连接超时"
+                        f"（{_HTTP_CONNECT_TIMEOUT_SECONDS:.0f}s 无进展），请检查服务端可用性"
+                    ) from e
+            else:
+                await session.initialize()
             tools_result = await session.list_tools()
             return SimpleNamespace(
                 server=cfg.name, session=session, tools=list(tools_result.tools), stack=stack
             )
-        except Exception:
-            await stack.aclose()
-            raise
+        except BaseException as e:  # noqa: BLE001
+            # 收口可能因 anyio 生成器/取消风暴抛次生异常（ISSUE-029 同族，
+            # OAuth 授权流在 initialize 内失败时实测必现）——吞掉次生异常，
+            # 保原始异常为主向外抛
+            try:
+                await stack.aclose()
+            except BaseException as close_err:  # noqa: BLE001
+                logger.warning(
+                    "MCP 连接收口失败",
+                    server=cfg.name,
+                    error=f"{type(close_err).__name__}: {close_err}",
+                )
+            if oauth_setup is not None and oauth_setup.last_error is not None:
+                from .oauth import McpOAuthError
+
+                raise McpOAuthError(
+                    f"MCP server '{cfg.name}' OAuth 授权失败：{oauth_setup.last_error}"
+                ) from e
+            if isinstance(e, McpConnectError):
+                raise  # 超时路径已翻译，直接透传
+            real = _extract_connect_failure(e) or e
+            if isinstance(e, GeneratorExit):
+                raise  # 解释器收口语义不翻译
+            raise McpConnectError(
+                f"MCP server '{cfg.name}' 连接失败：{type(real).__name__}: {real}"
+            ) from e
 
     # ---------- 连接 ----------
 
@@ -205,6 +288,9 @@ class McpManager:
         out: Dict[str, dict] = {}
         for name, cfg in self._configs.items():
             conn = self._connections.get(name)
+            token_summary = None
+            if cfg.auth is not None:
+                token_summary = FileTokenStorage(name, home_dir=self._token_home).snapshot()
             out[name] = {
                 "connected": conn is not None,
                 "tools": len(conn.tools) if conn else 0,
@@ -213,6 +299,8 @@ class McpManager:
                 "command": cfg.command,
                 "url": cfg.url,
                 "error": None,
+                "auth": cfg.auth.mode if cfg.auth else None,
+                "auth_token": token_summary,
             }
         return out
 

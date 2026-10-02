@@ -62,6 +62,8 @@
 - 连接的 stdio 子进程 + anyio 任务非 daemon 级资源：`run_graph` 的 finally 必须调 `close_mcp_connections()`
 - 子代理白名单（两处 ALLOWED_TOOLS）不得加入 mcp__ 工具
 - 放行记录只存会话内存，重启后重新确认——这是刻意设计，别"优化"成持久化
+- **连接失败的异常翻译是红线**：授权流/初始化在 SDK 任务组内失败时，原始异常被取消风暴顶掉（伪装成 "Cancelled via cancel scope" 或含取消成员的异常组）——`_open_connection` 收口必须吞次生异常保原始异常、经 `_extract_connect_failure` 还原真实原因后包成 `McpConnectError`/`McpOAuthError`；裸放 CancelledError 会穿透 connect_all 炸掉主链路（实测）。收口 aclose 只能在进入连接的同一任务里直接 await（ISSUE-029 同族）
+- **OAuth（http server 的 auth 配置）**：复用 SDK `OAuthClientProvider`（PKCE/动态注册/RFC 9728 发现/刷新都在 SDK 内），本项目只做回调交互（mcp/oauth.py：本地回环 server + OOB 粘贴兜底）、token 文件落盘（mcp/token_store.py，SDK 无关纯 I/O）与装配；授权 URL 展示靠 `_default_notify`（可注入）；mcp/token_store.py 与 mcp/oauth.py 顶层不得 import mcp——CI 无 SDK 环境必须可收集
 
 ### Checkpoint 与会话
 

@@ -24,7 +24,7 @@
 - **Skills 系统**：从 `~/.mini-claude/skills/` 加载 SKILL.md，支持 `/skill` 调用和自动匹配
 - **任务清单**：`todo_write` 维护会话 todo；Task v2（`task_create/update/list/get`）支持多任务、依赖边（防环）与委派——主代理 `task_update(owner=<agent_id>)` 指派、子代理认领推进（对齐 Claude Code Task 系统）；清单**跨会话落盘**（`<工作区>/.mini-claude/tasks.json`，重启新会话自动接续，resume 以 checkpoint 为准）
 - **项目记忆**：自动加载 `~/.mini-claude/CLAUDE.md`、工作区 `CLAUDE.md` 与 `CLAUDE.local.md` 作为持久约定；支持 `@path` 引用展开（5 跳防环，含代码文件）（`CLAUDE_MD_ENABLED` 可关）
-- **MCP 支持**：接入 Model Context Protocol 服务器（stdio + streamable HTTP），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道；resources/prompts 经 `mcp_list_resources`/`mcp_read_resource`/`mcp_list_prompts`/`mcp_get_prompt` 只读访问（对齐 Claude Code 生态）
+- **MCP 支持**：接入 Model Context Protocol 服务器（stdio + streamable HTTP），远端工具以 `mcp__<server>__<tool>` 动态注册，默认走确认通道；http server 支持 OAuth 2.0 授权码 + PKCE（401 自动触发、token 落盘自动刷新）；resources/prompts 经 `mcp_list_resources`/`mcp_read_resource`/`mcp_list_prompts`/`mcp_get_prompt` 只读访问（对齐 Claude Code 生态）
 - **Hooks**：PreToolUse/PostToolUse/Stop/UserPromptSubmit/Notification/SubagentStop/SessionStart/SessionEnd/PreCompact/SubagentStart 十事件（对齐 Claude Code 事件面），用户自配 shell 命令（stdin JSON / exit 2 阻断 / replacement 替换 / additionalContext 注入），超时强杀
 - **细粒度权限**：default/accept_edits/plan/bypass 四模式（shift+tab 循环）+ allow/ask/deny 规则——支持 Claude Code 的 `Tool(specifier)` 语法：`run_command(git diff:*)` 命令前缀、`edit_file(src/**)` 路径 glob、`web_fetch(domain:x)` 域名（与遗留 `tool:pattern` 并存），deny > ask > allow > 模式默认；plan 模式配 `exit_plan_mode` 审批流（批准即转执行）
 - **会话回退**：`/rewind` 列出回合边界 checkpoint，支持 `[chat|code|both]` 三种范围——对话分叉重跑之外还能**恢复文件**（write/edit/force_write 的修改按快照时间戳回放：改写恢复、新建删除；会话内日志，侧门修改除外）
@@ -225,12 +225,14 @@ pip install -e ".[mcp]"        # 先装 SDK（pin 1.x）
 {
   "mcpServers": {
     "fs": { "command": "uvx", "args": ["mcp-server-fs"], "trusted": false },
-    "remote": { "type": "http", "url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer ..."} }
+    "remote": { "type": "http", "url": "https://mcp.example.com/mcp", "headers": {"Authorization": "Bearer ..."} },
+    "oauthed": { "type": "http", "url": "https://mcp.example.com/mcp", "auth": "oauth" }
   }
 }
 ```
 
 - **transport**：`type` 缺省时按字段推断（有 `command` → stdio 向后兼容、有 `url` → streamable HTTP）；`headers` 透传（放鉴权头）；`sse` 等其他类型 v1 显式拒绝并提示
+- **OAuth（http server）**：`"auth": "oauth"`（或 `{"mode": "oauth", "scope": "mcp:read", "callback": "local|paste", "client_name": "..."}`）。连接遇 401 自动走 OAuth 2.0 授权码 + PKCE + 动态客户端注册（RFC 7591）+ 受保护资源发现（RFC 9728）：打印授权 URL → 浏览器回跳由本地回环回调 server 接住（`callback: "local"`，等待超时自动转手动粘贴）；`callback: "paste"` 用 OOB redirect_uri 全程手动粘贴完整回跳 URL——SSH/无浏览器环境的兜底路径。token 落盘 `~/.mini-claude/mcp-auth/<server>.json`（POSIX 0600），过期自动刷新，`/mcp` 状态可见授权与 token 摘要；授权失败/拒绝不阻断其他 server
 - **resources/prompts**：server 连接后可用 `mcp_list_resources` / `mcp_read_resource`（server + uri）与 `mcp_list_prompts` / `mcp_get_prompt`（server + name + arguments）只读访问；prompt 可直接作斜杠命令键入——`/mcp__<server>__<prompt> [{json 参数}]` 展开注入输入流（对齐 Claude Code），均不走确认通道
 - **确认通道**：未放行的 MCP 工具调用会暂停等待用户回复 `yes`（会话内放行）；`"trusted": true` 的 server 自动放行
 - **REPL 命令**：`/mcp` 看状态（含 transport 与 endpoint），`/mcp connect <name>` / `disconnect <name>` / `reload` 手动管理

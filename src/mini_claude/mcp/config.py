@@ -24,8 +24,20 @@ from ..utils.logger import get_logger
 logger = get_logger("mini_claude.mcp.config")
 
 _NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
-_VALID_KEYS = {"command", "args", "env", "trusted", "type", "url", "headers"}
+_VALID_KEYS = {"command", "args", "env", "trusted", "type", "url", "headers", "auth"}
 _SUPPORTED_TRANSPORTS = ("stdio", "http")
+_VALID_CALLBACK_MODES = ("local", "paste")
+_DEFAULT_CLIENT_NAME = "mini-claude"
+
+
+@dataclass
+class McpAuthConfig:
+    """http server 的 OAuth 配置（对齐 Claude Code 的 401 自动授权流）。"""
+
+    mode: str = "oauth"  # 目前仅支持 oauth
+    scope: str = ""  # 授权请求的 scope（空 = 不带）
+    callback: str = "local"  # local=本地回调 server（超时转粘贴兜底）；paste=纯手动粘贴
+    client_name: str = _DEFAULT_CLIENT_NAME  # 动态客户端注册展示名
 
 
 @dataclass
@@ -40,6 +52,7 @@ class McpServerConfig:
     transport: str = "stdio"  # stdio | http
     url: str = ""  # http transport 的 endpoint
     headers: Dict[str, str] = field(default_factory=dict)  # http 附加头（如鉴权）
+    auth: Optional[McpAuthConfig] = None  # http 专用：OAuth 启用与形态
 
 
 def _candidate_paths(
@@ -61,6 +74,34 @@ def _parse_servers(data: dict, source: str, warnings: List[str]) -> Dict[str, di
             return {}
         return servers
     return data
+
+
+def _parse_auth(entry: dict) -> Optional[McpAuthConfig]:
+    """解析 auth 字段：未启用返回 None，非法值抛 ValueError（消息面向用户）。"""
+    raw = entry.get("auth")
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        if raw != "oauth":
+            raise ValueError(f'auth 仅支持 "oauth"，得到 {raw!r}')
+        return McpAuthConfig()
+    if isinstance(raw, dict):
+        mode = raw.get("mode", "oauth")
+        if mode != "oauth":
+            raise ValueError(f'auth.mode 仅支持 "oauth"，得到 {mode!r}')
+        scope = raw.get("scope", "")
+        if not isinstance(scope, str):
+            raise ValueError("auth.scope 必须是字符串")
+        callback = raw.get("callback", "local")
+        if callback not in _VALID_CALLBACK_MODES:
+            raise ValueError(
+                f"auth.callback 仅支持 {'/'.join(_VALID_CALLBACK_MODES)}，得到 {callback!r}"
+            )
+        client_name = raw.get("client_name", _DEFAULT_CLIENT_NAME)
+        if not isinstance(client_name, str) or not client_name.strip():
+            raise ValueError("auth.client_name 必须是非空字符串")
+        return McpAuthConfig(mode="oauth", scope=scope, callback=callback, client_name=client_name)
+    raise ValueError(f'auth 必须是 "oauth" 或对象，得到 {type(raw).__name__}')
 
 
 def load_mcp_config(
@@ -129,8 +170,14 @@ def load_mcp_config(
         command = ""
         args: List[str] = []
         env: Dict[str, str] = {}
+        auth: Optional[McpAuthConfig] = None
 
         if transport == "http":
+            try:
+                auth = _parse_auth(entry)
+            except ValueError as e:
+                warnings.append(f"server {name!r} 配置非法：{e}，已跳过")
+                continue
             if not has_url:
                 warnings.append(f"server {name!r} 为 http transport 但缺少 url，已跳过")
                 continue
@@ -146,6 +193,8 @@ def load_mcp_config(
                 continue
             headers = raw_headers
         else:
+            if "auth" in entry:
+                warnings.append(f"server {name!r} 的 auth 仅 http transport 支持，已忽略")
             command = entry.get("command")
             if not isinstance(command, str) or not command.strip():
                 warnings.append(f"server {name!r} 缺少 command，已跳过")
@@ -171,6 +220,7 @@ def load_mcp_config(
             transport=transport,
             url=url,
             headers=headers,
+            auth=auth,
         )
 
     return configs, warnings
