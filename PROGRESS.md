@@ -64,6 +64,24 @@
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（`observe.py`、`web_fetch.py` 等核心路径优先） |
 | 低 | ~~同步 HTTP~~ | 已结（2026-09-28）：web 三件套全部异步化（httpx 共享 client + to_thread），见当日节 |
 
+## 2026-10-03 质量打磨：懒加载单例拔根 + 测试注入缝 + OAuth 手测指南
+
+（上轮遗留的两处小尾巴 + 一份缺失文档，半天清完）
+
+| 项 | 内容 |
+|---|---|
+| `_shared` 导入期单例拔根 | `llm_provider = LLMProvider()` 改懒加载（导入期零构造，首次经 `get_llm_provider()` 取用才创建）；四处按名绑定迁移——_act_helpers/reflect/check_completion/compact_handler 改访问器调用，nodes/__init__ 改 PEP 562 `__getattr__` 懒转发（`nodes.llm_provider` 旧用法与按属性 patch 均兼容，回归锁定）。**2026-10-02 单例污染事故从此在结构上不可能复发** |
+| 测试脆弱模式改造 | test_ask_exit_code 不再全局替换 `LLMProvider` 类（会波及补丁窗口内一切构造点），改 patch cli.main 新增的依赖注入缝 `_build_ask_llm`——进程内与子进程 stub 两条路径同步迁移 |
+| OAuth 手测指南 | 新增 `docs/mcp-oauth-guide.md`（连接真实服务的逐步说明+手测清单+排查表），README 链接；真实服务端点实测核对（GitHub 远程 MCP：未认证 401、PRM 发现端点 200 且为 SDK 回退链覆盖的路径后缀形态） |
+
+### 实测数字
+
+- CI 筛选层：常态/不可达 **2240 passed / 44 skipped**（新增 5：懒加载回归）
+- integration 层：常态/不可达 **157 passed / 1 skipped**
+- 教训：测试里 pop + 重导模块时，导入机制会同时改写**父包属性**——只还原
+  sys.modules 不够，两处都要显式还原，否则 fresh 模块（绑定着补丁类）泄漏
+  给后续用例，重演被测事故本身（本条测试先踩后修）
+
 ## 2026-10-02 任务完成能力实测与四洞修复（ask 模式对齐）
 
 **起因**：2×2 真机实测（qwen3.8-flash，有无环境提示 × FizzBuzz 自验证任务/源码定位任务）

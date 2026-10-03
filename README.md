@@ -232,7 +232,7 @@ pip install -e ".[mcp]"        # 先装 SDK（pin 1.x）
 ```
 
 - **transport**：`type` 缺省时按字段推断（有 `command` → stdio 向后兼容、有 `url` → streamable HTTP）；`headers` 透传（放鉴权头）；`sse` 等其他类型 v1 显式拒绝并提示
-- **OAuth（http server）**：`"auth": "oauth"`（或 `{"mode": "oauth", "scope": "mcp:read", "callback": "local|paste", "client_name": "..."}`）。连接遇 401 自动走 OAuth 2.0 授权码 + PKCE + 动态客户端注册（RFC 7591）+ 受保护资源发现（RFC 9728）：打印授权 URL → 浏览器回跳由本地回环回调 server 接住（`callback: "local"`，等待超时自动转手动粘贴）；`callback: "paste"` 用 OOB redirect_uri 全程手动粘贴完整回跳 URL——SSH/无浏览器环境的兜底路径。token 落盘 `~/.mini-claude/mcp-auth/<server>.json`（POSIX 0600），过期自动刷新，`/mcp` 状态可见授权与 token 摘要；授权失败/拒绝不阻断其他 server
+- **OAuth（http server）**：`"auth": "oauth"`（或 `{"mode": "oauth", "scope": "mcp:read", "callback": "local|paste", "client_name": "..."}`）。连接遇 401 自动走 OAuth 2.0 授权码 + PKCE + 动态客户端注册（RFC 7591）+ 受保护资源发现（RFC 9728）：打印授权 URL → 浏览器回跳由本地回环回调 server 接住（`callback: "local"`，等待超时自动转手动粘贴）；`callback: "paste"` 用 OOB redirect_uri 全程手动粘贴完整回跳 URL——SSH/无浏览器环境的兜底路径。token 落盘 `~/.mini-claude/mcp-auth/<server>.json`（POSIX 0600），过期自动刷新，`/mcp` 状态可见授权与 token 摘要；授权失败/拒绝不阻断其他 server。连接真实服务的逐步手测指南见 [docs/mcp-oauth-guide.md](docs/mcp-oauth-guide.md)
 - **resources/prompts**：server 连接后可用 `mcp_list_resources` / `mcp_read_resource`（server + uri）与 `mcp_list_prompts` / `mcp_get_prompt`（server + name + arguments）只读访问；prompt 可直接作斜杠命令键入——`/mcp__<server>__<prompt> [{json 参数}]` 展开注入输入流（对齐 Claude Code），均不走确认通道
 - **确认通道**：未放行的 MCP 工具调用会暂停等待用户回复 `yes`（会话内放行）；`"trusted": true` 的 server 自动放行
 - **REPL 命令**：`/mcp` 看状态（含 transport、endpoint 与 OAuth/token 摘要），`/mcp connect <name>` / `disconnect <name>` / `reload` 手动管理

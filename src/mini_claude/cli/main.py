@@ -45,6 +45,17 @@ async def _execute_ask_tool(tool_name: str, tool_args: dict) -> str:
         )
 
 
+def _build_ask_llm(model: Optional[str] = None):
+    """ask 链路的 LLM 构造缝（依赖注入点）。
+
+    测试经 monkeypatch 本函数注入 fake，而不是全局替换 LLMProvider 类——
+    类替换会波及补丁窗口内的一切构造点（2026-10-02 导入期单例事故的根源）。
+    """
+    from ..llm.provider import LLMProvider
+
+    return LLMProvider(model=model)
+
+
 def load_environment():
     """Load environment variables."""
     load_dotenv()
@@ -147,7 +158,7 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
     """
     import json
     import traceback
-    from ..llm.provider import LLMProvider, convert_tools_to_litellm
+    from ..llm.provider import convert_tools_to_litellm
     from ..tools import get_all_tools
     from ..utils.logger import get_logger
 
@@ -268,7 +279,7 @@ def ask(ctx, prompt: str, model: Optional[str], output_json: bool, full: bool):
             await _cleanup_background()
 
     async def run_single():
-        llm = LLMProvider(model)
+        llm = _build_ask_llm(model)
 
         # SessionStart hook（P5 尾部事件）：ask 的一次执行即一个会话，
         # 与 REPL 同语义——非阻断，stdout/additionalContext 并入本次上下文

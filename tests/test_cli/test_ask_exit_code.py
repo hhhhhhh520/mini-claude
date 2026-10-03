@@ -47,11 +47,15 @@ def _invoke_ask(provider_cls):
     `init_logging()` 会重配 root logger，使后续用例的 caplog 收不到日志；
     `load_dotenv()` 会把 .env 写进 os.environ。二者都与「退出码」无关，
     真实路径（含这两个副作用）由下面的子进程用例覆盖。
+
+    注入方式：patch cli.main 的 LLM 构造缝 `_build_ask_llm`——不全局替换
+    LLMProvider 类，类替换会波及补丁窗口内的一切构造点（2026-10-02
+    导入期单例事故的根源，2026-10-03 改依赖注入）。
     """
     with (
         patch("mini_claude.cli.main.init_logging"),
         patch("mini_claude.cli.main.load_environment"),
-        patch("mini_claude.llm.provider.LLMProvider", provider_cls),
+        patch("mini_claude.cli.main._build_ask_llm", lambda model=None: provider_cls()),
     ):
         return CliRunner().invoke(main, ["ask", "说 ok"])
 
@@ -87,14 +91,14 @@ class TestAskExitCode:
 
 
 _PROCESS_STUB = """
-from unittest.mock import patch
-
-from mini_claude.cli.main import main
+import mini_claude.cli.main as _cli
 
 {provider}
 
-with patch("mini_claude.llm.provider.LLMProvider", _Provider):
-    main(["ask", "hi"])
+# 经依赖注入缝替换 LLM 构造（不全局替换 LLMProvider 类）
+_cli._build_ask_llm = lambda model=None: _Provider()
+
+_cli.main(["ask", "hi"])
 """
 
 _FAILING_PROVIDER_SNIPPET = """

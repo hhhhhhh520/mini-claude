@@ -115,14 +115,14 @@ async def compact_session(
         pass
 
     from ...agent.nodes._act_helpers import convert_message, setup_token_counter
-    from ...agent.nodes._shared import llm_provider
+    from ...agent.nodes._shared import get_llm_provider
 
     token_counter = setup_token_counter()
     litellm_messages = [convert_message(m) for m in messages]
     before_tokens = token_counter.count_messages_tokens(litellm_messages)
 
     async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:
-        return await llm_provider.chat(messages=messages, **kwargs)
+        return await get_llm_provider().chat(messages=messages, **kwargs)
 
     try:
         summarized, _summary_text = await token_counter.summarize_messages(

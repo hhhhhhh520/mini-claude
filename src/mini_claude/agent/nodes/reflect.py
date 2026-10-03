@@ -149,9 +149,9 @@ async def reflect_node(state: AgentState) -> dict:
 }}"""
 
         try:
-            from ._shared import llm_provider
+            from ._shared import get_llm_provider
 
-            response = await llm_provider.chat(
+            response = await get_llm_provider().chat(
                 messages=[{"role": "user", "content": reflection_prompt}],
                 temperature=0.3,
             )

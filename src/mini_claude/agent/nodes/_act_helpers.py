@@ -12,7 +12,7 @@ from ._shared import (
     PathConfirmationRequired,
     settings,
     logger,
-    llm_provider,
+    get_llm_provider,
 )
 from ...mcp.bridge import McpConfirmationRequired
 from ...permissions.manager import PermissionAskRequired, PlanApprovalRequired
@@ -110,7 +110,7 @@ async def handle_token_budget(
             try:
 
                 async def llm_chat_for_summary(messages: List[Dict], **kwargs) -> Dict:
-                    return await llm_provider.chat(messages=messages, **kwargs)
+                    return await get_llm_provider().chat(messages=messages, **kwargs)
 
                 summarized, summary_text = await token_counter.summarize_messages(
                     litellm_messages,

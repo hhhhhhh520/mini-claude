@@ -38,7 +38,7 @@ async def session_with_graph(tmp_path, monkeypatch):
     from mini_claude.agent.state import create_turn_increment
     from mini_claude.config.settings import settings
 
-    provider = _shared.llm_provider
+    provider = _shared.get_llm_provider()
 
     async def fake_chat(*a, **k):
         return _fake_llm_response("好")

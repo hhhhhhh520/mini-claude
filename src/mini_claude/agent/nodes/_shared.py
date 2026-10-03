@@ -27,16 +27,23 @@ from .exceptions import ToolExecutionError, ToolTimeoutError, ToolParameterError
 # Module logger
 logger = get_logger("mini_claude.agent.nodes")
 
-# Initialize LLM provider
-llm_provider = LLMProvider()
+# LLM provider 单例——懒加载（2026-10-03 拔除导入期副作用）：
+# 此前模块导入期即 `LLMProvider()`，ask 在测试把 LLMProvider 打补丁的窗口内
+# 首次导入 _shared 时会把假 provider 铸进全局，污染同进程后续图测试
+# （实测 20 errors，单跑全过——导入序敏感）。导入期零构造，首次取用才创建。
+llm_provider: Optional[LLMProvider] = None
 
 
-def get_llm_provider():
-    """取当前 LLM provider 实例（P4-4）。
+def get_llm_provider() -> LLMProvider:
+    """取当前 LLM provider 实例（P4-4；懒加载）。
 
     act 等模块不得在 import 期按名绑定 llm_provider——/model 热切换会重建
-    单例，按名绑定会失联（ISSUE-024 同款教训）。统一经本访问器取。
+    单例，按名绑定会失联（ISSUE-024 同款教训）；懒加载后按名绑定更会拿到
+    None。统一经本访问器取。
     """
+    global llm_provider
+    if llm_provider is None:
+        llm_provider = LLMProvider()
     return llm_provider
 
 

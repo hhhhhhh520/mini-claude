@@ -39,8 +39,20 @@ from .check_completion import check_completion_node
 from .error_handling import handle_error_node
 from .retry import retry_node
 
-# Re-export llm_provider for backward compatibility with tests
-from ._shared import llm_provider
+
+def __getattr__(name: str):
+    """llm_provider 懒加载兼容面（PEP 562）。
+
+    单例改懒加载后导入期不再有实例，模块级 `from ._shared import llm_provider`
+    会固化 None——经模块 __getattr__ 转发到访问器，`nodes.llm_provider` 与
+    `from mini_claude.agent.nodes import llm_provider` 的旧用法保持有效
+    （monkeypatch.setattr(nodes, "llm_provider", ...) 设真属性后同样优先生效）。
+    """
+    if name == "llm_provider":
+        from ._shared import get_llm_provider
+
+        return get_llm_provider()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # =============================================================================

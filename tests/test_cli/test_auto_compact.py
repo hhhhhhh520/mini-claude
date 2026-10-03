@@ -18,7 +18,7 @@ async def session_with_graph(tmp_path, monkeypatch):
     from mini_claude.agent.state import create_turn_increment
     from mini_claude.config.settings import settings
 
-    provider = _shared.llm_provider
+    provider = _shared.get_llm_provider()
     msg = SimpleNamespace(content="好", tool_calls=None)
     response = SimpleNamespace(
         choices=[SimpleNamespace(message=msg)],

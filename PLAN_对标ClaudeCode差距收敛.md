@@ -168,6 +168,7 @@
 - ~~MCP OAuth（http transport）~~ 已完成（2026-10-02：`auth: "oauth"` / dict 形态（scope/callback/client_name）；401 自动触发 SDK 授权码+PKCE+动态注册+RFC 9728 发现，过期自动刷新；本地回环回调 server + OOB 手动粘贴兜底；token 落盘 ~/.mini-claude/mcp-auth/<server>.json（POSIX 0600）；授权失败/拒绝经异常翻译成 McpOAuthError，不阻断其他 server；三层测试——无 SDK 单测 / 真 SDK 单测 / FastMCP+uvicorn 回环 E2E 五场景）
 - ~~任务完成能力四洞修复~~（2026-10-02 实测驱动）：①系统提示词注入 `<env>` 环境块（沙箱根/OS/shell 习惯，对齐本体 env 注入）②ask 模式接入完整系统消息（此前无系统提示词）③确认类异常翻译成工具错误回流（原 PathConfirmationRequired 炸穿 ask 循环）④ask 轮数预算 10→25 可配置。真机 2×2 复测：FizzBuzz 任务 ❌→✅、源码定位任务 崩溃→✅；附代根治 build_system_messages 迁移出 `_shared` 导入期单例副作用
 - ~~敏感路径守卫~~（2026-10-02 拍板）：命令通道硬拒密钥/凭据路径（.env 模板变体放行/.ssh/mcp-auth/id_rsa/*.pem/credentials，白名单之前单点生效）；通用读面缺口文档化为已知边界
+- ~~质量打磨小尾巴~~（2026-10-03）：`_shared` 导入期单例拔根（懒加载+四处绑定迁移+PEP 562 兼容面）；test_ask_exit_code 改依赖注入缝 `_build_ask_llm`（不再全局替换 LLMProvider 类）；新增 docs/mcp-oauth-guide.md 手测指南（GitHub 远程 MCP 端点实测核对）
 - 差距清单剩余：Agent Teams/ScheduleCronTool（属未做新功能）——**已有功能对齐 Claude Code 的差距收敛完毕**
 - 待独立评审：注入检查拦裸 $VAR（bash_env 测试因此改走 printenv）——放宽属安全策略变更，需单独评审+测试，勿顺手改
 - `ScheduleCronTool` 定时任务、Agent Teams
