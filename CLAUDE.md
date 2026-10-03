@@ -70,7 +70,8 @@
 - **连接失败的异常翻译是红线**：授权流/初始化在 SDK 任务组内失败时，原始异常被取消风暴顶掉（伪装成 "Cancelled via cancel scope" 或含取消成员的异常组）——`_open_connection` 收口必须吞次生异常保原始异常、经 `_extract_connect_failure` 还原真实原因后包成 `McpConnectError`/`McpOAuthError`；裸放 CancelledError 会穿透 connect_all 炸掉主链路（实测）。收口 aclose 只能在进入连接的同一任务里直接 await（ISSUE-029 同族）
 - **OAuth（http server 的 auth 配置）**：复用 SDK `OAuthClientProvider`（PKCE/动态注册/RFC 9728 发现/刷新都在 SDK 内），本项目只做回调交互（mcp/oauth.py：本地回环 server + OOB 粘贴兜底）、token 文件落盘（mcp/token_store.py，SDK 无关纯 I/O）与装配；授权 URL 展示靠 `_default_notify`（可注入）；mcp/token_store.py 与 mcp/oauth.py 顶层不得 import mcp——CI 无 SDK 环境必须可收集
 
-- **ask 模式与 REPL 共用系统消息装配**：`build_system_messages` 在 `llm/prompts.py`（含 `<env>` 环境块：沙箱根/OS/shell 习惯）。**严禁从 `agent.nodes._shared` 导入**——`_shared` 有模块导入期 `LLMProvider()` 单例副作用，在测试打补丁窗口内被首次导入会把假 provider 铸进全局、污染后续所有图测试（2026-10-02 实测 20 errors）
+- **ask 模式与 REPL 共用系统消息装配**：`build_system_messages` 在 `llm/prompts.py`（含 `<env>` 环境块：沙箱根/OS/shell 习惯）。ask/cli 层从这里导入，**不得从 `agent.nodes._shared` 导入**——那是 agent 层内部件，层级错位（它曾有导入期 LLMProvider 单例副作用并引发跨测试污染，2026-10-03 已改懒加载拔根，红线保留为层级纪律）
+- **`llm_provider` 是懒加载单例（2026-10-03）**：任何模块**不得在 import 期按名绑定** `from ._shared import llm_provider`——懒加载下绑到的是 None，运行即炸；必须经 `get_llm_provider()` 访问器取用（/model 热切换重建单例，ISSUE-024 同款纪律）。测试注入走 `cli.main._build_ask_llm` 缝或按属性 patch `_shared.llm_provider`，不全局替换 LLMProvider 类
 - 确认类异常（PathConfirmationRequired/McpConfirmationRequired/PermissionAskRequired）在 ask 模式经 `_execute_ask_tool` 翻译成可读工具错误回流 LLM——ask 无法交互确认，裸抛即炸循环
 
 ### Checkpoint 与会话
