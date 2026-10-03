@@ -64,6 +64,22 @@
 | 低 | 无测试覆盖模块 | ~15 个源模块无测试（`observe.py`、`web_fetch.py` 等核心路径优先） |
 | 低 | ~~同步 HTTP~~ | 已结（2026-09-28）：web 三件套全部异步化（httpx 共享 client + to_thread），见当日节 |
 
+## 2026-10-03 定时 CI flaky 排查：OAuth 刷新测试去时钟竞态
+
+- **现象**：schedule 触发的 CI（ubuntu 3.11）`test_oauth_refresh_after_expiry` 失败
+  （McpConnectError：取消风暴 CancelledError），同提交同 job 的 push 运行是绿的——flaky
+- **根因**：刷新测试用 `expires_in=1` 短命 token + sleep 1.4s。CI 慢机上**连接阶段本身
+  超过 1 秒**，token 在连接中途过期 → 强行触发"连接内刷新" → 恰好踩进 ISSUE-030
+  取消风暴高发窗口（同轮长命 token 的全流程测试全过，完全吻合）
+- **修复**：连接阶段用长命 token（expires_in=3600），刷新由**确定性拨表**触发——
+  manager 把 `oauth_setup` 挂到连接对象（测试可达），测试直接把
+  `provider.context.token_expiry_time` 拨到过去（1.30 公开属性，constraints 锁 1.30）；
+  删掉 sleep 与短命 token，稳定性实测 5/5
+- **附带更正**：两个 MCP E2E 文件头"CI 不装 [mcp] extra：importorskip 跳过"的说法
+  过期——`mcp`/`uvicorn` 早已在 `[dev]` extra 里，**CI 全矩阵一直真跑这些 E2E**；
+  importorskip 仅是无 SDK 环境的兜底
+- 数字：两层四场景 **2240 + 157** 同数全绿；ruff 双清
+
 ## 2026-10-03 质量打磨：懒加载单例拔根 + 测试注入缝 + OAuth 手测指南
 
 （上轮遗留的两处小尾巴 + 一份缺失文档，半天清完）

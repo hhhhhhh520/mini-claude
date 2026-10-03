@@ -7,7 +7,8 @@ SDK 原生挂 /.well-known/oauth-protected-resource、/.well-known/oauth-authori
 客户端：走 mini_claude 真连接链路（config → manager → oauth 适配器 → SDK
 OAuthClientProvider），浏览器由测试模拟（notify 捕获授权 URL 后真 GET）。
 
-CI 不装 [mcp] extra：importorskip 整文件跳过；本地两层验证必跑。
+mcp/uvicorn 在 [dev] extra 里，CI 全矩阵真跑本文件（每矩阵约 30s）；
+importorskip 仅作无 SDK 环境的兜底。
 """
 
 import asyncio
@@ -333,8 +334,15 @@ async def test_oauth_paste_mode_with_oob(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_oauth_refresh_after_expiry(tmp_path, monkeypatch):
-    """过期刷新：expires_in=1 的 token 在下一次请求前被 SDK 自动刷新。"""
-    base, provider, server, task = await _start_oauth_server(expires_in=1)
+    """过期刷新：把 SDK 本地令牌到期时间拨到过去，下一次请求前自动刷新。
+
+    刻意不用 expires_in=1 + sleep 的真实时钟竞态——CI 慢机上连接阶段本身
+    超过 1 秒会强行触发"连接内刷新"，踩进 ISSUE-030 取消风暴高发窗口
+    （2026-10-03 定时 CI 实测 flaky：push 绿、schedule 红）。连接阶段用
+    长命 token，刷新由确定性拨表触发（provider.context 是 1.30 的公开
+    属性，constraints 锁 1.30）。
+    """
+    base, provider, server, task = await _start_oauth_server()
     try:
         _write_config(tmp_path, f"{base}/mcp", "oauth")
         configs, _ = load_mcp_config(workspace_root=tmp_path)
@@ -358,7 +366,11 @@ async def test_oauth_refresh_after_expiry(tmp_path, monkeypatch):
         store = FileTokenStorage("remote", home_dir=tmp_path / "home")
         first_token = (await store.get_tokens())["access_token"]
 
-        await asyncio.sleep(1.4)  # token A 过期（寿命 1s）
+        # 拨表：SDK 本地到期时间拨到过去 → is_token_valid()=False 且
+        # can_refresh_token()=True → 下一次请求前走刷新路径
+        conn = mgr._connections["remote"]
+        conn.oauth_setup.provider.context.token_expiry_time = time.time() - 1
+
         assert await execute_tool("mcp__remote__echo", {"text": "hi"}) == "hi"
 
         assert provider.calls.get("exchange_refresh_token") == 1, "过期后必须走刷新而非重新授权"

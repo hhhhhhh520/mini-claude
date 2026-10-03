@@ -4,7 +4,8 @@
 走完整链路：HTTP 连接 → 工具发现 → 桥接注册 → 放行 → 调用 →
 resources/prompts 读取 → 断连。
 
-CI 不装 [mcp] extra：importorskip 整文件跳过；本地两层验证必跑。
+mcp/uvicorn 在 [dev] extra 里，CI 全矩阵真跑本文件；
+importorskip 仅作无 SDK 环境的兜底。
 """
 
 import asyncio

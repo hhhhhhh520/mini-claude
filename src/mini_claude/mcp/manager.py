@@ -181,7 +181,11 @@ class McpManager:
                 await session.initialize()
             tools_result = await session.list_tools()
             return SimpleNamespace(
-                server=cfg.name, session=session, tools=list(tools_result.tools), stack=stack
+                server=cfg.name,
+                session=session,
+                tools=list(tools_result.tools),
+                stack=stack,
+                oauth_setup=oauth_setup,  # 测试/诊断可达 provider（如拨表测刷新）
             )
         except BaseException as e:  # noqa: BLE001
             # 收口可能因 anyio 生成器/取消风暴抛次生异常（ISSUE-029 同族，
